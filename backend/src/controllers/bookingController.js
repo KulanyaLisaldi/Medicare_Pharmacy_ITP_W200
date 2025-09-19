@@ -231,4 +231,37 @@ export async function rescheduleBooking(req, res) {
     }
 }
 
+// Admin: delete booking (remove from appointments table)
+export async function deleteBooking(req, res) {
+    try {
+        const { id } = req.params;
+        
+        // Find the booking first to get appointment details
+        const booking = await Booking.findById(id);
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+        
+        // Delete the booking
+        await Booking.findByIdAndDelete(id);
+        
+        // Update appointment slot availability if the booking was confirmed
+        if (booking.status === 'confirmed' || booking.status === 'pending') {
+            const appointment = await Appointment.findById(booking.appointmentId);
+            if (appointment) {
+                appointment.bookedCount = Math.max(0, appointment.bookedCount - 1);
+                if (appointment.status === 'fully_booked') {
+                    appointment.status = 'active';
+                }
+                await appointment.save();
+            }
+        }
+        
+        return res.status(200).json({ message: 'Booking deleted successfully' });
+    } catch (error) {
+        console.error('Error in deleteBooking', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
 

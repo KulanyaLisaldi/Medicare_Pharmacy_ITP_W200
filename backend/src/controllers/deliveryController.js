@@ -267,3 +267,90 @@ export const getOrderDetails = async (req, res) => {
     return res.status(500).json({ message: 'Failed to fetch order details' });
   }
 };
+
+// Get delivery statistics for dashboard
+export const getDeliveryStats = async (req, res) => {
+  try {
+    const deliveryAgentId = req.userId;
+    
+    // Get active deliveries count (accepted orders with picked_up status)
+    const activeDeliveriesCount = await DeliveryAssignment.countDocuments({
+      deliveryAgent: deliveryAgentId,
+      status: 'picked_up'
+    });
+
+    // Get completed deliveries today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const completedTodayCount = await DeliveryAssignment.countDocuments({
+      deliveryAgent: deliveryAgentId,
+      status: 'delivered',
+      deliveredAt: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    // Get pending assignments (assigned but not picked up yet)
+    const pendingCount = await DeliveryAssignment.countDocuments({
+      deliveryAgent: deliveryAgentId,
+      status: { $in: ['assigned', 'accepted'] }
+    });
+
+    // Calculate today's earnings (mock calculation - you might want to implement actual earnings logic)
+    const todayEarnings = completedTodayCount * 15; // Assuming Rs.15 per delivery
+
+    return res.status(200).json({
+      activeDeliveries: activeDeliveriesCount,
+      completedToday: completedTodayCount,
+      pending: pendingCount,
+      todayEarnings: todayEarnings
+    });
+  } catch (err) {
+    console.error('getDeliveryStats error:', err);
+    return res.status(500).json({ message: 'Failed to fetch delivery statistics' });
+  }
+};
+
+// Get recent assigned deliveries for dashboard
+export const getRecentDeliveries = async (req, res) => {
+  try {
+    const deliveryAgentId = req.userId;
+    
+    // Get recent assignments (last 10) with populated order and user data
+    const recentDeliveries = await DeliveryAssignment.find({
+      deliveryAgent: deliveryAgentId,
+      status: { $in: ['assigned', 'accepted', 'picked_up', 'delivered', 'failed'] }
+    })
+    .populate({
+      path: 'order',
+      populate: {
+        path: 'user',
+        select: 'firstName lastName phone'
+      }
+    })
+    .sort({ createdAt: -1 })
+    .limit(10);
+
+    // Format the response with relevant information
+    const formattedDeliveries = recentDeliveries.map(assignment => ({
+      _id: assignment._id,
+      orderId: assignment.order?._id,
+      customerName: `${assignment.order?.user?.firstName || ''} ${assignment.order?.user?.lastName || ''}`.trim(),
+      address: assignment.order?.customer?.address || 'N/A',
+      status: assignment.status,
+      assignedAt: assignment.assignedAt,
+      pickedUpAt: assignment.pickedUpAt,
+      deliveredAt: assignment.deliveredAt,
+      createdAt: assignment.createdAt
+    }));
+
+    return res.status(200).json(formattedDeliveries);
+  } catch (err) {
+    console.error('getRecentDeliveries error:', err);
+    return res.status(500).json({ message: 'Failed to fetch recent deliveries' });
+  }
+};
