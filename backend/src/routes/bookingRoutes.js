@@ -1,5 +1,5 @@
 import express from 'express';
-import { createBooking, listBookings, bookingStats, rescheduleBooking, getUserBookings, cancelUserBooking } from '../controllers/bookingController.js';
+import { createBooking, listBookings, bookingStats, rescheduleBooking, getUserBookings, cancelUserBooking, deleteBooking } from '../controllers/bookingController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -16,6 +16,7 @@ router.use(authenticateToken, requireAdmin);
 router.get('/', listBookings);
 router.get('/stats', bookingStats);
 router.patch('/:id', rescheduleBooking);
+router.delete('/:id', deleteBooking);
 
 export default router;
 

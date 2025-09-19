@@ -5,6 +5,16 @@ import { useAuth } from '../../context/AuthContext'
 
 const DeliveryDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
+	const [deliveryStats, setDeliveryStats] = useState({
+		activeDeliveries: 0,
+		completedToday: 0,
+		pending: 0,
+		todayEarnings: 0
+	})
+	const [statsLoading, setStatsLoading] = useState(true)
+	const [recentDeliveries, setRecentDeliveries] = useState([])
+	const [recentDeliveriesLoading, setRecentDeliveriesLoading] = useState(true)
+	const { token } = useAuth()
 
 	const sidebar = [
 		{ id: 'overview', label: 'Overview', icon: '🏠' },
@@ -14,36 +24,145 @@ const DeliveryDashboard = () => {
 		{ id: 'messages', label: 'Messages', icon: '💬' },
 	]
 
+	const fetchDeliveryStats = async () => {
+		try {
+			setStatsLoading(true)
+			const res = await fetch('http://localhost:5001/api/delivery/stats', {
+				headers: { 'Authorization': `Bearer ${token}` }
+			})
+			const data = await res.json()
+			if (res.ok) {
+				setDeliveryStats(data)
+			} else {
+				console.error('Failed to fetch delivery stats:', data.message)
+			}
+		} catch (error) {
+			console.error('Error fetching delivery stats:', error)
+		} finally {
+			setStatsLoading(false)
+		}
+	}
+
+	const fetchRecentDeliveries = async () => {
+		try {
+			setRecentDeliveriesLoading(true)
+			const res = await fetch('http://localhost:5001/api/delivery/recent', {
+				headers: { 'Authorization': `Bearer ${token}` }
+			})
+			const data = await res.json()
+			if (res.ok) {
+				setRecentDeliveries(data)
+			} else {
+				console.error('Failed to fetch recent deliveries:', data.message)
+			}
+		} catch (error) {
+			console.error('Error fetching recent deliveries:', error)
+		} finally {
+			setRecentDeliveriesLoading(false)
+		}
+	}
+
+	const fetchAllData = async () => {
+		await Promise.all([fetchDeliveryStats(), fetchRecentDeliveries()])
+	}
+
+	const getStatusBadgeColor = (status) => {
+		switch (status) {
+			case 'assigned':
+				return 'bg-purple-100 text-purple-800'
+			case 'accepted':
+				return 'bg-indigo-100 text-indigo-800'
+			case 'picked_up':
+				return 'bg-yellow-100 text-yellow-800'
+			case 'delivered':
+				return 'bg-green-100 text-green-800'
+			case 'failed':
+				return 'bg-red-100 text-red-800'
+			default:
+				return 'bg-gray-100 text-gray-800'
+		}
+	}
+
+	const getStatusText = (status) => {
+		switch (status) {
+			case 'assigned':
+				return 'Assigned'
+			case 'accepted':
+				return 'Accepted'
+			case 'picked_up':
+				return 'Picked Up'
+			case 'delivered':
+				return 'Delivered'
+			case 'failed':
+				return 'Failed'
+			default:
+				return status
+		}
+	}
+
+	const formatDate = (dateString) => {
+		if (!dateString) return 'N/A'
+		const date = new Date(dateString)
+		return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+	}
+
+	useEffect(() => {
+		if (token) {
+			fetchAllData()
+		}
+	}, [token])
+
 	const renderSection = () => {
 		switch (activeSection) {
 			case 'overview':
 				return (
 					<div className="delivery-overview">
+						{/* Header with refresh button */}
+						<div className="flex items-center justify-between mb-6">
+							{/*<h2>Delivery Overview</h2>*/}
+							<button 
+								onClick={fetchAllData}
+								disabled={statsLoading || recentDeliveriesLoading}
+								className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+							>
+								<span>🔄</span>
+								{(statsLoading || recentDeliveriesLoading) ? 'Refreshing...' : 'Refresh Data'}
+							</button>
+						</div>
+
 						{/* Stats Grid */}
 						<div className="delivery-stats">
 							<div className="stat-card">
 								<div className="stat-icon">🛵</div>
 								<h3>Active Deliveries</h3>
-								<p className="stat-number">5</p>
-								<span className="stat-change positive">+2 from yesterday</span>
+								<p className="stat-number">
+									{statsLoading ? '...' : deliveryStats.activeDeliveries}
+								</p>
+								<span className="stat-change positive">Orders picked up and in transit</span>
 							</div>
 							<div className="stat-card">
 								<div className="stat-icon">✅</div>
 								<h3>Completed Today</h3>
-								<p className="stat-number">12</p>
-								<span className="stat-change positive">+3 from yesterday</span>
+								<p className="stat-number">
+									{statsLoading ? '...' : deliveryStats.completedToday}
+								</p>
+								<span className="stat-change positive">Successfully delivered</span>
 							</div>
 							<div className="stat-card">
 								<div className="stat-icon">⏳</div>
 								<h3>Pending</h3>
-								<p className="stat-number">3</p>
-								<span className="stat-change neutral">Same as yesterday</span>
+								<p className="stat-number">
+									{statsLoading ? '...' : deliveryStats.pending}
+								</p>
+								<span className="stat-change neutral">Assigned but not picked up</span>
 							</div>
 							<div className="stat-card">
 								<div className="stat-icon">💰</div>
 								<h3>Today's Earnings</h3>
-								<p className="stat-number">$45.50</p>
-								<span className="stat-change positive">+$8.20 from yesterday</span>
+								<p className="stat-number">
+									{statsLoading ? '...' : `Rs.${deliveryStats.todayEarnings}`}
+								</p>
+								<span className="stat-change positive">From completed deliveries</span>
 							</div>
 						</div>
 
@@ -77,32 +196,38 @@ const DeliveryDashboard = () => {
 
 						{/* Recent Deliveries */}
 						<div className="recent-deliveries">
-							<h2>Recent Deliveries</h2>
+							<h2>Recent Assignments</h2>
 							<div className="deliveries-list">
-								<div className="delivery-item">
-									<div className="delivery-info">
-										<div className="delivery-id">#DL-2024-001</div>
-										<div className="delivery-address">123 Main St, Downtown</div>
-										<div className="delivery-time">2:30 PM - 3:00 PM</div>
+								{recentDeliveriesLoading ? (
+									<div className="text-center py-4">
+										<div className="text-gray-500">Loading recent deliveries...</div>
 									</div>
-									<div className="delivery-status completed">Completed</div>
-								</div>
-								<div className="delivery-item">
-									<div className="delivery-info">
-										<div className="delivery-id">#DL-2024-002</div>
-										<div className="delivery-address">456 Oak Ave, Westside</div>
-										<div className="delivery-time">3:15 PM - 3:45 PM</div>
+								) : recentDeliveries.length === 0 ? (
+									<div className="text-center py-4">
+										<div className="text-gray-500">No recent deliveries found</div>
 									</div>
-									<div className="delivery-status completed">Completed</div>
-								</div>
-								<div className="delivery-item">
-									<div className="delivery-info">
-										<div className="delivery-id">#DL-2024-003</div>
-										<div className="delivery-address">789 Pine Rd, Eastside</div>
-										<div className="delivery-time">4:00 PM - 4:30 PM</div>
-									</div>
-									<div className="delivery-status in-progress">In Progress</div>
-								</div>
+								) : (
+									recentDeliveries.map((delivery) => (
+										<div key={delivery._id} className="delivery-item">
+											<div className="delivery-info">
+												<div className="delivery-id">#{delivery.orderId?.slice(-8) || 'N/A'}</div>
+												<div className="delivery-customer">{delivery.customerName || 'N/A'}</div>
+												<div className="delivery-address">{delivery.address}</div>
+												<div className="delivery-time">
+													{delivery.status === 'delivered' && delivery.deliveredAt 
+														? `Delivered: ${formatDate(delivery.deliveredAt)}`
+														: delivery.status === 'picked_up' && delivery.pickedUpAt
+														? `Picked up: ${formatDate(delivery.pickedUpAt)}`
+														: `Assigned: ${formatDate(delivery.assignedAt || delivery.createdAt)}`
+													}
+												</div>
+											</div>
+											<div className={`delivery-status ${getStatusBadgeColor(delivery.status)}`}>
+												{getStatusText(delivery.status)}
+											</div>
+										</div>
+									))
+								)}
 							</div>
 						</div>
 

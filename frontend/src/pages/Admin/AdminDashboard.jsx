@@ -1650,7 +1650,6 @@ function AdminAppointments() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showReschedule, setShowReschedule] = useState(false);
-    const [showCancelModal, setShowCancelModal] = useState(false);
     const [selected, setSelected] = useState(null);
     const [filters, setFilters] = useState({ status: '', from: '', to: '' });
     const [resForm, setResForm] = useState({ doctorId: '', date: '', startTime: '', endTime: '', status: '' });
@@ -1716,44 +1715,6 @@ function AdminAppointments() {
         }
     };
 
-    const openCancelModal = (booking) => {
-        setSelected(booking);
-        setShowCancelModal(true);
-    };
-
-    const cancelAppointment = async () => {
-        try {
-            const res = await fetch(`http://localhost:5001/api/bookings/${selected._id}`, {
-                method: 'PATCH',
-                headers: { 
-                    'Authorization': `Bearer ${token}`, 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({ status: 'cancelled' })
-            });
-            
-            if (res.ok) {
-                setBookings(prev => prev.map(x => 
-                    x._id === selected._id ? { ...x, status: 'cancelled' } : x
-                ));
-                setShowCancelModal(false);
-                setSelected(null);
-                // Refresh stats
-                const statsRes = await fetch('http://localhost:5001/api/bookings/stats', { 
-                    headers: { 'Authorization': `Bearer ${token}` } 
-                });
-                if (statsRes.ok) {
-                    const statsData = await statsRes.json();
-                    setStats(statsData);
-                }
-            } else {
-                const errorData = await res.json();
-                console.error('Error cancelling appointment:', errorData.message);
-            }
-        } catch (error) {
-            console.error('Error cancelling appointment:', error);
-        }
-    };
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div className="text-red-600">{error}</div>;
@@ -1853,15 +1814,6 @@ function AdminAppointments() {
                                             >
                                                 Reschedule
                                             </button>
-                                            {b.status !== 'cancelled' && b.status !== 'completed' && (
-                                                <button 
-                                                    className="bg-red-100 text-red-700 border border-red-200 text-xs px-3 py-1 rounded hover:bg-red-200 transition-colors" 
-                                                    onClick={() => openCancelModal(b)}
-                                                    title="Cancel Appointment"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -1994,52 +1946,6 @@ function AdminAppointments() {
                 </div>
             )}
 
-            {/* Cancel Appointment Confirmation Modal */}
-            {showCancelModal && selected && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="text-red-500 text-2xl">⚠️</div>
-                            <h3 className="text-lg font-semibold text-gray-900">Cancel Appointment</h3>
-                        </div>
-                        
-                        <div className="mb-6">
-                            <p className="text-gray-600 mb-3">
-                                Are you sure you want to cancel this appointment?
-                            </p>
-                            <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                                <div className="font-medium text-gray-900 mb-1">
-                                    {selected.patientName} - Dr. {selected.doctorName}
-                                </div>
-                                <div className="text-gray-600">
-                                    {new Date(selected.date).toLocaleDateString()} at {selected.startTime}
-                                </div>
-                                <div className="text-gray-500 text-xs mt-1">
-                                    Ref: {selected.referenceNo}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowCancelModal(false);
-                                    setSelected(null);
-                                }}
-                                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                Keep Appointment
-                            </button>
-                            <button
-                                onClick={cancelAppointment}
-                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                                Yes, Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

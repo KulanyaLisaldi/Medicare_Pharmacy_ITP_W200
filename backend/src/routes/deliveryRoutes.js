@@ -6,7 +6,9 @@ import {
   acceptOrder, 
   rejectOrder, 
   updateDeliveryStatus, 
-  getOrderDetails 
+  getOrderDetails,
+  getDeliveryStats,
+  getRecentDeliveries
 } from '../controllers/deliveryController.js';
 
 const router = express.Router();
@@ -32,5 +34,11 @@ router.patch('/assignments/:assignmentId/status', updateDeliveryStatus);
 
 // Get order details
 router.get('/orders/:orderId/details', getOrderDetails);
+
+// Get delivery statistics for dashboard
+router.get('/stats', getDeliveryStats);
+
+// Get recent deliveries for dashboard
+router.get('/recent', getRecentDeliveries);
 
 export default router;
