@@ -46,7 +46,7 @@ export async function registerCustomer(req, res) {
             return res.status(400).json({ message: `User with this ${conflictField} already exists` });
         }
 
-        // Additional password policy enforcement (defense-in-depth)
+        // Additional password policy enforcement
         const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
         if (!strongPassword.test(password)) {
             return res.status(400).json({ message: 'Password must be at least 8 characters and include uppercase, lowercase, number and special (@,#,$,%,!)' });
