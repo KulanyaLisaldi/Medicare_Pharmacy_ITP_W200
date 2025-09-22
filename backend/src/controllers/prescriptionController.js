@@ -1,396 +1,228 @@
-import Prescription from '../models/Prescription.js';
-import User from '../models/User.js';
-import Product from '../models/Product.js';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import Order from '../models/Order.js';
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = 'uploads/prescriptions';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+// Upload prescription file
+export const uploadPrescription = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No prescription file uploaded' });
     }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `prescription-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only images and PDFs are allowed.'), false);
+    const prescriptionNumber = `PRES-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    res.json({
+      message: 'Prescription uploaded successfully',
+      prescriptionNumber,
+      fileName: req.file.filename,
+      filePath: req.file.path
+    });
+  } catch (error) {
+    console.error('Upload prescription error:', error);
+    res.status(500).json({ message: 'Failed to upload prescription' });
   }
 };
-
-export const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: fileFilter
-});
 
 // Create prescription order
-export const createPrescription = async (req, res) => {
+export const createPrescriptionOrder = async (req, res) => {
   try {
-    const { patientName, phone, address, paymentMethod, notes } = req.body;
-    const userId = req.userId;
+    const {
+      prescriptionFile,
+      prescriptionDetails,
+      customer,
+      paymentMethod,
+      deliveryType,
+      total
+    } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ message: 'Prescription file is required' });
-    }
+    // Generate prescription number
+    const prescriptionNumber = `PRES-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    const prescription = await Prescription.create({
-      user: userId,
-      patientName,
-      phone,
-      address,
-      prescriptionFile: req.file.path,
-      originalFileName: req.file.originalname,
-      fileSize: req.file.size,
-      fileType: req.file.mimetype,
-      paymentMethod: paymentMethod || 'cod',
-      notes: notes || '',
-      status: 'uploaded'
-    });
+  const order = new Order({
+    user: req.userId,
+    orderType: 'prescription',
+    prescriptionFile: prescriptionFile, // Use the prescriptionFile from request body
+    prescriptionDetails: {
+      ...prescriptionDetails,
+      prescriptionNumber
+    },
+    customer,
+    paymentMethod,
+    deliveryType,
+    total: total || 0, // Will be calculated by pharmacist
+    status: 'pending'
+  });
 
-    // Populate user details
-    await prescription.populate('user', 'firstName lastName email');
+    await order.save();
 
-    return res.status(201).json({
-      message: 'Prescription uploaded successfully',
-      prescription: {
-        _id: prescription._id,
-        prescriptionNumber: prescription.prescriptionNumber,
-        patientName: prescription.patientName,
-        phone: prescription.phone,
-        address: prescription.address,
-        status: prescription.status,
-        totalAmount: prescription.totalAmount,
-        createdAt: prescription.createdAt
-      }
+    res.status(201).json({
+      message: 'Prescription order created successfully',
+      order: order
     });
   } catch (error) {
-    console.error('Error creating prescription:', error);
-    return res.status(500).json({ message: 'Failed to upload prescription' });
+    console.error('Create prescription order error:', error);
+    res.status(500).json({ message: 'Failed to create prescription order' });
   }
 };
 
-// Get user's prescriptions
-export const getUserPrescriptions = async (req, res) => {
+// Get prescription orders for pharmacist
+export const getPrescriptionOrders = async (req, res) => {
   try {
-    const userId = req.userId;
-    const { status } = req.query;
-
-    const query = { user: userId };
-    if (status) {
-      query.status = status;
-    }
-
-    const prescriptions = await Prescription.find(query)
-      .sort({ createdAt: -1 })
-      .select('-prescriptionFile'); // Exclude file path for security
-
-    return res.status(200).json(prescriptions);
-  } catch (error) {
-    console.error('Error fetching prescriptions:', error);
-    return res.status(500).json({ message: 'Failed to fetch prescriptions' });
-  }
-};
-
-// Get prescription by ID
-export const getPrescriptionById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.userId;
-
-    const prescription = await Prescription.findOne({
-      _id: id,
-      user: userId
-    }).populate('user', 'firstName lastName email');
-
-    if (!prescription) {
-      return res.status(404).json({ message: 'Prescription not found' });
-    }
-
-    return res.status(200).json(prescription);
-  } catch (error) {
-    console.error('Error fetching prescription:', error);
-    return res.status(500).json({ message: 'Failed to fetch prescription' });
-  }
-};
-
-// Update prescription status (for admin/pharmacist)
-export const updatePrescriptionStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, pharmacistNotes, totalAmount } = req.body;
-    const userId = req.userId;
-
-    const prescription = await Prescription.findById(id);
-    if (!prescription) {
-      return res.status(404).json({ message: 'Prescription not found' });
-    }
-
-    // Update status and related fields
-    prescription.status = status;
-    if (pharmacistNotes) prescription.pharmacistNotes = pharmacistNotes;
-    if (totalAmount !== undefined) prescription.totalAmount = totalAmount;
-
-    // Set timestamps based on status
-    const now = new Date();
-    switch (status) {
-      case 'under_review':
-        prescription.reviewedBy = userId;
-        prescription.reviewedAt = now;
-        break;
-      case 'approved':
-        prescription.approvedAt = now;
-        break;
-      case 'delivered':
-        prescription.deliveredAt = now;
-        break;
-    }
-
-    await prescription.save();
-
-    return res.status(200).json({
-      message: 'Prescription status updated successfully',
-      prescription
-    });
-  } catch (error) {
-    console.error('Error updating prescription:', error);
-    return res.status(500).json({ message: 'Failed to update prescription' });
-  }
-};
-
-// Get all prescriptions (for admin/pharmacist)
-export const getAllPrescriptions = async (req, res) => {
-  try {
-    const { status } = req.query;
-
-    const query = {};
-    if (status) {
-      query.status = status;
-    }
-
-    const prescriptions = await Prescription.find(query)
-      .populate('user', 'firstName lastName email phone')
-      .populate('reviewedBy', 'firstName lastName')
+    const orders = await Order.find({ orderType: 'prescription' })
+      .populate('user', 'firstName lastName email')
       .sort({ createdAt: -1 });
 
-    return res.status(200).json(prescriptions);
+    res.json(orders);
   } catch (error) {
-    console.error('Error fetching all prescriptions:', error);
-    return res.status(500).json({ message: 'Failed to fetch prescriptions' });
+    console.error('Get prescription orders error:', error);
+    res.status(500).json({ message: 'Failed to fetch prescription orders' });
   }
 };
 
-// Download prescription file
-export const downloadPrescriptionFile = async (req, res) => {
+// Get prescription orders for customer
+export const getCustomerPrescriptionOrders = async (req, res) => {
   try {
-    const { id } = req.params;
-    const userId = req.userId;
+    const orders = await Order.find({ 
+      orderType: 'prescription',
+      user: req.userId 
+    })
+      .populate('user', 'firstName lastName email')
+      .sort({ createdAt: -1 });
 
-    // First try to find prescription for the current user (for customers)
-    let prescription = await Prescription.findOne({
-      _id: id,
-      user: userId
-    });
-
-    // If not found and user is pharmacist/admin, allow access to any prescription
-    if (!prescription) {
-      const user = await User.findById(userId);
-      if (user && (user.role === 'pharmacist' || user.role === 'admin')) {
-        prescription = await Prescription.findById(id);
-      }
-    }
-
-    if (!prescription) {
-      return res.status(404).json({ message: 'Prescription not found' });
-    }
-
-    const filePath = prescription.prescriptionFile;
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: 'File not found' });
-    }
-
-    res.download(filePath, prescription.originalFileName);
+    res.json(orders);
   } catch (error) {
-    console.error('Error downloading prescription file:', error);
-    return res.status(500).json({ message: 'Failed to download file' });
+    console.error('Get customer prescription orders error:', error);
+    res.status(500).json({ message: 'Failed to fetch prescription orders' });
   }
 };
 
-// Get all products for order list creation
-export const getProductsForOrderList = async (req, res) => {
+// Send product list to customer for prescription order
+export const sendProductListToCustomer = async (req, res) => {
   try {
-    const { search, category } = req.query;
-    let query = {};
-
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    if (category) {
-      query.category = category;
-    }
-
-    const products = await Product.find(query)
-      .select('name description price category stock')
-      .sort({ name: 1 });
-
-    res.json(products);
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    return res.status(500).json({ message: 'Failed to fetch products' });
-  }
-};
-
-// Create order list for prescription
-export const createOrderList = async (req, res) => {
-  try {
-    const { prescriptionId } = req.params;
+    const { orderId } = req.params;
     const { orderList } = req.body;
 
     if (!orderList || !Array.isArray(orderList) || orderList.length === 0) {
-      return res.status(400).json({ message: 'Order list is required and must not be empty' });
-    }
-
-    // Validate order list items
-    for (const item of orderList) {
-      if (!item.productId || !item.productName || !item.quantity || !item.unitPrice) {
-        return res.status(400).json({ message: 'All order list items must have productId, productName, quantity, and unitPrice' });
-      }
-    }
-
-    const prescription = await Prescription.findById(prescriptionId);
-    if (!prescription) {
-      return res.status(404).json({ message: 'Prescription not found' });
-    }
-
-    // Update prescription with order list
-    prescription.orderList = orderList;
-    prescription.orderListSentAt = new Date();
-    prescription.status = 'order_list_sent';
-
-    await prescription.save();
-
-    res.json({ message: 'Order list created successfully', prescription });
-  } catch (error) {
-    console.error('Error creating order list:', error);
-    return res.status(500).json({ message: 'Failed to create order list' });
-  }
-};
-
-// Customer confirms order list
-export const confirmOrderList = async (req, res) => {
-  try {
-    const { prescriptionId } = req.params;
-    const userId = req.userId;
-
-    const prescription = await Prescription.findOne({ _id: prescriptionId, user: userId });
-    if (!prescription) {
-      return res.status(404).json({ message: 'Prescription not found' });
-    }
-
-    if (prescription.status !== 'order_list_sent') {
-      return res.status(400).json({ message: 'Order list has not been sent for this prescription' });
-    }
-
-    // Check stock availability and reduce stock
-    for (const item of prescription.orderList) {
-      const product = await Product.findById(item.productId);
-      if (!product) {
-        return res.status(400).json({ message: `Product ${item.productName} not found` });
-      }
-      
-      if (product.stock < item.quantity) {
-        return res.status(400).json({ 
-          message: `Insufficient stock for ${item.productName}. Available: ${product.stock}, Requested: ${item.quantity}` 
-        });
-      }
-      
-      // Reduce stock
-      product.stock -= item.quantity;
-      await product.save();
+      return res.status(400).json({ message: 'Product list is required' });
     }
 
     // Calculate total amount
-    const totalAmount = prescription.orderList.reduce((sum, item) => sum + item.totalPrice, 0);
+    const totalAmount = orderList.reduce((sum, item) => sum + (item.lineTotal || 0), 0);
 
-    prescription.status = 'approved';
-    prescription.totalAmount = totalAmount;
-    prescription.customerConfirmedAt = new Date();
+    // Update the order with the product list and total (keep status as pending until customer confirms)
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      {
+        $set: {
+          orderList: orderList,
+          total: totalAmount,
+          status: 'pending', // Keep as pending until customer confirms
+          confirmationStatus: 'pending'
+        }
+      },
+      { new: true }
+    );
 
-    await prescription.save();
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
 
-    res.json({ message: 'Order list confirmed successfully and stock updated', prescription });
+
+    res.json({
+      message: 'Product list sent to customer successfully',
+      order: order
+    });
   } catch (error) {
-    console.error('Error confirming order list:', error);
-    return res.status(500).json({ message: 'Failed to confirm order list' });
+    console.error('Send product list error:', error);
+    res.status(500).json({ message: 'Failed to send product list' });
   }
 };
 
-// Update prescription status for pharmacist workflow
-export const updatePrescriptionWorkflow = async (req, res) => {
+// Customer confirms prescription order and reduce stock
+export const confirmPrescriptionOrder = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-    const userId = req.userId;
+    const { orderId } = req.params;
+    const { action } = req.body; // 'confirm' or 'reject'
 
-    const prescription = await Prescription.findById(id);
-    if (!prescription) {
-      return res.status(404).json({ message: 'Prescription not found' });
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Validate status transition
-    const validTransitions = {
-      'approved': ['preparing'],
-      'preparing': ['ready_for_delivery'],
-      'ready_for_delivery': ['delivered']
-    };
+    if (order.orderType !== 'prescription') {
+      return res.status(400).json({ message: 'This is not a prescription order' });
+    }
 
-    if (!validTransitions[prescription.status] || !validTransitions[prescription.status].includes(status)) {
-      return res.status(400).json({ 
-        message: `Invalid status transition from ${prescription.status} to ${status}` 
+    if (action === 'confirm') {
+      // Import Product model
+      const Product = (await import('../models/Product.js')).default;
+      
+      // Reduce stock for each product in the order list
+      for (const item of order.orderList) {
+        await Product.findByIdAndUpdate(
+          item.productId,
+          { $inc: { stockQuantity: -item.quantity } }
+        );
+      }
+
+      // Update order status
+      await Order.findByIdAndUpdate(orderId, {
+        $set: {
+          status: 'approved',
+          confirmationStatus: 'confirmed'
+        }
       });
-    }
 
-    // Update status and set timestamps
-    prescription.status = status;
-    const now = new Date();
-    
-    switch (status) {
-      case 'preparing':
-        prescription.preparingAt = now;
-        break;
-      case 'ready_for_delivery':
-        prescription.readyForDeliveryAt = now;
-        break;
-      case 'delivered':
-        prescription.deliveredAt = now;
-        break;
-    }
+      res.json({
+        message: 'Order confirmed successfully. Stock has been reduced.',
+        order: await Order.findById(orderId)
+      });
+    } else if (action === 'reject') {
+      // Update order status to rejected
+      await Order.findByIdAndUpdate(orderId, {
+        $set: {
+          status: 'canceled',
+          confirmationStatus: 'rejected'
+        }
+      });
 
-    await prescription.save();
+      res.json({
+        message: 'Order rejected successfully.',
+        order: await Order.findById(orderId)
+      });
+    } else {
+      return res.status(400).json({ message: 'Invalid action. Use "confirm" or "reject"' });
+    }
+  } catch (error) {
+    console.error('Confirm prescription order error:', error);
+    res.status(500).json({ message: 'Failed to process order confirmation' });
+  }
+};
+
+// Fix prescription file paths for existing orders
+export const fixPrescriptionFilePaths = async (req, res) => {
+  try {
+    const orders = await Order.find({ 
+      orderType: 'prescription',
+      prescriptionFile: { $regex: '^uploads/prescriptions/' }
+    });
+
+    let fixedCount = 0;
+    for (const order of orders) {
+      // Extract just the filename from the full path
+      const filename = order.prescriptionFile.split('/').pop();
+      
+      await Order.findByIdAndUpdate(order._id, {
+        $set: { prescriptionFile: filename }
+      });
+      
+      fixedCount++;
+    }
 
     res.json({
-      message: `Prescription status updated to ${status}`,
-      prescription
+      message: `Fixed ${fixedCount} prescription file paths`,
+      fixedCount
     });
   } catch (error) {
-    console.error('Error updating prescription workflow:', error);
-    return res.status(500).json({ message: 'Failed to update prescription status' });
+    console.error('Fix prescription file paths error:', error);
+    res.status(500).json({ message: 'Failed to fix prescription file paths' });
   }
 };

@@ -1,52 +1,29 @@
 import express from 'express';
+import { uploadPrescription, createPrescriptionOrder, getPrescriptionOrders, getCustomerPrescriptionOrders, sendProductListToCustomer, confirmPrescriptionOrder, fixPrescriptionFilePaths } from '../controllers/prescriptionController.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { 
-  createPrescription, 
-  getUserPrescriptions, 
-  getPrescriptionById, 
-  updatePrescriptionStatus, 
-  getAllPrescriptions, 
-  downloadPrescriptionFile,
-  getProductsForOrderList,
-  createOrderList,
-  confirmOrderList,
-  updatePrescriptionWorkflow,
-  upload
-} from '../controllers/prescriptionController.js';
+import { upload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-// User routes (authenticated)
-router.use(authenticateToken);
+// Upload prescription file
+router.post('/upload', authenticateToken, upload.single('prescriptionFile'), uploadPrescription);
 
 // Create prescription order
-router.post('/', upload.single('prescriptionFile'), createPrescription);
+router.post('/create-order', authenticateToken, createPrescriptionOrder);
 
-// Get user's prescriptions
-router.get('/user', getUserPrescriptions);
+// Get prescription orders for pharmacist
+router.get('/pharmacist/orders', authenticateToken, getPrescriptionOrders);
 
-// Order list management (specific routes first)
-router.get('/products', getProductsForOrderList);
+// Get prescription orders for customer
+router.get('/customer/orders', authenticateToken, getCustomerPrescriptionOrders);
 
-// Admin/Pharmacist routes
-router.get('/admin/all', getAllPrescriptions);
+// Send product list to customer for prescription order
+router.post('/:orderId/order-list', authenticateToken, sendProductListToCustomer);
 
-// Get prescription by ID
-router.get('/:id', getPrescriptionById);
+// Customer confirms or rejects prescription order
+router.post('/:orderId/confirm', authenticateToken, confirmPrescriptionOrder);
 
-// Download prescription file
-router.get('/:id/download', downloadPrescriptionFile);
-
-// Update prescription status
-router.patch('/:id/status', updatePrescriptionStatus);
-
-// Update prescription workflow (for pharmacist)
-router.patch('/:id/workflow', updatePrescriptionWorkflow);
-
-// Order list management
-router.post('/:prescriptionId/order-list', createOrderList);
-
-// Customer order list confirmation
-router.post('/:prescriptionId/confirm-order', confirmOrderList);
+// Fix prescription file paths for existing orders
+router.post('/fix-file-paths', authenticateToken, fixPrescriptionFilePaths);
 
 export default router;

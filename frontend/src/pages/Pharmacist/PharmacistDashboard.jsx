@@ -7,6 +7,12 @@ const PharmacistDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
 	const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
 	const [recentOrders, setRecentOrders] = useState([])
+	const [lowStockCount, setLowStockCount] = useState(0)
+	const [lowStockProducts, setLowStockProducts] = useState([])
+	const [processedTodayCount, setProcessedTodayCount] = useState(0)
+	const [notifications, setNotifications] = useState([])
+	const [allProducts, setAllProducts] = useState([])
+	const [readNotifications, setReadNotifications] = useState(new Set())
 
 	const { token } = useAuth()
 
@@ -14,31 +20,166 @@ const PharmacistDashboard = () => {
 		{ id: 'overview', label: 'Overview', icon: '🏠' },
 		{ id: 'orders', label: 'Orders', icon: '📦' },
 		{ id: 'inventory', label: 'Inventory', icon: '📋' },
-		{ id: 'prescriptions', label: 'Prescriptions', icon: '💊' },
 		{ id: 'reports', label: 'Reports', icon: '📊' },
-		{ id: 'messages', label: 'Messages', icon: '💬' },
+		{ id: 'messages', label: 'Notifications', icon: '💬' },
 	]
 
 	// Fetch orders data
 	useEffect(() => {
 		const fetchOrders = async () => {
 			try {
-				const res = await fetch('http://localhost:5001/api/orders', {
-					headers: { 'Authorization': `Bearer ${token}` }
-				})
-				const data = await res.json()
-				if (res.ok) {
-					const pending = data.filter(order => order.status === 'pending').length
-					setPendingOrdersCount(pending)
+				// Fetch both product orders and prescription orders
+				const [productOrdersRes, prescriptionOrdersRes] = await Promise.all([
+					fetch('http://localhost:5001/api/orders', { headers: { 'Authorization': `Bearer ${token}` } }),
+					fetch('http://localhost:5001/api/prescriptions/pharmacist/orders', { headers: { 'Authorization': `Bearer ${token}` } })
+				]);
+
+				const productOrders = await productOrdersRes.json();
+				const prescriptionOrders = await prescriptionOrdersRes.json();
+
+				if (productOrdersRes.ok && prescriptionOrdersRes.ok) {
+					// Process and combine both order types with proper orderType field
+					const processedProductOrders = productOrders.map(order => ({
+						...order,
+						orderType: 'product'
+					}));
+					
+					const processedPrescriptionOrders = prescriptionOrders.map(order => ({
+						...order,
+						orderType: 'prescription'
+					}));
+					
+					const allOrders = [...processedProductOrders, ...processedPrescriptionOrders];
+					
+					// Calculate pending count from both order types
+					const pending = allOrders.filter(order => order.status === 'pending').length;
+					setPendingOrdersCount(pending);
+					
+					// Calculate processed orders for today
+					const today = new Date();
+					today.setHours(0, 0, 0, 0);
+					const processedToday = allOrders.filter(order => {
+						const orderDate = new Date(order.updatedAt || order.createdAt);
+						orderDate.setHours(0, 0, 0, 0);
+						return orderDate.getTime() === today.getTime() && 
+							   (order.status === 'processing' || order.status === 'ready' || 
+								order.status === 'out_for_delivery' || order.status === 'delivered' || 
+								order.status === 'completed');
+					}).length;
+					setProcessedTodayCount(processedToday);
+					
 					// Get 3 most recent orders
-					setRecentOrders(data.slice(0, 3))
+					setRecentOrders(allOrders.slice(0, 3));
 				}
 			} catch (error) {
-				console.error('Error fetching orders:', error)
+				console.error('Error fetching orders:', error);
 			}
 		}
 		if (token) fetchOrders()
 	}, [token])
+
+	// Fetch low stock products
+	useEffect(() => {
+		const fetchLowStockProducts = async () => {
+			try {
+				const res = await fetch('http://localhost:5001/api/products', {
+					headers: { 'Authorization': `Bearer ${token}` }
+				})
+				const data = await res.json()
+				if (res.ok) {
+					// Store all products for expiry checking
+					setAllProducts(data)
+					
+					// Filter products with stock less than 20
+					const lowStock = data.filter(product => (product.stock || 0) < 20)
+					setLowStockCount(lowStock.length)
+					setLowStockProducts(lowStock.slice(0, 5)) // Show top 5 low stock items
+				}
+			} catch (error) {
+				console.error('Error fetching low stock products:', error)
+			}
+		}
+		if (token) fetchLowStockProducts()
+	}, [token])
+
+	// Generate notifications
+	useEffect(() => {
+		const generateNotifications = () => {
+			const notificationList = []
+
+			// New orders notifications
+			if (recentOrders.length > 0) {
+				recentOrders.slice(0, 3).forEach(order => {
+					notificationList.push({
+						id: `order-${order._id}`,
+						type: 'order',
+						title: 'New Order',
+						message: `${order.orderType === 'prescription' ? 'New prescription uploaded by' : 'New product order from'} ${order.customer?.name || 'Customer'}`,
+						timestamp: new Date(order.createdAt),
+						priority: 'high',
+						icon: order.orderType === 'prescription' ? '📄' : '📦'
+					})
+				})
+			}
+
+			// Stock alerts notifications
+			lowStockProducts.slice(0, 3).forEach(product => {
+				const stock = product.stock || 0
+				notificationList.push({
+					id: `stock-${product._id}`,
+					type: 'stock',
+					title: 'Stock Alert',
+					message: `${product.name} stock is below threshold (${stock} units left)`,
+					timestamp: new Date(),
+					priority: stock <= 5 ? 'high' : stock <= 10 ? 'medium' : 'low',
+					icon: '⚠️'
+				})
+			})
+
+			// Expiry alerts - filter products expiring within 30 days
+			const today = new Date()
+			const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000))
+			
+			// Filter products expiring within 30 days
+			const expiringProducts = allProducts.filter(product => {
+				if (!product.expiryDate) return false
+				const expiryDate = new Date(product.expiryDate)
+				return expiryDate >= today && expiryDate <= thirtyDaysFromNow
+			})
+
+			expiringProducts.forEach(product => {
+				const expiryDate = new Date(product.expiryDate)
+				const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24))
+				
+				notificationList.push({
+					id: `expiry-${product._id}`,
+					type: 'expiry',
+					title: 'Expiry Alert',
+					message: `${product.name} will expire in ${daysLeft} days`,
+					timestamp: new Date(),
+					priority: daysLeft <= 7 ? 'high' : daysLeft <= 15 ? 'medium' : 'low',
+					icon: '⏰'
+				})
+			})
+
+			// Sort by timestamp (newest first)
+			notificationList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+			setNotifications(notificationList)
+		}
+
+		generateNotifications()
+	}, [recentOrders, lowStockProducts, allProducts])
+
+	// Function to mark notification as read
+	const markNotificationAsRead = (notificationId) => {
+		setReadNotifications(prev => new Set([...prev, notificationId]))
+	}
+
+	// Function to mark all notifications as read
+	const markAllNotificationsAsRead = () => {
+		const allNotificationIds = notifications.map(n => n.id)
+		setReadNotifications(new Set(allNotificationIds))
+	}
 
 	const renderSection = () => {
 		switch (activeSection) {
@@ -56,20 +197,14 @@ const PharmacistDashboard = () => {
 							<div className="stat-card">
 								<div className="stat-icon">⚠️</div>
 								<h3>Low Stock Items</h3>
-								<p className="stat-number">7</p>
-								<span className="stat-change negative">+2 from yesterday</span>
+								<p className="stat-number">{lowStockCount}</p>
+								<span className="stat-change negative">Stock level below 20</span>
 							</div>
 							<div className="stat-card">
 								<div className="stat-icon">✅</div>
 								<h3>Processed Today</h3>
-								<p className="stat-number">24</p>
-								<span className="stat-change positive">+3 from yesterday</span>
-							</div>
-							<div className="stat-card">
-								<div className="stat-icon">💊</div>
-								<h3>Prescriptions</h3>
-								<p className="stat-number">15</p>
-								<span className="stat-change positive">+2 from yesterday</span>
+								<p className="stat-number">{processedTodayCount}</p>
+								<span className="stat-change positive">Real-time count</span>
 							</div>
 						</div>
 
@@ -83,13 +218,6 @@ const PharmacistDashboard = () => {
 								>
 									<span className="action-icon">📋</span>
 									Process Order
-								</button>
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('prescriptions')}
-								>
-									<span className="action-icon">💊</span>
-									Fill Prescription
 								</button>
 								<button 
 									className="action-btn secondary"
@@ -134,55 +262,29 @@ const PharmacistDashboard = () => {
 						<div className="inventory-alerts">
 							<h2>Low Stock Alerts</h2>
 							<div className="alerts-list">
-								<div className="alert-item high">
-									<div className="alert-icon">🔴</div>
-									<div className="alert-content">
-										<div className="alert-title">Paracetamol 500mg</div>
-										<div className="alert-details">Only 15 tablets remaining</div>
-									</div>
-									<button className="alert-action">Reorder</button>
-								</div>
-								<div className="alert-item medium">
-									<div className="alert-icon">🟡</div>
-									<div className="alert-content">
-										<div className="alert-title">Ibuprofen 400mg</div>
-										<div className="alert-details">Only 25 tablets remaining</div>
-									</div>
-									<button className="alert-action">Reorder</button>
-								</div>
-								<div className="alert-item low">
-									<div className="alert-icon">🟢</div>
-									<div className="alert-content">
-										<div className="alert-title">Vitamin C 1000mg</div>
-										<div className="alert-details">Only 30 tablets remaining</div>
-									</div>
-									<button className="alert-action">Reorder</button>
-								</div>
+								{lowStockProducts.length === 0 ? (
+									<div className="text-gray-500 text-center py-4">No low stock items</div>
+								) : (
+									lowStockProducts.map(product => {
+										const stock = product.stock || 0
+										const alertLevel = stock <= 5 ? 'high' : stock <= 10 ? 'medium' : 'low'
+										const icon = stock <= 5 ? '🔴' : stock <= 10 ? '🟡' : '🟢'
+										
+										return (
+											<div key={product._id} className={`alert-item ${alertLevel}`}>
+												<div className="alert-icon">{icon}</div>
+												<div className="alert-content">
+													<div className="alert-title">{product.name}</div>
+													<div className="alert-details">Only {stock} units remaining</div>
+												</div>
+												<button className="alert-action">Reorder</button>
+											</div>
+										)
+									})
+								)}
 							</div>
 						</div>
 
-						{/* Performance Summary */}
-						<div className="performance-summary">
-							<h2>Today's Performance</h2>
-							<div className="performance-metrics">
-								<div className="metric">
-									<span className="metric-label">Orders Processed</span>
-									<span className="metric-value">24</span>
-								</div>
-								<div className="metric">
-									<span className="metric-label">Customer Satisfaction</span>
-									<span className="metric-value">4.9/5</span>
-								</div>
-								<div className="metric">
-									<span className="metric-label">Prescriptions Filled</span>
-									<span className="metric-value">15</span>
-								</div>
-								<div className="metric">
-									<span className="metric-label">Revenue Generated</span>
-									<span className="metric-value">$1,245.80</span>
-								</div>
-							</div>
-						</div>
 					</div>
 				);
 
@@ -192,8 +294,6 @@ const PharmacistDashboard = () => {
             case 'inventory':
                 return <InventorySection />;
 
-			case 'prescriptions':
-				return <PrescriptionsSection />;
 
 			case 'reports':
 				return (
@@ -205,9 +305,98 @@ const PharmacistDashboard = () => {
 
 			case 'messages':
 				return (
-					<div className="messages-section">
-						<h2>Messages</h2>
-						<p>Messages features coming soon...</p>
+					<div className="notifications-section">
+						<div className="flex items-center justify-between mb-6">
+							<h2 className="text-2xl font-semibold text-gray-900">Notifications</h2>
+							<div className="flex items-center gap-2">
+								<span className="text-sm text-gray-500">{notifications.length} notifications</span>
+								<button 
+									onClick={markAllNotificationsAsRead}
+									className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+								>
+									Mark All Read
+								</button>
+							</div>
+						</div>
+
+						{notifications.length === 0 ? (
+							<div className="text-center py-12">
+								<div className="text-gray-400 text-4xl mb-4">🔔</div>
+								<h3 className="text-lg font-medium text-gray-900 mb-2">No notifications</h3>
+								<p className="text-gray-500">You're all caught up! No new notifications at the moment.</p>
+							</div>
+						) : (
+							<div className="space-y-4">
+								{notifications.map(notification => {
+									const isRead = readNotifications.has(notification.id)
+									return (
+										<div 
+											key={notification.id} 
+											className={`p-4 rounded-lg border-l-4 transition-opacity ${
+												notification.priority === 'high' 
+													? 'border-red-500 bg-red-50' 
+													: notification.priority === 'medium'
+													? 'border-yellow-500 bg-yellow-50'
+													: 'border-blue-500 bg-blue-50'
+											} ${isRead ? 'opacity-60' : ''}`}
+										>
+											<div className="flex items-start gap-3">
+												<div className="text-2xl">{notification.icon}</div>
+												<div className="flex-1">
+													<div className="flex items-center justify-between">
+														<div className="flex items-center gap-2">
+															<h3 className={`font-semibold ${isRead ? 'text-gray-600' : 'text-gray-900'}`}>
+																{notification.title}
+															</h3>
+															{!isRead && (
+																<span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+															)}
+														</div>
+														<div className="flex items-center gap-2">
+															<span className="text-xs text-gray-500">
+																{notification.timestamp.toLocaleTimeString()}
+															</span>
+															{!isRead && (
+																<button
+																	onClick={() => markNotificationAsRead(notification.id)}
+																	className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+																>
+																	Mark Read
+																</button>
+															)}
+														</div>
+													</div>
+													<p className={`mt-1 ${isRead ? 'text-gray-500' : 'text-gray-700'}`}>
+														{notification.message}
+													</p>
+													<div className="flex items-center gap-2 mt-2">
+														<span className={`px-2 py-1 rounded-full text-xs font-medium ${
+															notification.priority === 'high' 
+																? 'bg-red-100 text-red-800' 
+																: notification.priority === 'medium'
+																? 'bg-yellow-100 text-yellow-800'
+																: 'bg-blue-100 text-blue-800'
+														}`}>
+															{notification.priority === 'high' ? 'High Priority' : 
+															 notification.priority === 'medium' ? 'Medium Priority' : 'Low Priority'}
+														</span>
+														<span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+															{notification.type === 'order' ? 'Order' : 
+															 notification.type === 'stock' ? 'Stock' : 'Expiry'}
+														</span>
+														{isRead && (
+															<span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+																Read
+															</span>
+														)}
+													</div>
+												</div>
+											</div>
+										</div>
+									)
+								})}
+							</div>
+						)}
 					</div>
 				);
 
@@ -222,6 +411,8 @@ const PharmacistDashboard = () => {
 			sidebarItems={sidebar}
 			onSectionChange={setActiveSection}
 			activeSection={activeSection}
+			notificationCount={notifications.filter(n => !readNotifications.has(n.id)).length}
+			notifications={notifications.filter(n => !readNotifications.has(n.id))}
 		>
 			<div className="pharmacist-dashboard">
 				{renderSection()}
@@ -489,13 +680,40 @@ function OrdersSection() {
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [notes, setNotes] = useState('');
     const [filterStatus, setFilterStatus] = useState('all'); // all, pending, processing
+    const [showProductSelection, setShowProductSelection] = useState(false);
+    const [selectedProducts, setSelectedProducts] = useState([]);
+    const [availableProducts, setAvailableProducts] = useState([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filteredProducts, setFilteredProducts] = useState([]);
 
     const load = async () => {
         try {
-            const res = await fetch('http://localhost:5001/api/orders', { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed to load orders');
-            setOrders(data);
+            // Fetch both product orders and prescription orders
+            const [productOrdersRes, prescriptionOrdersRes] = await Promise.all([
+                fetch('http://localhost:5001/api/orders', { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch('http://localhost:5001/api/prescriptions/pharmacist/orders', { headers: { 'Authorization': `Bearer ${token}` } })
+            ]);
+
+            const productOrders = await productOrdersRes.json();
+            const prescriptionOrders = await prescriptionOrdersRes.json();
+
+            if (!productOrdersRes.ok) throw new Error(productOrders.message || 'Failed to load product orders');
+            if (!prescriptionOrdersRes.ok) throw new Error(prescriptionOrders.message || 'Failed to load prescription orders');
+
+            // Process and combine both order types with proper orderType field
+            const processedProductOrders = productOrders.map(order => ({
+                ...order,
+                orderType: 'product'
+            }));
+            
+            const processedPrescriptionOrders = prescriptionOrders.map(order => ({
+                ...order,
+                orderType: 'prescription'
+            }));
+            
+            const allOrders = [...processedProductOrders, ...processedPrescriptionOrders];
+            setOrders(allOrders);
         } catch (e) {
             setError(e.message);
         } finally {
@@ -504,6 +722,20 @@ function OrdersSection() {
     };
 
     useEffect(() => { load(); /* eslint-disable-next-line */ }, [token]);
+
+    // Handle search filtering
+    useEffect(() => {
+        if (searchTerm.trim()) {
+            const filtered = availableProducts.filter(product =>
+                product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                product.category.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            setFilteredProducts(filtered);
+        } else {
+            setFilteredProducts(availableProducts);
+        }
+    }, [searchTerm, availableProducts]);
 
     const openDetails = async (o) => { 
         setSelected(o); 
@@ -566,6 +798,150 @@ function OrdersSection() {
 
     const markAsReady = async (orderId) => {
         await updateStatus(orderId, { status: 'ready' });
+    };
+
+    const fetchAvailableProducts = async () => {
+        setLoadingProducts(true);
+        try {
+            const res = await fetch('http://localhost:5001/api/products', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setAvailableProducts(data);
+                setFilteredProducts(data); // Initialize filtered products
+            } else {
+                setError(data.message || 'Failed to fetch products');
+            }
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
+
+    const openProductSelection = async () => {
+        await fetchAvailableProducts();
+        setSelectedProducts([]);
+        setSearchTerm(''); // Reset search
+        setShowProductSelection(true);
+    };
+
+    // Search products function
+    const handleSearch = (searchValue) => {
+        setSearchTerm(searchValue);
+        if (!searchValue.trim()) {
+            setFilteredProducts(availableProducts);
+        } else {
+            const filtered = availableProducts.filter(product =>
+                product.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+                product.description.toLowerCase().includes(searchValue.toLowerCase()) ||
+                product.category.toLowerCase().includes(searchValue.toLowerCase())
+            );
+            setFilteredProducts(filtered);
+        }
+    };
+
+    const closeProductSelection = () => {
+        setShowProductSelection(false);
+        setSelectedProducts([]);
+        setSearchTerm('');
+        setFilteredProducts([]);
+    };
+
+    const addProductToSelection = (product) => {
+        // Check if product has stock
+        if ((product.stock || 0) <= 0) {
+            setError('This product is out of stock');
+            return;
+        }
+
+        const existing = selectedProducts.find(p => p.productId === product._id);
+        if (existing) {
+            // Check if adding one more would exceed stock
+            if (existing.quantity + 1 > (product.stock || 0)) {
+                setError(`Cannot add more. Only ${product.stock} units available in stock.`);
+                return;
+            }
+            setSelectedProducts(selectedProducts.map(p => 
+                p.productId === product._id 
+                    ? { ...p, quantity: p.quantity + 1, lineTotal: (p.quantity + 1) * p.price }
+                    : p
+            ));
+        } else {
+            setSelectedProducts([...selectedProducts, {
+                productId: product._id,
+                name: product.name,
+                price: product.price,
+                quantity: 1,
+                lineTotal: product.price,
+                stockQuantity: product.stock || 0
+            }]);
+        }
+    };
+
+    const updateProductQuantity = (productId, quantity) => {
+        if (quantity <= 0) {
+            setSelectedProducts(selectedProducts.filter(p => p.productId !== productId));
+        } else {
+            // Find the product to check stock
+            const product = availableProducts.find(p => p._id === productId);
+            if (product && quantity > (product.stock || 0)) {
+                setError(`Cannot set quantity to ${quantity}. Only ${product.stock} units available in stock.`);
+                return;
+            }
+            setSelectedProducts(selectedProducts.map(p => 
+                p.productId === productId 
+                    ? { ...p, quantity, lineTotal: quantity * p.price }
+                    : p
+            ));
+        }
+    };
+
+    const removeProductFromSelection = (productId) => {
+        setSelectedProducts(selectedProducts.filter(p => p.productId !== productId));
+    };
+
+    const sendProductListToCustomer = async () => {
+        if (!selected || selectedProducts.length === 0) return;
+
+
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/${selected._id}/order-list`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ orderList: selectedProducts })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                setShowProductSelection(false);
+                setSelectedProducts([]);
+                load(); // Refresh orders
+                setSelected(null); // Close details modal
+            } else {
+                setError(data.message || 'Failed to send product list');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        }
+    };
+
+    // Helper function to clean prescription file path
+    const getPrescriptionFileUrl = (prescriptionFile) => {
+        if (!prescriptionFile) return '';
+        
+        // If the file path already includes uploads/prescriptions, extract just the filename
+        if (prescriptionFile.includes('uploads/prescriptions/')) {
+            const filename = prescriptionFile.split('/').pop();
+            return `http://localhost:5001/uploads/prescriptions/${filename}`;
+        }
+        
+        // If it's just a filename, add the uploads/prescriptions prefix
+        return `http://localhost:5001/uploads/prescriptions/${prescriptionFile}`;
     };
 
     // Filter orders based on status
@@ -634,12 +1010,11 @@ function OrdersSection() {
                         <thead>
                             <tr className="text-left text-gray-600 bg-gray-50">
                                 <th className="p-3">Order ID</th>
-                                <th className="p-3">Date/Time</th>
-                                <th className="p-3">Customer Name</th>
-                                <th className="p-3">Contact</th>
-                                <th className="p-3">Delivery Address</th>
-                                <th className="p-3">Payment Method</th>
+                                <th className="p-3">Customer Info</th>
+                                <th className="p-3">Order Type</th>
                                 <th className="p-3">Status</th>
+                                <th className="p-3">Amount</th>
+                                <th className="p-3">Note</th>
                                 <th className="p-3">Actions</th>
                             </tr>
                         </thead>
@@ -648,27 +1023,19 @@ function OrdersSection() {
                                 <tr key={o._id} className="border-t hover:bg-gray-50">
                                     <td className="p-3 font-mono text-blue-600">#{o._id.slice(-8)}</td>
                                     <td className="p-3">
-                                        <div className="text-sm">{new Date(o.createdAt).toLocaleDateString()}</div>
-                                        <div className="text-xs text-gray-500">{new Date(o.createdAt).toLocaleTimeString()}</div>
-                                    </td>
-                                    <td className="p-3 font-medium">{o.customer?.name}</td>
-                                    <td className="p-3">{o.customer?.phone}</td>
-                                    <td className="p-3">
-                                        {o.deliveryType === 'home_delivery' ? (
-                                            <div className="text-sm max-w-xs truncate" title={o.customer?.address}>
-                                                {o.customer?.address}
-                                            </div>
-                                        ) : (
-                                            <span className="text-gray-500">Pickup</span>
-                                        )}
+                                        <div className="text-sm font-medium">{o.customer?.name}</div>
+                                        <div className="text-xs text-gray-500">{o.customer?.phone}</div>
+                                        <div className="text-xs text-gray-500 max-w-xs truncate" title={o.orderType === 'prescription' ? o.prescriptionDetails?.patientAddress : o.customer?.address}>
+                                            {o.orderType === 'prescription' ? o.prescriptionDetails?.patientAddress : o.customer?.address}
+                                        </div>
                                     </td>
                                     <td className="p-3">
                                         <span className={`px-2 py-1 rounded-full text-xs ${
-                                            o.paymentMethod === 'cod' 
-                                                ? 'bg-orange-100 text-orange-800' 
-                                                : 'bg-green-100 text-green-800'
+                                            o.orderType === 'prescription' 
+                                                ? 'bg-purple-100 text-purple-800' 
+                                                : 'bg-blue-100 text-blue-800'
                                         }`}>
-                                            {o.paymentMethod === 'cod' ? 'COD' : 'Online'}
+                                            {o.orderType === 'prescription' ? 'Prescription Order' : 'Product Order'}
                                         </span>
                                     </td>
                                     <td className="p-3">
@@ -684,6 +1051,12 @@ function OrdersSection() {
                                              o.status.charAt(0).toUpperCase() + o.status.slice(1).replace('_', ' ')}
                                         </span>
                                     </td>
+                                    <td className="p-3 font-semibold">Rs. {Number(o.total || 0).toFixed(2)}</td>
+                                    <td className="p-3">
+                                        <div className="text-xs text-gray-600 max-w-xs truncate" title={o.pharmacistNotes || 'No notes'}>
+                                            {o.pharmacistNotes || '-'}
+                                        </div>
+                                    </td>
                                     <td className="p-3 whitespace-nowrap">
                                         <button 
                                             className="btn-outline mr-2 px-3 py-1 text-xs" 
@@ -691,14 +1064,6 @@ function OrdersSection() {
                                         >
                                             View Details
                                         </button>
-                                        {o.status === 'pending' && (
-                                            <button 
-                                                className="btn-primary mr-2 px-3 py-1 text-xs" 
-                                                onClick={() => verifyOrder(o._id)}
-                                            >
-                                                Verify
-                                            </button>
-                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -722,7 +1087,7 @@ function OrdersSection() {
                                 <div className="space-y-2">
                                     <div><span className="text-gray-600">Name:</span> {selected.customer?.name}</div>
                                     <div><span className="text-gray-600">Phone:</span> {selected.customer?.phone}</div>
-                                    <div><span className="text-gray-600">Address:</span> {selected.customer?.address}</div>
+                                    <div><span className="text-gray-600">Address:</span> {selected.orderType === 'prescription' ? selected.prescriptionDetails?.patientAddress : selected.customer?.address}</div>
                                     {selected.customer?.notes && (
                                         <div><span className="text-gray-600">Notes:</span> {selected.customer.notes}</div>
                                     )}
@@ -760,8 +1125,34 @@ function OrdersSection() {
                             </div>
                         </div>
 
-                        {/* Product List */}
+                        {/* Order Details */}
                         <div className="mb-6">
+                            {selected.orderType === 'prescription' ? (
+                                <div>
+                                    <h3 className="font-semibold mb-3">Prescription Details</h3>
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <p><span className="font-medium">Prescription Number:</span> {selected.prescriptionDetails?.prescriptionNumber}</p>
+                                            </div>
+                                        </div>
+                                        {selected.prescriptionFile && (
+                                            <div className="mt-4">
+                                                <p className="font-medium mb-2">Prescription File:</p>
+                                                <a 
+                                                    href={getPrescriptionFileUrl(selected.prescriptionFile)} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:text-blue-800 underline"
+                                                >
+                                                    View Prescription File
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
                             <h3 className="font-semibold mb-3">Product List</h3>
                             {loadingDetails ? (
                                 <div className="bg-gray-50 rounded-lg p-6 text-center">
@@ -780,7 +1171,6 @@ function OrdersSection() {
                                                 <th className="p-3">Expiry Date</th>
                                                 <th className="p-3">Price</th>
                                                 <th className="p-3">Total</th>
-                                                <th className="p-3">Prescription</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -794,17 +1184,12 @@ function OrdersSection() {
                                                     <td className="p-3">{it.expiryDate ? new Date(it.expiryDate).toLocaleDateString() : '-'}</td>
                                                     <td className="p-3">Rs.{Number(it.price||0).toFixed(2)}</td>
                                                     <td className="p-3">Rs.{Number(it.lineTotal|| (it.price||0)*(it.quantity||1)).toFixed(2)}</td>
-                                                    <td className="p-3">
-                                                        {it.prescriptionRequired ? (
-                                                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">Required</span>
-                                                        ) : (
-                                                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">OTC</span>
-                                                        )}
-                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                                    </div>
+                                    )}
                             </div>
                             )}
                         </div>
@@ -826,7 +1211,23 @@ function OrdersSection() {
 
                         {/* Actions */}
                         <div className="flex justify-end gap-3">
-                            {selected.status === 'pending' && (
+                            {selected.orderType === 'prescription' && selected.status === 'pending' && (!selected.orderList || selected.orderList.length === 0) && (
+                                <button 
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    onClick={openProductSelection}
+                                >
+                                    Verify & Select Products
+                                </button>
+                            )}
+                            
+                            {selected.orderType === 'prescription' && selected.status === 'pending' && selected.orderList && selected.orderList.length > 0 && (
+                                <div className="text-center text-gray-600">
+                                    <p className="mb-2">Waiting for customer confirmation...</p>
+                                    <p className="text-sm">Products selected. Customer needs to confirm the order.</p>
+                                </div>
+                            )}
+                            
+                            {selected.orderType === 'product' && selected.status === 'pending' && (
                                 <button 
                                     className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
                                     onClick={() => verifyOrder(selected._id)}
@@ -863,739 +1264,174 @@ function OrdersSection() {
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
 
-// Prescriptions Section Component
-function PrescriptionsSection() {
-    const { token } = useAuth();
-    const [prescriptions, setPrescriptions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [filter, setFilter] = useState('all');
-    const [selectedPrescription, setSelectedPrescription] = useState(null);
-    const [showRejectModal, setShowRejectModal] = useState(false);
-    const [rejectForm, setRejectForm] = useState({
-        pharmacistNotes: ''
-    });
-    const [showOrderListModal, setShowOrderListModal] = useState(false);
-    const [products, setProducts] = useState([]);
-    const [orderList, setOrderList] = useState([]);
-    const [productSearch, setProductSearch] = useState('');
-    const [loadingProducts, setLoadingProducts] = useState(false);
-
-    useEffect(() => {
-        if (token) {
-            fetchPrescriptions();
-        }
-    }, [token, filter]);
-
-    const fetchPrescriptions = async () => {
-        try {
-            setLoading(true);
-            const url = filter === 'all' 
-                ? 'http://localhost:5001/api/prescriptions/admin/all'
-                : `http://localhost:5001/api/prescriptions/admin/all?status=${filter}`;
-            
-            const res = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await res.json();
-            
-            if (res.ok) {
-                setPrescriptions(data);
-            } else {
-                setError(data.message || 'Failed to fetch prescriptions');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-
-    const handleVerifyPrescription = (prescription) => {
-        setSelectedPrescription(prescription);
-        setOrderList([]);
-        setShowOrderListModal(true);
-        fetchProducts();
-    };
-
-    const handleRejectPrescription = (prescription) => {
-        setSelectedPrescription(prescription);
-        setRejectForm({
-            pharmacistNotes: ''
-        });
-        setShowRejectModal(true);
-    };
-
-
-    const rejectPrescription = async () => {
-        if (!selectedPrescription) return;
-
-        try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/${selectedPrescription._id}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    status: 'rejected',
-                    pharmacistNotes: rejectForm.pharmacistNotes
-                })
-            });
-
-            const data = await res.json();
-            if (res.ok) {
-                setShowRejectModal(false);
-                setSelectedPrescription(null);
-                fetchPrescriptions();
-            } else {
-                setError(data.message || 'Failed to reject prescription');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        }
-    };
-
-    const openOrderListModal = async () => {
-        setShowOrderListModal(true);
-        await fetchProducts();
-    };
-
-    const fetchProducts = async () => {
-        setLoadingProducts(true);
-        try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/products?search=${productSearch}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setProducts(data);
-            } else {
-                setError(data.message || 'Failed to fetch products');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        } finally {
-            setLoadingProducts(false);
-        }
-    };
-
-    const addToOrderList = (product) => {
-        const existingItem = orderList.find(item => item.productId === product._id);
-        if (existingItem) {
-            setOrderList(orderList.map(item => 
-                item.productId === product._id 
-                    ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * item.unitPrice }
-                    : item
-            ));
-        } else {
-            setOrderList([...orderList, {
-                productId: product._id,
-                productName: product.name,
-                quantity: 1,
-                unitPrice: product.price,
-                totalPrice: product.price
-            }]);
-        }
-    };
-
-    const updateOrderItemQuantity = (productId, quantity) => {
-        if (quantity <= 0) {
-            setOrderList(orderList.filter(item => item.productId !== productId));
-        } else {
-            setOrderList(orderList.map(item => 
-                item.productId === productId 
-                    ? { ...item, quantity, totalPrice: quantity * item.unitPrice }
-                    : item
-            ));
-        }
-    };
-
-    const removeFromOrderList = (productId) => {
-        setOrderList(orderList.filter(item => item.productId !== productId));
-    };
-
-    const sendOrderList = async () => {
-        if (!selectedPrescription || orderList.length === 0) return;
-
-        try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/${selectedPrescription._id}/order-list`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ orderList })
-            });
-
-            const data = await res.json();
-            if (res.ok) {
-                setShowOrderListModal(false);
-                setOrderList([]);
-                setSelectedPrescription(null);
-                fetchPrescriptions();
-            } else {
-                setError(data.message || 'Failed to send order list');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        }
-    };
-
-    const updatePrescriptionWorkflow = async (prescriptionId, newStatus) => {
-        try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/${prescriptionId}/workflow`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ status: newStatus })
-            });
-
-            const data = await res.json();
-            if (res.ok) {
-                fetchPrescriptions();
-            } else {
-                setError(data.message || 'Failed to update prescription status');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        }
-    };
-
-    const downloadPrescriptionFile = async (prescriptionId) => {
-        try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/${prescriptionId}/download`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `prescription-${prescriptionId}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                setError('Failed to download prescription file');
-            }
-        } catch (error) {
-            setError('Network error. Please try again.');
-        }
-    };
-
-    const previewPrescriptionFile = async (prescriptionId, fileName) => {
-        try {
-            const res = await fetch(`http://localhost:5001/api/prescriptions/${prescriptionId}/download`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                
-                // Check file type for proper preview
-                const fileExtension = fileName ? fileName.split('.').pop().toLowerCase() : 'unknown';
-                
-                if (fileExtension === 'pdf') {
-                    // For PDFs, open in new tab
-                    window.open(url, '_blank');
-                } else if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-                    // For images, open in new tab
-                    window.open(url, '_blank');
-                } else {
-                    // For other file types, try to open in new tab
-                    window.open(url, '_blank');
-                }
-                
-                // Clean up the URL after a delay to allow the browser to load it
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                }, 10000);
-            } else {
-                const errorData = await res.json();
-                setError(`Failed to preview prescription file: ${errorData.message || 'Unknown error'}`);
-            }
-        } catch (error) {
-            setError(`Network error: ${error.message}`);
-        }
-    };
-
-    const getStatusBadge = (status) => {
-        const statusConfig = {
-            'uploaded': { color: 'bg-blue-100 text-blue-800', text: 'Uploaded' },
-            'under_review': { color: 'bg-yellow-100 text-yellow-800', text: 'Under Review' },
-            'verified': { color: 'bg-green-100 text-green-800', text: 'Verified' },
-            'order_list_sent': { color: 'bg-purple-100 text-purple-800', text: 'Order List Sent' },
-            'approved': { color: 'bg-green-100 text-green-800', text: 'Approved' },
-            'preparing': { color: 'bg-purple-100 text-purple-800', text: 'Preparing' },
-            'ready_for_delivery': { color: 'bg-orange-100 text-orange-800', text: 'Ready for Delivery' },
-            'delivered': { color: 'bg-green-100 text-green-800', text: 'Delivered' },
-            'rejected': { color: 'bg-red-100 text-red-800', text: 'Rejected' },
-            'cancelled': { color: 'bg-red-100 text-red-800', text: 'Cancelled' }
-        };
-        
-        const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', text: status };
-        return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-                {config.text}
-            </span>
-        );
-    };
-
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    return (
-        <div className="prescriptions-section">
-            <div className="flex items-center justify-between mb-6">
-                <h2>Prescription Management</h2>
-                <button 
-                    onClick={fetchPrescriptions}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                    Refresh
-                </button>
-            </div>
-
-            {/* Filter Buttons */}
-            <div className="mb-6">
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => setFilter('all')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            filter === 'all' 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        }`}
-                    >
-                        All Prescriptions
-                    </button>
-                    <button
-                        onClick={() => setFilter('approved')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            filter === 'approved' 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        }`}
-                    >
-                        Approved
-                    </button>
-                </div>
-            </div>
-
-            {error && (
-                <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 rounded-lg">
-                    {error}
-                </div>
-            )}
-
-            <div className="bg-white rounded-xl shadow overflow-x-auto">
-                {loading ? (
-                    <div className="p-8 text-center">
-                        <div className="text-gray-500">Loading prescriptions...</div>
-                    </div>
-                ) : (
-                    <>
-                        {prescriptions.length === 0 ? (
-                            <div className="p-8 text-center">
-                                <div className="text-gray-500">No prescriptions found</div>
-                            </div>
-                        ) : (
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-gray-600 bg-gray-50">
-                                        <th className="p-4">Prescription #</th>
-                                        <th className="p-4">Customer Info</th>
-                                        <th className="p-4">Prescription File</th>
-                                        <th className="p-4">Status</th>
-                                        <th className="p-4">Amount</th>
-                                        <th className="p-4">Notes</th>
-                                        <th className="p-4">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {prescriptions.map((prescription) => (
-                                        <tr key={prescription._id} className="border-t hover:bg-gray-50">
-                                            <td className="p-4">
-                                                <div className="font-mono text-blue-600">
-                                                    {prescription.prescriptionNumber}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {formatDate(prescription.createdAt)}
-                                                </div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="font-medium">{prescription.patientName}</div>
-                                                <div className="text-sm text-gray-600">{prescription.phone}</div>
-                                                <div className="text-xs text-gray-500 max-w-xs truncate" title={prescription.address}>
-                                                    {prescription.address}
-                                                </div>
-                                                {prescription.user && (
-                                                    <div className="text-xs text-gray-500 mt-1">
-                                                        User: {prescription.user.firstName} {prescription.user.lastName}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="text-sm text-gray-600 mb-2">
-                                                    {prescription.originalFileName}
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => downloadPrescriptionFile(prescription._id)}
-                                                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                                                    >
-                                                        Download
-                                                    </button>
-                                                    <button
-                                                        onClick={() => previewPrescriptionFile(prescription._id, prescription.originalFileName)}
-                                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                                                    >
-                                                        Preview
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="p-4">
-                                                {getStatusBadge(prescription.status)}
-                                            </td>
-                                            <td className="p-4">
-                                                {prescription.totalAmount > 0 ? (
-                                                    <div className="font-medium text-green-600">
-                                                        Rs. {prescription.totalAmount.toFixed(2)}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-gray-500">Not calculated</div>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="max-w-xs">
-                                                    {prescription.notes && (
-                                                        <div className="text-sm text-gray-600 mb-1">
-                                                            <span className="font-medium">Customer:</span> {prescription.notes}
-                                                        </div>
-                                                    )}
-                                                    {prescription.pharmacistNotes && (
-                                                        <div className="text-sm text-blue-600">
-                                                            <span className="font-medium">Pharmacist:</span> {prescription.pharmacistNotes}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex gap-2">
-                                                    {prescription.status === 'uploaded' && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleVerifyPrescription(prescription)}
-                                                                className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                                                            >
-                                                                Verify
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleRejectPrescription(prescription)}
-                                                                className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                                                            >
-                                                                Reject
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    
-                                                    {prescription.status === 'approved' && (
-                                                        <button
-                                                            onClick={() => updatePrescriptionWorkflow(prescription._id, 'preparing')}
-                                                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                                                        >
-                                                            Start Processing
-                                                        </button>
-                                                    )}
-                                                    
-                                                    {prescription.status === 'preparing' && (
-                                                        <button
-                                                            onClick={() => updatePrescriptionWorkflow(prescription._id, 'ready_for_delivery')}
-                                                            className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
-                                                        >
-                                                            Ready for Delivery
-                                                        </button>
-                                                    )}
-                                                    
-                                                    {prescription.status === 'ready_for_delivery' && (
-                                                        <button
-                                                            onClick={() => updatePrescriptionWorkflow(prescription._id, 'delivered')}
-                                                            className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                                                        >
-                                                            Mark as Delivered
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </>
-                )}
-            </div>
-
-
-
-            {/* Reject Prescription Modal */}
-            {showRejectModal && selectedPrescription && (
+            {/* Product Selection Modal */}
+            {showProductSelection && (
                 <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white w-full max-w-md rounded-xl shadow-lg p-6">
+                    <div className="bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl shadow-lg p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-red-600">
-                                Reject Prescription
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Select Products for Prescription Order
                             </h3>
                             <button
-                                onClick={() => setShowRejectModal(false)}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="mb-4">
-                            <div className="text-sm text-gray-600 mb-2">
-                                Prescription: {selectedPrescription.prescriptionNumber}
-                            </div>
-                            <div className="text-sm text-gray-600 mb-2">
-                                Patient: {selectedPrescription.patientName}
-                            </div>
-                        </div>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Rejection Reason *
-                            </label>
-                            <textarea
-                                value={rejectForm.pharmacistNotes}
-                                onChange={(e) => setRejectForm({ ...rejectForm, pharmacistNotes: e.target.value })}
-                                rows={4}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                                placeholder="Please provide a detailed reason for rejecting this prescription..."
-                                required
-                            />
-                            {!rejectForm.pharmacistNotes && (
-                                <p className="text-red-500 text-xs mt-1">Rejection reason is required</p>
-                            )}
-                        </div>
-
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <div className="flex items-center">
-                                <span className="text-red-500 mr-2">⚠️</span>
-                                <span className="text-red-700 text-sm">
-                                    This action will reject the prescription order. The customer will be notified with the rejection reason.
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowRejectModal(false)}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={rejectPrescription}
-                                disabled={!rejectForm.pharmacistNotes.trim()}
-                                className={`px-4 py-2 rounded-lg ${
-                                    rejectForm.pharmacistNotes.trim() 
-                                        ? 'bg-red-600 text-white hover:bg-red-700' 
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                }`}
-                            >
-                                Reject Prescription
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Order List Modal */}
-            {showOrderListModal && selectedPrescription && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                    <div className="bg-white w-full max-w-6xl rounded-xl shadow-lg p-6 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-green-600">
-                                Create Order List for Prescription #{selectedPrescription.prescriptionNumber}
-                            </h3>
-                            <button
-                                onClick={() => setShowOrderListModal(false)}
-                                className="text-gray-500 hover:text-gray-700"
+                                onClick={closeProductSelection}
+                                className="text-gray-500 hover:text-gray-700 text-xl"
                             >
                                 ✕
                             </button>
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Product Selection */}
+                            {/* Available Products */}
                             <div>
-                                <h4 className="text-md font-semibold mb-3">Available Products</h4>
-                                
-                                {/* Product Dropdown */}
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Quick Select Product
-                                    </label>
-                                    <select
-                                        onChange={(e) => {
-                                            const productId = e.target.value;
-                                            if (productId) {
-                                                const product = products.find(p => p._id === productId);
-                                                if (product) addToOrderList(product);
-                                                e.target.value = ''; // Reset selection
-                                            }
-                                        }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    >
-                                        <option value="">Choose a product to add...</option>
-                                        {products.map(product => (
-                                            <option key={product._id} value={product._id}>
-                                                {product.name} - Rs. {product.price} (Stock: {product.stock})
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div className="flex justify-between items-center mb-3">
+                                    <h4 className="font-semibold">Available Products</h4>
+                                    <span className="text-sm text-gray-500">
+                                        {filteredProducts.length} products
+                                    </span>
                                 </div>
                                 
-                                {/* Search */}
+                                {/* Search Bar */}
                                 <div className="mb-4">
                                     <input
                                         type="text"
-                                        placeholder="Search products..."
-                                        value={productSearch}
-                                        onChange={(e) => setProductSearch(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && fetchProducts()}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        placeholder="Search products by name, description, or category..."
+                                        value={searchTerm}
+                                        onChange={(e) => handleSearch(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                     />
-                                    <button
-                                        onClick={fetchProducts}
-                                        className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                                    >
-                                        Search Products
-                                    </button>
                                 </div>
 
-                                {/* Products List */}
-                                <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
                                     {loadingProducts ? (
-                                        <div className="p-4 text-center">Loading products...</div>
-                                    ) : (
-                                        products.map(product => (
-                                            <div key={product._id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
-                                                <div className="flex justify-between items-center">
+                                    <div className="text-center py-4">Loading products...</div>
+                                ) : (
+                                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                                        {filteredProducts.length === 0 ? (
+                                            <div className="text-center py-4 text-gray-500">
+                                                {searchTerm ? 'No products found matching your search' : 'No products available'}
+                                            </div>
+                                        ) : (
+                                            filteredProducts.map(product => (
+                                                <div key={product._id} className="border rounded-lg p-3 hover:bg-gray-50">
+                                                    <div className="flex justify-between items-start">
                                                     <div className="flex-1">
-                                                        <h5 className="font-medium text-gray-900">{product.name}</h5>
+                                                            <h5 className="font-medium">{product.name}</h5>
                                                         <p className="text-sm text-gray-600">{product.description}</p>
-                                                        <p className="text-sm text-green-600 font-medium">Rs. {product.price}</p>
-                                                        <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                                                            <div className="flex items-center gap-4 mt-1">
+                                                                <p className="text-sm font-semibold text-green-600">
+                                                                    Rs.{Number(product.price).toFixed(2)}
+                                                                </p>
+                                                                <p className={`text-xs px-2 py-1 rounded-full ${
+                                                                    (product.stock || 0) > 0 
+                                                                        ? 'bg-green-100 text-green-800' 
+                                                                        : 'bg-red-100 text-red-800'
+                                                                }`}>
+                                                                    Stock: {product.stock || 0} units
+                                                                </p>
+                                                            </div>
                                                     </div>
                                                     <button
-                                                        onClick={() => addToOrderList(product)}
-                                                        className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                                                    >
-                                                        Add
+                                                            onClick={() => addProductToSelection(product)}
+                                                            disabled={(product.stock || 0) <= 0}
+                                                            className={`ml-2 px-3 py-1 rounded text-xs ${
+                                                                (product.stock || 0) > 0
+                                                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                            }`}
+                                                        >
+                                                            {(product.stock || 0) > 0 ? 'Add' : 'Out of Stock'}
                                                     </button>
                                                 </div>
                                             </div>
                                         ))
                                     )}
                                 </div>
+                                )}
                             </div>
 
-                            {/* Order List */}
+                            {/* Selected Products */}
                             <div>
-                                <h4 className="text-md font-semibold mb-3">Order List</h4>
-                                
-                                <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
-                                    {orderList.length === 0 ? (
-                                        <div className="p-4 text-center text-gray-500">No items in order list</div>
-                                    ) : (
-                                        orderList.map((item, index) => (
-                                            <div key={index} className="p-3 border-b border-gray-100">
+                                <h4 className="font-semibold mb-3">Selected Products</h4>
+                                {selectedProducts.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        No products selected
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                                        {selectedProducts.map(product => (
+                                            <div key={product.productId} className="border rounded-lg p-3 bg-gray-50">
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex-1">
-                                                        <h5 className="font-medium text-gray-900">{item.productName}</h5>
-                                                        <p className="text-sm text-gray-600">Rs. {item.unitPrice} each</p>
+                                                        <h5 className="font-medium">{product.name}</h5>
+                                                        <p className="text-sm text-gray-600">
+                                                            Rs.{Number(product.price).toFixed(2)} each
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            Stock: {product.stockQuantity || 0} units
+                                                        </p>
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <button
-                                                            onClick={() => updateOrderItemQuantity(item.productId, item.quantity - 1)}
-                                                            className="w-6 h-6 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                                                            onClick={() => updateProductQuantity(product.productId, product.quantity - 1)}
+                                                            className="w-6 h-6 bg-gray-300 text-gray-700 rounded flex items-center justify-center text-sm"
                                                         >
                                                             -
                                                         </button>
-                                                        <span className="w-8 text-center">{item.quantity}</span>
+                                                        <span className="w-8 text-center">{product.quantity}</span>
                                                         <button
-                                                            onClick={() => updateOrderItemQuantity(item.productId, item.quantity + 1)}
-                                                            className="w-6 h-6 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                                                            onClick={() => updateProductQuantity(product.productId, product.quantity + 1)}
+                                                            disabled={product.quantity >= (product.stockQuantity || 0)}
+                                                            className={`w-6 h-6 rounded flex items-center justify-center text-sm ${
+                                                                product.quantity >= (product.stockQuantity || 0)
+                                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                                    : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                                                            }`}
                                                         >
                                                             +
                                                         </button>
-                                                        <span className="w-16 text-right font-medium">Rs. {item.totalPrice.toFixed(2)}</span>
                                                         <button
-                                                            onClick={() => removeFromOrderList(item.productId)}
-                                                            className="w-6 h-6 bg-red-200 text-red-600 rounded hover:bg-red-300"
+                                                            onClick={() => removeProductFromSelection(product.productId)}
+                                                            className="ml-2 px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
                                                         >
-                                                            ×
+                                                            Remove
                                                         </button>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                {/* Total */}
-                                {orderList.length > 0 && (
-                                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-semibold text-green-800">Total Amount:</span>
-                                            <span className="text-lg font-bold text-green-800">
-                                                Rs. {orderList.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2)}
+                                                <div className="mt-2 text-right">
+                                                    <span className="font-semibold">
+                                                        Total: Rs.{Number(product.lineTotal).toFixed(2)}
                                             </span>
                                         </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
-                                {/* Actions */}
-                                <div className="flex justify-end gap-3 mt-4">
+                                {/* Total and Actions */}
+                                {selectedProducts.length > 0 && (
+                                    <div className="mt-4 border-t pt-4">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <span className="text-lg font-semibold">Total Amount:</span>
+                                            <span className="text-xl font-bold text-green-600">
+                                                Rs.{selectedProducts.reduce((sum, p) => sum + p.lineTotal, 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-3">
                                     <button
-                                        onClick={() => setShowOrderListModal(false)}
-                                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                                onClick={closeProductSelection}
+                                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                                     >
                                         Cancel
                                     </button>
                                     <button
-                                        onClick={sendOrderList}
-                                        disabled={orderList.length === 0}
-                                        className={`px-4 py-2 rounded-lg ${
-                                            orderList.length > 0 
-                                                ? 'bg-green-600 text-white hover:bg-green-700' 
-                                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        }`}
-                                    >
-                                        Send Order List to Customer
+                                                onClick={sendProductListToCustomer}
+                                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                            >
+                                                Send to Customer
                                     </button>
                                 </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

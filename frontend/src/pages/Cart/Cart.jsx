@@ -12,50 +12,8 @@ const Cart = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [cart, setCart] = useState(getCart())
-  const [stockStatus, setStockStatus] = useState({})
-  const [loadingStock, setLoadingStock] = useState(false)
   const subtotal = useMemo(() => cart.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0), [cart])
 
-  // Check stock status for cart items
-  const checkStockStatus = async () => {
-    if (cart.length === 0) return
-    
-    setLoadingStock(true)
-    try {
-      const items = cart.map(item => ({
-        productId: item._id || item.id,
-        name: item.name,
-        quantity: item.quantity || 1
-      }))
-      
-      const response = await fetch('http://localhost:5001/api/orders/check-stock', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ items })
-      })
-      
-      const data = await response.json()
-      if (response.ok && data.items) {
-        const statusMap = {}
-        data.items.forEach(item => {
-          statusMap[item.productId] = {
-            available: item.available,
-            availableStock: item.availableStock,
-            requestedQuantity: item.requestedQuantity,
-            message: item.message
-          }
-        })
-        setStockStatus(statusMap)
-      }
-    } catch (error) {
-      console.error('Failed to check stock status:', error)
-    } finally {
-      setLoadingStock(false)
-    }
-  }
 
   // Update cart when localStorage changes
   useEffect(() => {
@@ -72,12 +30,6 @@ const Cart = () => {
     }
   }, [])
 
-  // Check stock status when cart changes
-  useEffect(() => {
-    if (user && cart.length > 0) {
-      checkStockStatus()
-    }
-  }, [cart, user])
 
   const clearCart = () => {
     localStorage.removeItem('cart')
@@ -95,18 +47,6 @@ const Cart = () => {
   const proceedToCheckout = () => {
     if (cart.length === 0) {
       alert('Your cart is empty. Add some products first!')
-      return
-    }
-    
-    // Check if any items are out of stock
-    const outOfStockItems = cart.filter(item => {
-      const productId = item._id || item.id
-      const status = stockStatus[productId]
-      return status && !status.available
-    })
-    
-    if (outOfStockItems.length > 0) {
-      alert('Some items in your cart are out of stock. Please remove them before proceeding to checkout.')
       return
     }
     
@@ -129,7 +69,6 @@ const Cart = () => {
                     <th className="p-2">Product</th>
                     <th className="p-2">Price</th>
                     <th className="p-2">Qty</th>
-                    <th className="p-2">Stock Status</th>
                     <th className="p-2">Total</th>
                     <th className="p-2">Action</th>
                   </tr>
@@ -137,41 +76,17 @@ const Cart = () => {
                 <tbody>
                   {cart.length === 0 ? (
                     <tr className="border-t">
-                      <td className="p-2 text-center text-gray-500" colSpan="6">No items in cart.</td>
+                      <td className="p-2 text-center text-gray-500" colSpan="5">No items in cart.</td>
                     </tr>
                   ) : (
                     cart.map((item, idx) => {
-                      const productId = item._id || item.id
-                      const status = stockStatus[productId]
-                      const isOutOfStock = status && !status.available
-                      
                       return (
-                        <tr key={idx} className={`border-t ${isOutOfStock ? 'bg-red-50' : ''}`}>
+                        <tr key={idx} className="border-t">
                           <td className="p-2">
                             <div className="font-medium">{item.name}</div>
-                            {isOutOfStock && (
-                              <div className="text-xs text-red-600 mt-1">
-                                Requested: {status.requestedQuantity}, Available: {status.availableStock}
-                              </div>
-                            )}
                           </td>
                           <td className="p-2">Rs.{item.price?.toFixed ? item.price.toFixed(2) : item.price}</td>
                           <td className="p-2">{item.quantity || 1}</td>
-                          <td className="p-2">
-                            {loadingStock ? (
-                              <span className="text-gray-500 text-xs">Checking...</span>
-                            ) : status ? (
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                status.available 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {status.available ? 'In Stock' : 'Out of Stock'}
-                              </span>
-                            ) : (
-                              <span className="text-gray-500 text-xs">Unknown</span>
-                            )}
-                          </td>
                           <td className="p-2">Rs.{((item.price || 0) * (item.quantity || 1)).toFixed(2)}</td>
                           <td className="p-2">
                             <button

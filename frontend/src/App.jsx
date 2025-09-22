@@ -24,7 +24,6 @@ import Cart from "./pages/Cart/Cart"
 import Checkout from "./pages/Checkout/Checkout"
 import Orders from "./pages/Orders/Orders"
 import UploadPrescription from "./pages/UploadPrescription/UploadPrescription"
-import Prescriptions from "./pages/Prescriptions/Prescriptions"
 
 const App = () => {
   return (
@@ -62,9 +61,8 @@ const App = () => {
         <Route path="/contact" element={<div className="min-h-screen bg-white flex items-center justify-center"><h1 className="text-4xl font-bold text-blue-600">Contact Us Page - Coming Soon</h1></div>} /> 
         <Route path="/appointments" element={<Appointments />} /> 
         <Route path="/my-appointments" element={<RequireAuth><UserAppointments /></RequireAuth>} /> 
-        <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} /> 
-        <Route path="/upload-prescription" element={<RequireAuth><UploadPrescription /></RequireAuth>} />
-        <Route path="/prescriptions" element={<RequireAuth><Prescriptions /></RequireAuth>} /> 
+        <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} />
+        <Route path="/upload-prescription" element={<RequireAuth><UploadPrescription /></RequireAuth>} /> 
         
         {/* Catch-all route for authenticated users */}
         <Route path="*" element={<CatchAllRoute />} />

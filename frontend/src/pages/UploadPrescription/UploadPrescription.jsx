@@ -1,114 +1,142 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import Navbar from '../../components/Navbar/Navbar'
-import Footer from '../../components/Footer/Footer'
-import { useAuth } from '../../context/AuthContext'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Navbar from '../../components/Navbar/Navbar';
+import Footer from '../../components/Footer/Footer';
+import { useAuth } from '../../context/AuthContext';
 
 const UploadPrescription = () => {
-  const { user, token } = useAuth()
-  const navigate = useNavigate()
-  
-  const [formData, setFormData] = useState({
-    patientName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : '',
-    phone: user?.phone || '',
-    address: user?.address || '',
-    prescriptionFile: null,
-    paymentMethod: 'cod',
-    notes: ''
-  })
-  
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const { user, token } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+  const [formData, setFormData] = useState({
+    prescriptionFile: null,
+    patientName: '',
+    patientPhone: '',
+    patientAddress: '',
+    notes: '',
+    paymentMethod: 'cod',
+    deliveryType: 'home_delivery'
+  });
+
+  // Auto-fill user data when component mounts
+  useEffect(() => {
+    if (user) {
+      // Auto-fill patient name with user's full name
+      if (user.firstName || user.lastName) {
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+        setFormData(prev => ({ ...prev, patientName: fullName }));
+      }
+      
+      // Auto-fill patient phone with user's phone
+      if (user.phone) {
+        setFormData(prev => ({ ...prev, patientPhone: user.phone }));
+      }
+    }
+  }, [user]);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf']
-      if (!allowedTypes.includes(file.type)) {
-        setError('Please upload a valid image (JPEG, PNG, GIF) or PDF file')
-        return
-      }
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB')
-        return
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        prescriptionFile: file
-      }))
-      setError('')
-    }
-  }
+    setFormData({ ...formData, prescriptionFile: e.target.files[0] });
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-    
-    if (!formData.patientName || !formData.phone || !formData.address || !formData.prescriptionFile) {
-      setError('Please fill in all required fields and upload a prescription')
-      return
-    }
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
-    setLoading(true)
-    
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append('patientName', formData.patientName)
-      formDataToSend.append('phone', formData.phone)
-      formDataToSend.append('address', formData.address)
-      formDataToSend.append('prescriptionFile', formData.prescriptionFile)
-      formDataToSend.append('paymentMethod', formData.paymentMethod)
-      formDataToSend.append('notes', formData.notes)
+      // First upload the prescription file
+      const formDataToSend = new FormData();
+      formDataToSend.append('prescriptionFile', formData.prescriptionFile);
 
-      const response = await fetch('http://localhost:5001/api/prescriptions', {
+      const uploadResponse = await fetch('http://localhost:5001/api/prescriptions/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
         body: formDataToSend
-      })
+      });
 
-      const data = await response.json()
-      
-      if (response.ok) {
-        setSuccess('Prescription order placed successfully! You can view the status in your prescriptions section.')
-        setFormData({
-          patientName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : '',
-          phone: user?.phone || '',
-          address: user?.address || '',
-          prescriptionFile: null,
-          paymentMethod: 'cod',
-          notes: ''
-        })
-        // Reset file input
-        document.getElementById('prescriptionFile').value = ''
-      } else {
-        setError(data.message || 'Failed to upload prescription')
+      const uploadData = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.message || 'Failed to upload prescription');
       }
+
+      // Then create the prescription order
+      const orderData = {
+        prescriptionFile: uploadData.fileName,
+        prescriptionDetails: {
+          patientName: formData.patientName,
+          patientPhone: formData.patientPhone,
+          patientAddress: formData.patientAddress,
+          notes: formData.notes,
+          prescriptionNumber: uploadData.prescriptionNumber
+        },
+        customer: {
+          name: user.firstName + ' ' + user.lastName,
+          phone: user.phone || formData.patientPhone,
+          address: formData.patientAddress || user.address,
+          notes: formData.notes
+        },
+        paymentMethod: formData.paymentMethod,
+        deliveryType: formData.deliveryType,
+        total: 0 // Will be calculated by pharmacist
+      };
+
+      const orderResponse = await fetch('http://localhost:5001/api/prescriptions/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      const orderResult = await orderResponse.json();
+
+      if (!orderResponse.ok) {
+        throw new Error(orderResult.message || 'Failed to create prescription order');
+      }
+
+      setSuccess('Prescription order created successfully! Our pharmacist will review it and contact you soon.');
+      setFormData({
+        prescriptionFile: null,
+        patientName: '',
+        patientPhone: '',
+        patientAddress: '',
+        notes: '',
+        paymentMethod: 'cod',
+        deliveryType: 'home_delivery'
+      });
+
+      // Reset file input
+      const fileInput = document.getElementById('prescriptionFile');
+      if (fileInput) fileInput.value = '';
+
     } catch (error) {
-      setError('Network error. Please try again.')
+      setError(error.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   if (!user) {
-    navigate('/login')
-    return null
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Please log in to upload prescription</h1>
+          <button onClick={() => navigate('/login')} className="btn-primary">Sign In</button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,17 +144,11 @@ const UploadPrescription = () => {
       <Navbar />
       
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">📄</span>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Prescription</h1>
-            <p className="text-gray-600">Upload your prescription and we'll prepare your medicines</p>
-          </div>
-
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">Upload Prescription</h1>
+          
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-center">
                 <span className="text-red-500 mr-2">⚠️</span>
                 <span className="text-red-700">{error}</span>
@@ -135,7 +157,7 @@ const UploadPrescription = () => {
           )}
 
           {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center">
                 <span className="text-green-500 mr-2">✅</span>
                 <span className="text-green-700">{success}</span>
@@ -144,13 +166,27 @@ const UploadPrescription = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Prescription File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Prescription File *
+              </label>
+              <input
+                type="file"
+                id="prescriptionFile"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Supported formats: PDF, JPG, JPEG, PNG</p>
+            </div>
+
             {/* Patient Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Patient Information</h3>
-              
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Patient Name *
+                  Full Name *
                 </label>
                 <input
                   type="text"
@@ -158,161 +194,108 @@ const UploadPrescription = () => {
                   value={formData.patientName}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Enter patient name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
                 <input
                   type="tel"
-                  name="phone"
-                  value={formData.phone}
+                  name="patientPhone"
+                  value={formData.patientPhone}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Enter phone number"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Delivery Address *
-                </label>
-                <textarea
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  required
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Enter complete delivery address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            {/* Prescription Upload */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Prescription Upload</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Prescription *
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-400 transition-colors">
-                  <input
-                    type="file"
-                    id="prescriptionFile"
-                    name="prescriptionFile"
-                    onChange={handleFileChange}
-                    accept="image/*,.pdf"
-                    required
-                    className="hidden"
-                  />
-                  <label htmlFor="prescriptionFile" className="cursor-pointer">
-                    <div className="space-y-2">
-                      <div className="text-4xl text-gray-400">📄</div>
-                      <div className="text-sm text-gray-600">
-                        {formData.prescriptionFile ? (
-                          <span className="text-green-600 font-medium">{formData.prescriptionFile.name}</span>
-                        ) : (
-                          <>
-                            Click to upload prescription<br />
-                            <span className="text-xs text-gray-500">Supports: JPG, PNG, GIF, PDF (Max 5MB)</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Method */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Payment Method</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Choose Payment Method
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="cod"
-                      checked={formData.paymentMethod === 'cod'}
-                      onChange={handleInputChange}
-                      className="mr-3"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900">Cash on Delivery (COD)</div>
-                      <div className="text-sm text-gray-500">Pay when your order is delivered</div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Additional Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Notes (Optional)
+                Delivery Address *
+              </label>
+              <textarea
+                name="patientAddress"
+                value={formData.patientAddress}
+                onChange={handleInputChange}
+                required
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Notes
               </label>
               <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleInputChange}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="Any special instructions or notes for the pharmacist..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Any special instructions or notes..."
               />
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-4">
+            {/* Payment and Delivery Options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payment Method
+                </label>
+                <select
+                  name="paymentMethod"
+                  value={formData.paymentMethod}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="cod">Cash on Delivery</option>
+                  <option value="online">Online Payment</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Delivery Type
+                </label>
+                <select
+                  name="deliveryType"
+                  value={formData.deliveryType}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="home_delivery">Home Delivery</option>
+                  <option value="pickup">Pickup from Store</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
               >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Placing Order...
-                  </>
-                ) : (
-                  'Place Prescription Order'
-                )}
+                {loading ? 'Creating Order...' : 'Create Prescription Order'}
               </button>
             </div>
           </form>
-
-          {/* Information Box */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start">
-              <span className="text-blue-500 mr-2 mt-0.5">ℹ️</span>
-              <div className="text-sm text-blue-700">
-                <p className="font-medium mb-1">What happens next?</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Your prescription will be reviewed by our pharmacist</li>
-                  <li>We'll prepare your medicines and calculate the total cost</li>
-                  <li>You'll receive a confirmation with the order details</li>
-                  <li>Your order will be delivered to the provided address</li>
-                </ul>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       <Footer />
     </div>
-  )
-}
+  );
+};
 
-export default UploadPrescription
+export default UploadPrescription;

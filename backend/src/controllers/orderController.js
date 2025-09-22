@@ -205,7 +205,11 @@ export const listDeliveryOrders = async (req, res) => {
 export const listMyOrders = async (req, res) => {
   try {
     const userId = req.userId
-    const orders = await Order.find({ user: userId }).sort({ createdAt: -1 })
+    // Only return product orders, not prescription orders
+    const orders = await Order.find({ 
+      user: userId,
+      orderType: { $ne: 'prescription' } // Exclude prescription orders
+    }).sort({ createdAt: -1 })
     return res.json(orders)
   } catch (err) {
     console.error('listMyOrders error:', err)
@@ -215,7 +219,10 @@ export const listMyOrders = async (req, res) => {
 
 export const listAllOrders = async (_req, res) => {
   try {
-    const orders = await Order.find({}).sort({ createdAt: -1 })
+    // Only return product orders, not prescription orders
+    const orders = await Order.find({ 
+      orderType: { $ne: 'prescription' } // Exclude prescription orders
+    }).sort({ createdAt: -1 })
     return res.json(orders)
   } catch (err) {
     console.error('listAllOrders error:', err)
