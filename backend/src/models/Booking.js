@@ -12,22 +12,25 @@ const bookingSchema = new mongoose.Schema({
     endTime: { type: String, required: true },
 
     // patient info
-    patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     patientName: { type: String, required: true },
     patientEmail: { type: String, required: true },
     patientPhone: { type: String, required: true },
-    patientNIC: { type: String, required: true },
     patientAge: { type: Number, required: true },
     patientGender: { type: String, enum: ['male', 'female', 'other'], required: true },
-    patientAddress: { type: String, required: true },
     ongoingCondition: { type: String, enum: ['yes', 'no'], required: true },
     notes: { type: String, default: '' },
+    documents: [{ 
+        filename: String, 
+        originalName: String, 
+        path: String, 
+        uploadedAt: { type: Date, default: Date.now }
+    }],
 
     // statuses
-    status: { type: String, enum: ['pending', 'confirmed', 'completed', 'cancelled', 'no_show'], default: 'pending' },
     paymentStatus: { type: String, enum: ['paid', 'cod', 'pending'], default: 'pending' },
     channel: { type: String, enum: ['online', 'walk_in', 'phone'], default: 'online' },
-    slotNumber: { type: Number, default: null } // Slot number in the appointment session
+    slotNumber: { type: Number, default: null }, // Slot number in the appointment session
+    slotTime: { type: String, default: null } // Actual time of the booked slot
 }, { timestamps: true });
 
 bookingSchema.pre('validate', function(next) {

@@ -93,7 +93,7 @@ const Products = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6 text-center">
             {activeCategory && (
-              <div className="text-gray-500 text-lg mb-2">/ {activeCategory}</div>
+              <div className="text-gray-500 text-lg mb-2"> {activeCategory}</div>
             )}
             <div className="flex justify-center">
               <div className="flex gap-2 flex-wrap justify-center">
@@ -118,6 +118,13 @@ const Products = () => {
                   className="border border-gray-300 rounded-lg px-3 py-2 w-80 max-w-full focus:outline-none focus:ring-0 focus:border-gray-400"
                 />
                 <button onClick={() => { setLoading(true); load(q); }} className="btn-primary">Search</button>
+                <Link 
+                  to="/upload-prescription" 
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <span>📄</span>
+                  + Order with Prescription
+                </Link>
               </div>
             </div>
           </div>

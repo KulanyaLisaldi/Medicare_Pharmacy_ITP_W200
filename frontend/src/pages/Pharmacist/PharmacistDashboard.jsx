@@ -193,12 +193,7 @@ const PharmacistDashboard = () => {
                 return <InventorySection />;
 
 			case 'prescriptions':
-				return (
-					<div className="prescriptions-section">
-						<h2>Prescription Management</h2>
-						<p>Prescription management features coming soon...</p>
-					</div>
-				);
+				return <PrescriptionsSection />;
 
 			case 'reports':
 				return (
@@ -864,6 +859,744 @@ function OrdersSection() {
                             >
                                 Cancel Order
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Prescriptions Section Component
+function PrescriptionsSection() {
+    const { token } = useAuth();
+    const [prescriptions, setPrescriptions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [filter, setFilter] = useState('all');
+    const [selectedPrescription, setSelectedPrescription] = useState(null);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectForm, setRejectForm] = useState({
+        pharmacistNotes: ''
+    });
+    const [showOrderListModal, setShowOrderListModal] = useState(false);
+    const [products, setProducts] = useState([]);
+    const [orderList, setOrderList] = useState([]);
+    const [productSearch, setProductSearch] = useState('');
+    const [loadingProducts, setLoadingProducts] = useState(false);
+
+    useEffect(() => {
+        if (token) {
+            fetchPrescriptions();
+        }
+    }, [token, filter]);
+
+    const fetchPrescriptions = async () => {
+        try {
+            setLoading(true);
+            const url = filter === 'all' 
+                ? 'http://localhost:5001/api/prescriptions/admin/all'
+                : `http://localhost:5001/api/prescriptions/admin/all?status=${filter}`;
+            
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            
+            if (res.ok) {
+                setPrescriptions(data);
+            } else {
+                setError(data.message || 'Failed to fetch prescriptions');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const handleVerifyPrescription = (prescription) => {
+        setSelectedPrescription(prescription);
+        setOrderList([]);
+        setShowOrderListModal(true);
+        fetchProducts();
+    };
+
+    const handleRejectPrescription = (prescription) => {
+        setSelectedPrescription(prescription);
+        setRejectForm({
+            pharmacistNotes: ''
+        });
+        setShowRejectModal(true);
+    };
+
+
+    const rejectPrescription = async () => {
+        if (!selectedPrescription) return;
+
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/${selectedPrescription._id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    status: 'rejected',
+                    pharmacistNotes: rejectForm.pharmacistNotes
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                setShowRejectModal(false);
+                setSelectedPrescription(null);
+                fetchPrescriptions();
+            } else {
+                setError(data.message || 'Failed to reject prescription');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        }
+    };
+
+    const openOrderListModal = async () => {
+        setShowOrderListModal(true);
+        await fetchProducts();
+    };
+
+    const fetchProducts = async () => {
+        setLoadingProducts(true);
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/products?search=${productSearch}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setProducts(data);
+            } else {
+                setError(data.message || 'Failed to fetch products');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
+
+    const addToOrderList = (product) => {
+        const existingItem = orderList.find(item => item.productId === product._id);
+        if (existingItem) {
+            setOrderList(orderList.map(item => 
+                item.productId === product._id 
+                    ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * item.unitPrice }
+                    : item
+            ));
+        } else {
+            setOrderList([...orderList, {
+                productId: product._id,
+                productName: product.name,
+                quantity: 1,
+                unitPrice: product.price,
+                totalPrice: product.price
+            }]);
+        }
+    };
+
+    const updateOrderItemQuantity = (productId, quantity) => {
+        if (quantity <= 0) {
+            setOrderList(orderList.filter(item => item.productId !== productId));
+        } else {
+            setOrderList(orderList.map(item => 
+                item.productId === productId 
+                    ? { ...item, quantity, totalPrice: quantity * item.unitPrice }
+                    : item
+            ));
+        }
+    };
+
+    const removeFromOrderList = (productId) => {
+        setOrderList(orderList.filter(item => item.productId !== productId));
+    };
+
+    const sendOrderList = async () => {
+        if (!selectedPrescription || orderList.length === 0) return;
+
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/${selectedPrescription._id}/order-list`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ orderList })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                setShowOrderListModal(false);
+                setOrderList([]);
+                setSelectedPrescription(null);
+                fetchPrescriptions();
+            } else {
+                setError(data.message || 'Failed to send order list');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        }
+    };
+
+    const updatePrescriptionWorkflow = async (prescriptionId, newStatus) => {
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/${prescriptionId}/workflow`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                fetchPrescriptions();
+            } else {
+                setError(data.message || 'Failed to update prescription status');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        }
+    };
+
+    const downloadPrescriptionFile = async (prescriptionId) => {
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/${prescriptionId}/download`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `prescription-${prescriptionId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                setError('Failed to download prescription file');
+            }
+        } catch (error) {
+            setError('Network error. Please try again.');
+        }
+    };
+
+    const previewPrescriptionFile = async (prescriptionId, fileName) => {
+        try {
+            const res = await fetch(`http://localhost:5001/api/prescriptions/${prescriptionId}/download`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                
+                // Check file type for proper preview
+                const fileExtension = fileName ? fileName.split('.').pop().toLowerCase() : 'unknown';
+                
+                if (fileExtension === 'pdf') {
+                    // For PDFs, open in new tab
+                    window.open(url, '_blank');
+                } else if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+                    // For images, open in new tab
+                    window.open(url, '_blank');
+                } else {
+                    // For other file types, try to open in new tab
+                    window.open(url, '_blank');
+                }
+                
+                // Clean up the URL after a delay to allow the browser to load it
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                }, 10000);
+            } else {
+                const errorData = await res.json();
+                setError(`Failed to preview prescription file: ${errorData.message || 'Unknown error'}`);
+            }
+        } catch (error) {
+            setError(`Network error: ${error.message}`);
+        }
+    };
+
+    const getStatusBadge = (status) => {
+        const statusConfig = {
+            'uploaded': { color: 'bg-blue-100 text-blue-800', text: 'Uploaded' },
+            'under_review': { color: 'bg-yellow-100 text-yellow-800', text: 'Under Review' },
+            'verified': { color: 'bg-green-100 text-green-800', text: 'Verified' },
+            'order_list_sent': { color: 'bg-purple-100 text-purple-800', text: 'Order List Sent' },
+            'approved': { color: 'bg-green-100 text-green-800', text: 'Approved' },
+            'preparing': { color: 'bg-purple-100 text-purple-800', text: 'Preparing' },
+            'ready_for_delivery': { color: 'bg-orange-100 text-orange-800', text: 'Ready for Delivery' },
+            'delivered': { color: 'bg-green-100 text-green-800', text: 'Delivered' },
+            'rejected': { color: 'bg-red-100 text-red-800', text: 'Rejected' },
+            'cancelled': { color: 'bg-red-100 text-red-800', text: 'Cancelled' }
+        };
+        
+        const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', text: status };
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                {config.text}
+            </span>
+        );
+    };
+
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    return (
+        <div className="prescriptions-section">
+            <div className="flex items-center justify-between mb-6">
+                <h2>Prescription Management</h2>
+                <button 
+                    onClick={fetchPrescriptions}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                    Refresh
+                </button>
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="mb-6">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setFilter('all')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            filter === 'all' 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                        All Prescriptions
+                    </button>
+                    <button
+                        onClick={() => setFilter('approved')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            filter === 'approved' 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                        Approved
+                    </button>
+                </div>
+            </div>
+
+            {error && (
+                <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow overflow-x-auto">
+                {loading ? (
+                    <div className="p-8 text-center">
+                        <div className="text-gray-500">Loading prescriptions...</div>
+                    </div>
+                ) : (
+                    <>
+                        {prescriptions.length === 0 ? (
+                            <div className="p-8 text-center">
+                                <div className="text-gray-500">No prescriptions found</div>
+                            </div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-left text-gray-600 bg-gray-50">
+                                        <th className="p-4">Prescription #</th>
+                                        <th className="p-4">Customer Info</th>
+                                        <th className="p-4">Prescription File</th>
+                                        <th className="p-4">Status</th>
+                                        <th className="p-4">Amount</th>
+                                        <th className="p-4">Notes</th>
+                                        <th className="p-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {prescriptions.map((prescription) => (
+                                        <tr key={prescription._id} className="border-t hover:bg-gray-50">
+                                            <td className="p-4">
+                                                <div className="font-mono text-blue-600">
+                                                    {prescription.prescriptionNumber}
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                    {formatDate(prescription.createdAt)}
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="font-medium">{prescription.patientName}</div>
+                                                <div className="text-sm text-gray-600">{prescription.phone}</div>
+                                                <div className="text-xs text-gray-500 max-w-xs truncate" title={prescription.address}>
+                                                    {prescription.address}
+                                                </div>
+                                                {prescription.user && (
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        User: {prescription.user.firstName} {prescription.user.lastName}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="text-sm text-gray-600 mb-2">
+                                                    {prescription.originalFileName}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => downloadPrescriptionFile(prescription._id)}
+                                                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                                    >
+                                                        Download
+                                                    </button>
+                                                    <button
+                                                        onClick={() => previewPrescriptionFile(prescription._id, prescription.originalFileName)}
+                                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                    >
+                                                        Preview
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                {getStatusBadge(prescription.status)}
+                                            </td>
+                                            <td className="p-4">
+                                                {prescription.totalAmount > 0 ? (
+                                                    <div className="font-medium text-green-600">
+                                                        Rs. {prescription.totalAmount.toFixed(2)}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-gray-500">Not calculated</div>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="max-w-xs">
+                                                    {prescription.notes && (
+                                                        <div className="text-sm text-gray-600 mb-1">
+                                                            <span className="font-medium">Customer:</span> {prescription.notes}
+                                                        </div>
+                                                    )}
+                                                    {prescription.pharmacistNotes && (
+                                                        <div className="text-sm text-blue-600">
+                                                            <span className="font-medium">Pharmacist:</span> {prescription.pharmacistNotes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex gap-2">
+                                                    {prescription.status === 'uploaded' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleVerifyPrescription(prescription)}
+                                                                className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                            >
+                                                                Verify
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleRejectPrescription(prescription)}
+                                                                className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    
+                                                    {prescription.status === 'approved' && (
+                                                        <button
+                                                            onClick={() => updatePrescriptionWorkflow(prescription._id, 'preparing')}
+                                                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                                        >
+                                                            Start Processing
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {prescription.status === 'preparing' && (
+                                                        <button
+                                                            onClick={() => updatePrescriptionWorkflow(prescription._id, 'ready_for_delivery')}
+                                                            className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+                                                        >
+                                                            Ready for Delivery
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {prescription.status === 'ready_for_delivery' && (
+                                                        <button
+                                                            onClick={() => updatePrescriptionWorkflow(prescription._id, 'delivered')}
+                                                            className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                        >
+                                                            Mark as Delivered
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </>
+                )}
+            </div>
+
+
+
+            {/* Reject Prescription Modal */}
+            {showRejectModal && selectedPrescription && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white w-full max-w-md rounded-xl shadow-lg p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-red-600">
+                                Reject Prescription
+                            </h3>
+                            <button
+                                onClick={() => setShowRejectModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="mb-4">
+                            <div className="text-sm text-gray-600 mb-2">
+                                Prescription: {selectedPrescription.prescriptionNumber}
+                            </div>
+                            <div className="text-sm text-gray-600 mb-2">
+                                Patient: {selectedPrescription.patientName}
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Rejection Reason *
+                            </label>
+                            <textarea
+                                value={rejectForm.pharmacistNotes}
+                                onChange={(e) => setRejectForm({ ...rejectForm, pharmacistNotes: e.target.value })}
+                                rows={4}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                                placeholder="Please provide a detailed reason for rejecting this prescription..."
+                                required
+                            />
+                            {!rejectForm.pharmacistNotes && (
+                                <p className="text-red-500 text-xs mt-1">Rejection reason is required</p>
+                            )}
+                        </div>
+
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-center">
+                                <span className="text-red-500 mr-2">⚠️</span>
+                                <span className="text-red-700 text-sm">
+                                    This action will reject the prescription order. The customer will be notified with the rejection reason.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowRejectModal(false)}
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={rejectPrescription}
+                                disabled={!rejectForm.pharmacistNotes.trim()}
+                                className={`px-4 py-2 rounded-lg ${
+                                    rejectForm.pharmacistNotes.trim() 
+                                        ? 'bg-red-600 text-white hover:bg-red-700' 
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                }`}
+                            >
+                                Reject Prescription
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Order List Modal */}
+            {showOrderListModal && selectedPrescription && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white w-full max-w-6xl rounded-xl shadow-lg p-6 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-green-600">
+                                Create Order List for Prescription #{selectedPrescription.prescriptionNumber}
+                            </h3>
+                            <button
+                                onClick={() => setShowOrderListModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Product Selection */}
+                            <div>
+                                <h4 className="text-md font-semibold mb-3">Available Products</h4>
+                                
+                                {/* Product Dropdown */}
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Quick Select Product
+                                    </label>
+                                    <select
+                                        onChange={(e) => {
+                                            const productId = e.target.value;
+                                            if (productId) {
+                                                const product = products.find(p => p._id === productId);
+                                                if (product) addToOrderList(product);
+                                                e.target.value = ''; // Reset selection
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    >
+                                        <option value="">Choose a product to add...</option>
+                                        {products.map(product => (
+                                            <option key={product._id} value={product._id}>
+                                                {product.name} - Rs. {product.price} (Stock: {product.stock})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                {/* Search */}
+                                <div className="mb-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Search products..."
+                                        value={productSearch}
+                                        onChange={(e) => setProductSearch(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && fetchProducts()}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    />
+                                    <button
+                                        onClick={fetchProducts}
+                                        className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                    >
+                                        Search Products
+                                    </button>
+                                </div>
+
+                                {/* Products List */}
+                                <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+                                    {loadingProducts ? (
+                                        <div className="p-4 text-center">Loading products...</div>
+                                    ) : (
+                                        products.map(product => (
+                                            <div key={product._id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex-1">
+                                                        <h5 className="font-medium text-gray-900">{product.name}</h5>
+                                                        <p className="text-sm text-gray-600">{product.description}</p>
+                                                        <p className="text-sm text-green-600 font-medium">Rs. {product.price}</p>
+                                                        <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => addToOrderList(product)}
+                                                        className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Order List */}
+                            <div>
+                                <h4 className="text-md font-semibold mb-3">Order List</h4>
+                                
+                                <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+                                    {orderList.length === 0 ? (
+                                        <div className="p-4 text-center text-gray-500">No items in order list</div>
+                                    ) : (
+                                        orderList.map((item, index) => (
+                                            <div key={index} className="p-3 border-b border-gray-100">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex-1">
+                                                        <h5 className="font-medium text-gray-900">{item.productName}</h5>
+                                                        <p className="text-sm text-gray-600">Rs. {item.unitPrice} each</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => updateOrderItemQuantity(item.productId, item.quantity - 1)}
+                                                            className="w-6 h-6 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <span className="w-8 text-center">{item.quantity}</span>
+                                                        <button
+                                                            onClick={() => updateOrderItemQuantity(item.productId, item.quantity + 1)}
+                                                            className="w-6 h-6 bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
+                                                        >
+                                                            +
+                                                        </button>
+                                                        <span className="w-16 text-right font-medium">Rs. {item.totalPrice.toFixed(2)}</span>
+                                                        <button
+                                                            onClick={() => removeFromOrderList(item.productId)}
+                                                            className="w-6 h-6 bg-red-200 text-red-600 rounded hover:bg-red-300"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Total */}
+                                {orderList.length > 0 && (
+                                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-semibold text-green-800">Total Amount:</span>
+                                            <span className="text-lg font-bold text-green-800">
+                                                Rs. {orderList.reduce((sum, item) => sum + item.totalPrice, 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex justify-end gap-3 mt-4">
+                                    <button
+                                        onClick={() => setShowOrderListModal(false)}
+                                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={sendOrderList}
+                                        disabled={orderList.length === 0}
+                                        className={`px-4 py-2 rounded-lg ${
+                                            orderList.length > 0 
+                                                ? 'bg-green-600 text-white hover:bg-green-700' 
+                                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        Send Order List to Customer
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1,15 +1,20 @@
 import express from 'express';
-import { createBooking, listBookings, bookingStats, rescheduleBooking, getUserBookings, cancelUserBooking, deleteBooking } from '../controllers/bookingController.js';
+import { createBooking, listBookings, bookingStats, rescheduleBooking, getUserBookings, cancelUserBooking, deleteBooking, getDoctorStats, getDoctorBookings } from '../controllers/bookingController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { uploadBookingFiles } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-// Public booking endpoint
-router.post('/', createBooking);
+// Public booking endpoint with file upload support
+router.post('/', uploadBookingFiles.array('documents', 5), createBooking);
 
 // User endpoints (authenticated users)
 router.get('/user', authenticateToken, getUserBookings);
 router.patch('/:id/cancel', authenticateToken, cancelUserBooking);
+
+// Doctor endpoints (authenticated doctors)
+router.get('/doctor/stats', authenticateToken, getDoctorStats);
+router.get('/doctor/bookings', authenticateToken, getDoctorBookings);
 
 // Admin
 router.use(authenticateToken, requireAdmin);
