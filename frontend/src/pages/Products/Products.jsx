@@ -93,7 +93,7 @@ const Products = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6 text-center">
             {activeCategory && (
-              <div className="text-gray-500 text-lg mb-2">/ {activeCategory}</div>
+              <div className="text-gray-500 text-lg mb-2"> {activeCategory}</div>
             )}
             <div className="flex justify-center">
               <div className="flex gap-2 flex-wrap justify-center">
@@ -118,6 +118,13 @@ const Products = () => {
                   className="border border-gray-300 rounded-lg px-3 py-2 w-80 max-w-full focus:outline-none focus:ring-0 focus:border-gray-400"
                 />
                 <button onClick={() => { setLoading(true); load(q); }} className="btn-primary">Search</button>
+                <Link 
+                  to="/upload-prescription" 
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  <span>📄</span>
+                  + Order with Prescription
+                </Link>
               </div>
             </div>
           </div>
@@ -197,6 +204,23 @@ function ProductCard({ p, addToCart }) {
           )}
         </div>
         {p.description && <div className="text-xs text-gray-500 mt-1 line-clamp-1">{p.description}</div>}
+        
+        {/* Tags */}
+        {p.tags && p.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {p.tags.slice(0, 3).map((tag, index) => (
+              <span key={index} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                {tag}
+              </span>
+            ))}
+            {p.tags.length > 3 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                +{p.tags.length - 3} more
+              </span>
+            )}
+          </div>
+        )}
+        
         <div className="grid grid-cols-2 gap-1 text-xs text-gray-700 mt-2">
           <div><span className="text-gray-500">Form:</span> {p.dosageForm || '-'}</div>
           <div><span className="text-gray-500">Strength:</span> {p.strength || '-'}</div>

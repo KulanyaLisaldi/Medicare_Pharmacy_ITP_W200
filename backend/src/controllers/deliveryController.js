@@ -229,38 +229,65 @@ export const getOrderDetails = async (req, res) => {
 
     // Fetch detailed product information for each item
     const Product = (await import('../models/Product.js')).default;
-    const itemsWithDetails = await Promise.all(
-      assignment.order.items.map(async (item) => {
-        if (item.productId) {
-          try {
-            const product = await Product.findById(item.productId);
-            if (product) {
-              return {
-                ...item.toObject(),
-                dosageForm: product.dosageForm,
-                strength: product.strength,
-                brand: product.brand,
-                description: product.description,
-                prescriptionRequired: product.prescriptionRequired
-              };
+    
+    // Process both items (regular orders) and orderList (prescription orders)
+    const itemsToProcess = assignment.order.items || assignment.order.orderList || [];
+    
+    // For prescription orders, the items already have the correct structure
+    // No need to fetch additional product details since they're already populated
+    let itemsWithDetails = itemsToProcess;
+    
+    // Only fetch additional details for regular orders that need product enhancement
+    if (assignment.order.orderType === 'product' && itemsToProcess.length > 0) {
+      itemsWithDetails = await Promise.all(
+        itemsToProcess.map(async (item) => {
+          if (item.productId) {
+            try {
+              const product = await Product.findById(item.productId);
+              if (product) {
+                const enhancedItem = {
+                  ...item.toObject(),
+                  dosageForm: product.dosageForm,
+                  strength: product.strength,
+                  brand: product.brand,
+                  description: product.description,
+                  prescriptionRequired: product.prescriptionRequired
+                };
+                return enhancedItem;
+              }
+            } catch (error) {
+              console.error('Error fetching product details:', error);
             }
-          } catch (error) {
-            console.error('Error fetching product details:', error);
           }
-        }
-        return item;
-      })
-    );
+          return item;
+        })
+      );
+    }
 
     // Update the assignment with detailed items
     const assignmentWithDetails = {
       ...assignment.toObject(),
       order: {
         ...assignment.order.toObject(),
-        items: itemsWithDetails
+        items: itemsWithDetails,
+        orderList: itemsWithDetails // Also populate orderList for prescription orders
       }
     };
 
+    // Force assign the items to ensure they're not empty
+    if (assignment.order.orderType === 'prescription') {
+      assignmentWithDetails.order.orderList = itemsWithDetails;
+      assignmentWithDetails.order.items = itemsWithDetails;
+    } else {
+      assignmentWithDetails.order.items = itemsWithDetails;
+      assignmentWithDetails.order.orderList = itemsWithDetails;
+    }
+
+    // Final check - ensure we have data
+    if (itemsWithDetails.length === 0 && itemsToProcess.length > 0) {
+      assignmentWithDetails.order.items = itemsToProcess;
+      assignmentWithDetails.order.orderList = itemsToProcess;
+    }
     return res.status(200).json(assignmentWithDetails);
   } catch (err) {
     console.error('getOrderDetails error:', err);

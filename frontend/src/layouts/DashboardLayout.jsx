@@ -4,13 +4,14 @@ import './DashboardLayout.css'
 import { useAuth } from '../context/AuthContext'
 import { LogOut } from 'lucide-react'
 
-const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection }) => {
+const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection, notificationCount = 0, notifications = [] }) => {
 	const location = useLocation()
 	const navigate = useNavigate()
 	const { user, logout, updateProfile } = useAuth()
 	const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 	const [showAccountManagement, setShowAccountManagement] = useState(false)
 	const [showPasswordChange, setShowPasswordChange] = useState(false)
+	const [showNotificationPopup, setShowNotificationPopup] = useState(false)
 	const [accountForm, setAccountForm] = useState({
 		firstName: user?.firstName || '',
 		lastName: user?.lastName || '',
@@ -131,9 +132,78 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 					</div>
 					<div className="dash-header-actions">
 						{/* Notification Icon */}
-						<div className="notification-icon" title="Notifications">
-							🔔
-							<span className="notification-badge">3</span>
+						<div className="notification-container" style={{ position: 'relative' }}>
+							<button 
+								className="notification-icon" 
+								title="Notifications"
+								onClick={() => setShowNotificationPopup(!showNotificationPopup)}
+								style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}
+							>
+								🔔
+								{notificationCount > 0 && (
+									<span className="notification-badge">{notificationCount}</span>
+								)}
+							</button>
+							
+							{/* Notification Popup */}
+							{showNotificationPopup && (
+								<div className="notification-popup">
+									<div className="notification-popup-header">
+										<h3>Notifications</h3>
+										<button 
+											onClick={() => setShowNotificationPopup(false)}
+											className="close-popup-btn"
+										>
+											×
+										</button>
+									</div>
+									<div className="notification-popup-content">
+										{notifications.length === 0 ? (
+											<div className="no-notifications">
+												<div className="text-gray-400 text-2xl mb-2">🔔</div>
+												<p className="text-gray-500 text-sm">No notifications</p>
+											</div>
+										) : (
+											<div className="notification-list">
+												{notifications.slice(0, 5).map(notification => (
+													<div 
+														key={notification.id} 
+														className={`notification-item ${
+															notification.priority === 'high' 
+																? 'high-priority' 
+																: notification.priority === 'medium'
+																? 'medium-priority'
+																: 'low-priority'
+														}`}
+													>
+														<div className="notification-item-header">
+															<span className="notification-icon-small">{notification.icon}</span>
+															<span className="notification-title">{notification.title}</span>
+															<span className="notification-time">
+																{notification.timestamp.toLocaleTimeString()}
+															</span>
+														</div>
+														<p className="notification-message">{notification.message}</p>
+													</div>
+												))}
+												{notifications.length > 5 && (
+													<div className="view-all-notifications">
+														<button 
+															onClick={() => {
+																setShowNotificationPopup(false)
+																onSectionChange && onSectionChange('messages')
+															}}
+															className="view-all-btn"
+														>
+															View All Notifications ({notifications.length})
+														</button>
+													</div>
+												)}
+											</div>
+										)}
+									</div>
+								</div>
+							)}
 						</div>
 						
 						{/* Profile Dropdown */}

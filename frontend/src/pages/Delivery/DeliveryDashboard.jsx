@@ -812,28 +812,16 @@ function AssignmentsSection() {
                                     <thead className="bg-gray-50">
                                         <tr>
                                             <th className="p-3 text-left">Product</th>
-                                            <th className="p-3 text-left">Dosage Form</th>
-                                            <th className="p-3 text-left">Strength</th>
                                             <th className="p-3 text-left">Quantity</th>
                                             <th className="p-3 text-left">Price</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {selectedOrder.order?.items?.map((item, index) => (
+                                        {(selectedOrder.order?.items || selectedOrder.order?.orderList || []).map((item, index) => (
                                             <tr key={index} className="border-t">
                                                 <td className="p-3">
                                                     <div className="font-medium">{item.name}</div>
                                                     <div className="text-gray-500 text-xs">{item.brand || 'Generic'}</div>
-                                                </td>
-                                                <td className="p-3">
-                                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                                                        {item.dosageForm || 'N/A'}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3">
-                                                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                                                        {item.strength || 'N/A'}
-                                                    </span>
                                                 </td>
                                                 <td className="p-3">
                                                     <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">

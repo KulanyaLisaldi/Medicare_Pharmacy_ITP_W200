@@ -7,18 +7,20 @@ export async function createBooking(req, res) {
     try {
         const { 
             appointmentId, 
-            patientName, 
+            patientFirstName,
+            patientLastName,
             patientEmail, 
             patientPhone, 
-            patientNIC,
             patientAge,
             patientGender,
-            patientAddress,
             ongoingCondition,
             notes, 
             channel, 
             paymentStatus 
         } = req.body;
+
+        // Combine first and last name
+        const patientName = `${patientFirstName} ${patientLastName}`;
 
         const session = await Appointment.findById(appointmentId);
         if (!session || !session.isActive) return res.status(400).json({ message: 'Invalid or inactive session' });
@@ -41,6 +43,19 @@ export async function createBooking(req, res) {
         // Generate appointment number based on slot number
         const appointmentNumber = `APT-${nextSlot.slotNumber.toString().padStart(3, '0')}`;
 
+        // Handle uploaded files
+        const documents = [];
+        if (req.files && req.files.length > 0) {
+            req.files.forEach(file => {
+                documents.push({
+                    filename: file.filename,
+                    originalName: file.originalname,
+                    path: `/uploads/bookings/${file.filename}`, // Use URL path instead of file system path
+                    uploadedAt: new Date()
+                });
+            });
+        }
+
         const booking = await Booking.create({ 
             appointmentId,
             doctorId: session.doctorId,
@@ -52,16 +67,15 @@ export async function createBooking(req, res) {
             patientName, 
             patientEmail, 
             patientPhone, 
-            patientNIC,
             patientAge,
             patientGender,
-            patientAddress,
             ongoingCondition,
             notes,
-            status: 'pending',
+            documents,
             paymentStatus: paymentStatus || 'pending',
             channel: channel || 'online',
-            slotNumber: bookedSlot.slotNumber
+            slotNumber: bookedSlot.slotNumber,
+            slotTime: bookedSlot.time
         });
 
         // Update the slot with booking reference
@@ -106,7 +120,7 @@ export async function bookingStats(_req, res) {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
         const [today, week, month, statusAgg, upcoming] = await Promise.all([
-            Booking.countDocuments({ createdAt: { $gte: startOfDay } }),
+            Booking.countDocuments({ date: { $gte: startOfDay, $lt: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000) } }),
             Booking.countDocuments({ createdAt: { $gte: startOfWeek } }),
             Booking.countDocuments({ createdAt: { $gte: startOfMonth } }),
             Booking.aggregate([
@@ -123,11 +137,105 @@ export async function bookingStats(_req, res) {
     }
 }
 
+// Doctor: get doctor-specific stats for dashboard
+export async function getDoctorStats(req, res) {
+    try {
+        const doctorId = req.userId;
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+        const startOfWeek = new Date(startOfDay); 
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const [todayAppointments, weekAppointments, monthAppointments, todayBookings, upcomingAppointments] = await Promise.all([
+            // Count appointments scheduled for today
+            Booking.countDocuments({ 
+                doctorId, 
+                date: { $gte: startOfDay, $lt: endOfDay } 
+            }),
+            // Count appointments scheduled this week
+            Booking.countDocuments({ 
+                doctorId, 
+                date: { $gte: startOfWeek } 
+            }),
+            // Count appointments scheduled this month
+            Booking.countDocuments({ 
+                doctorId, 
+                date: { $gte: startOfMonth } 
+            }),
+            // Get today's appointments with details
+            Booking.find({ 
+                doctorId, 
+                date: { $gte: startOfDay, $lt: endOfDay } 
+            }).sort({ startTime: 1 }),
+            // Get upcoming appointments (next 5)
+            Booking.find({ 
+                doctorId, 
+                date: { $gte: startOfDay } 
+            }).sort({ date: 1, startTime: 1 }).limit(5)
+        ]);
+
+        return res.status(200).json({ 
+            todayAppointments,
+            weekAppointments, 
+            monthAppointments,
+            todayBookings,
+            upcomingAppointments
+        });
+    } catch (error) {
+        console.error('Error in getDoctorStats', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+// Doctor: get all bookings for doctor with filtering options
+export async function getDoctorBookings(req, res) {
+    try {
+        const doctorId = req.userId;
+        const { date, page = 1, limit = 10 } = req.query;
+        
+        const query = { doctorId };
+        
+        // Always filter out past appointments - only show today and future
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        query.date = { $gte: today };
+        
+        // Add specific date filter if provided
+        if (date) {
+            const filterDate = new Date(date);
+            const startOfDay = new Date(filterDate.getFullYear(), filterDate.getMonth(), filterDate.getDate());
+            const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+            query.date = { $gte: startOfDay, $lt: endOfDay };
+        }
+        
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        
+        const [bookings, totalCount] = await Promise.all([
+            Booking.find(query)
+                .sort({ date: 1, startTime: 1 }) // Sort by date ascending, then time ascending
+                .skip(skip)
+                .limit(parseInt(limit)),
+            Booking.countDocuments(query)
+        ]);
+        
+        return res.status(200).json({
+            bookings,
+            totalCount,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalCount / parseInt(limit))
+        });
+    } catch (error) {
+        console.error('Error in getDoctorBookings', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
 // User: get their own bookings
 export async function getUserBookings(req, res) {
     try {
         const userId = req.userId;
-        console.log('getUserBookings - userId:', userId);
         
         if (!userId) {
             return res.status(401).json({ message: 'User ID not found in request' });
@@ -139,8 +247,6 @@ export async function getUserBookings(req, res) {
             return res.status(404).json({ message: 'User not found' });
         }
         
-        console.log('getUserBookings - user email:', user.email);
-        
         const bookings = await Booking.find({ 
             $or: [
                 { patientId: userId },
@@ -149,8 +255,6 @@ export async function getUserBookings(req, res) {
         })
         .populate('appointmentId', 'title specialization location mode')
         .sort({ date: -1, startTime: -1 });
-        
-        console.log('getUserBookings - found bookings:', bookings.length);
         
         return res.status(200).json(bookings);
     } catch (error) {

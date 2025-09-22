@@ -1521,7 +1521,7 @@ function ChannelCreator() {
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Date</label>
-                                <input type="date" name="date" value={form.date} onChange={handleChange} required className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input type="date" name="date" value={form.date} onChange={handleChange} required min={new Date().toISOString().split('T')[0]} className="mt-1 w-full border rounded-lg px-3 py-2" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1651,7 +1651,7 @@ function AdminAppointments() {
     const [error, setError] = useState('');
     const [showReschedule, setShowReschedule] = useState(false);
     const [selected, setSelected] = useState(null);
-    const [filters, setFilters] = useState({ status: '', from: '', to: '' });
+    const [filters, setFilters] = useState({ status: '', from: '', to: '', doctorName: '', upcomingDate: '' });
     const [resForm, setResForm] = useState({ doctorId: '', date: '', startTime: '', endTime: '', status: '' });
 
     useEffect(() => {
@@ -1687,8 +1687,75 @@ function AdminAppointments() {
     }, [token]);
 
     const deleteChannel = async (id) => {
-        const res = await fetch(`http://localhost:5001/api/appointments/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) setChannels(prev => prev.filter(c => c._id !== id));
+        // Find the channel to get its details
+        const channel = channels.find(c => c._id === id);
+        if (!channel) return;
+        
+        // Show confirmation dialog
+        const confirmed = window.confirm(
+            `Are you sure you want to delete this channel?\n\n` +
+            `Channel: ${channel.title || 'Consultation'}\n` +
+            `Date: ${new Date(channel.date).toLocaleDateString()}\n` +
+            `Time: ${channel.startTime} - ${channel.endTime}\n\n` +
+            `This will also delete ALL appointments under this channel!\n` +
+            `This action cannot be undone.`
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch(`http://localhost:5001/api/appointments/${id}`, { 
+                method: 'DELETE', 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Channel deleted successfully!\n\nDeleted ${data.deletedBookingsCount || 0} associated appointments.`);
+                setChannels(prev => prev.filter(c => c._id !== id));
+            } else {
+                const errorData = await res.json();
+                alert(`Error: ${errorData.message || 'Failed to delete channel'}`);
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    };
+
+    const cancelChannel = async (id) => {
+        // Find the channel to get its details
+        const channel = channels.find(c => c._id === id);
+        if (!channel) return;
+        
+        // Show confirmation dialog
+        const confirmed = window.confirm(
+            `Are you sure you want to cancel this channel?\n\n` +
+            `Channel: ${channel.title || 'Consultation'}\n` +
+            `Date: ${new Date(channel.date).toLocaleDateString()}\n` +
+            `Time: ${channel.startTime} - ${channel.endTime}\n\n` +
+            `This will make the channel inactive and prevent new bookings.\n` +
+            `Existing bookings will remain but patients should be notified.`
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch(`http://localhost:5001/api/appointments/${id}/cancel`, { 
+                method: 'PATCH', 
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } 
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Channel canceled successfully!\n\n${data.affectedBookings || 0} existing bookings are affected.\nPatients should be notified about the cancellation.`);
+                setChannels(prev => prev.map(c => c._id === id ? { ...c, isActive: false, status: 'cancelled' } : c));
+            } else {
+                const errorData = await res.json();
+                alert(`Error: ${errorData.message || 'Failed to cancel channel'}`);
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
     };
 
     const applyFilters = async () => {
@@ -1696,9 +1763,39 @@ function AdminAppointments() {
         if (filters.status) params.append('status', filters.status);
         if (filters.from) params.append('from', filters.from);
         if (filters.to) params.append('to', filters.to);
+        if (filters.doctorName) params.append('doctorName', filters.doctorName);
         const res = await fetch(`http://localhost:5001/api/bookings?${params.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         if (res.ok) setBookings(data);
+    };
+
+    // Filter upcoming appointments by doctor name and date
+    const getFilteredUpcoming = () => {
+        let filtered = stats.upcoming || [];
+        
+        // Filter out past appointments (before current date and time)
+        const now = new Date();
+        filtered = filtered.filter(appointment => {
+            const appointmentDate = new Date(appointment.date);
+            const appointmentDateTime = new Date(`${appointment.date}T${appointment.startTime}`);
+            
+            // Check if appointment is in the future
+            return appointmentDateTime > now;
+        });
+        
+        if (filters.doctorName) {
+            filtered = filtered.filter(appointment => 
+                appointment.doctorName?.toLowerCase().includes(filters.doctorName.toLowerCase())
+            );
+        }
+        
+        if (filters.upcomingDate) {
+            filtered = filtered.filter(appointment => 
+                appointment.date === filters.upcomingDate
+            );
+        }
+        
+        return filtered;
     };
 
     const openReschedule = (b) => { setSelected(b); setResForm({ doctorId: b.doctorId || '', date: b.date?.slice(0,10) || '', startTime: b.startTime || '', endTime: b.endTime || '', status: b.status }); setShowReschedule(true); };
@@ -1736,21 +1833,36 @@ function AdminAppointments() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                {['pending','confirmed','completed','cancelled','no_show'].map(k => (
-                    <div key={k} className="bg-white rounded-xl shadow p-4">
-                        <div className="text-gray-500 text-sm capitalize">{k.replace('_',' ')}</div>
-                        <div className="text-xl font-semibold">{stats.statusCounts?.[k] || 0}</div>
-                    </div>
-                ))}
-            </div>
 
             <div className="bg-white rounded-xl shadow p-4 mb-8">
-                <div className="text-gray-800 font-semibold mb-3">Upcoming Appointments</div>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="text-gray-800 font-semibold">Upcoming Appointments</div>
+                    <div className="flex flex-wrap gap-2">
+                        <input
+                            type="text"
+                            placeholder="Filter by doctor name..."
+                            value={filters.doctorName}
+                            onChange={e => setFilters({ ...filters, doctorName: e.target.value })}
+                            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                            type="date"
+                            value={filters.upcomingDate}
+                            onChange={e => setFilters({ ...filters, upcomingDate: e.target.value })}
+                            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                            onClick={() => setFilters({ ...filters, doctorName: '', upcomingDate: '' })}
+                            className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
                 <div className="space-y-2">
-                    {stats.upcoming?.length ? stats.upcoming.map(u => (
+                    {getFilteredUpcoming().length ? getFilteredUpcoming().map(u => (
                         <div key={u._id} className="flex items-center justify-between text-sm">
-                            <div>{new Date(u.date).toLocaleDateString()} • {u.startTime}-{u.endTime}</div>
+                            <div>{new Date(u.date).toLocaleDateString()} • {u.startTime}</div>
                             <div className="text-gray-600">{u.patientName || '-'} with Dr. {u.doctorName || ''}</div>
                         </div>
                     )) : <div className="text-gray-500 text-sm">No upcoming bookings</div>}
@@ -1761,14 +1873,6 @@ function AdminAppointments() {
                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-3">
                     <div className="font-semibold text-gray-800">Appointments</div>
                     <div className="flex flex-wrap gap-2">
-                        <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}>
-                            <option value="">All Statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Canceled</option>
-                            <option value="no_show">No-Show</option>
-                        </select>
                         <input type="date" value={filters.from} onChange={e => setFilters({ ...filters, from: e.target.value })} />
                         <input type="date" value={filters.to} onChange={e => setFilters({ ...filters, to: e.target.value })} />
                         <button onClick={applyFilters} className="btn-primary">Apply</button>
@@ -1783,10 +1887,8 @@ function AdminAppointments() {
                                 <th className="p-2">Patient</th>
                                 <th className="p-2">Doctor</th>
                                 <th className="p-2">Date & Time</th>
-                                <th className="p-2">Status</th>
                                 <th className="p-2">Payment</th>
                                 <th className="p-2">Channel</th>
-                                <th className="p-2">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1801,21 +1903,9 @@ function AdminAppointments() {
                                         <div className="text-gray-800">Dr. {b.doctorName}</div>
                                         <div className="text-gray-500 text-xs">{b.specialization}</div>
                                     </td>
-                                    <td className="p-2 text-gray-700">{new Date(b.date).toLocaleDateString()} • {b.startTime}-{b.endTime}</td>
-                                    <td className="p-2"><span className="px-2 py-1 rounded bg-gray-100 capitalize">{b.status.replace('_',' ')}</span></td>
+                                    <td className="p-2 text-gray-700">{new Date(b.date).toLocaleDateString()} • {b.startTime}</td>
                                     <td className="p-2 capitalize">{b.paymentStatus}</td>
                                     <td className="p-2 capitalize">{b.channel}</td>
-                                    <td className="p-2">
-                                        <div className="flex gap-2">
-                                            <button 
-                                                className="btn-outline text-xs px-3 py-1" 
-                                                onClick={() => openReschedule(b)}
-                                                title="Reschedule Appointment"
-                                            >
-                                                Reschedule
-                                            </button>
-                                        </div>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -1897,6 +1987,13 @@ function AdminAppointments() {
                                                 title="Delete Channel"
                                             >
                                                 🗑️
+                                            </button>
+                                            <button 
+                                                className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700" 
+                                                onClick={() => cancelChannel(c._id)}
+                                                title="Cancel Channel"
+                                            >
+                                                Cancel
                                             </button>
                                         </div>
                                     </td>

@@ -38,7 +38,10 @@ const Checkout = () => {
     setSubtotal(cartData.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0))
     
     // Pre-fill user data if available
-    if (user.name) setFormData(prev => ({ ...prev, name: user.name }))
+    if (user.firstName || user.lastName) {
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim()
+      setFormData(prev => ({ ...prev, name: fullName }))
+    }
     if (user.phone) setFormData(prev => ({ ...prev, phone: user.phone }))
   }, [user, navigate])
 
