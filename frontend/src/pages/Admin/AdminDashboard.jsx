@@ -1817,13 +1817,13 @@ function AdminAppointments() {
                     date: resForm.date,
                     startTime: resForm.startTime,
                     endTime: resForm.endTime,
-                    rescheduleReason: resForm.reason // Store the reason in rescheduleReason field
+                    rescheduleReason: resForm.reason // Backend expects 'rescheduleReason' field
                 })
             });
             const data = await res.json();
             if (res.ok) {
                 setShowReschedule(false);
-                // Auto-refresh page after successful reschedule
+                // Auto-refresh page after successful reschedule to show updated date/time
                 window.location.reload();
             } else {
                 alert(`Error: ${data.message || 'Failed to reschedule appointment'}`);

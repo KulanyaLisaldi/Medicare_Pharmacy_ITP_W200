@@ -333,7 +333,14 @@ const DoctorDashboard = () => {
 											.map((date) => (
 												<div key={date} className="date-group">
 													<div className="date-header">
-														<h3>{date}</h3>
+														<div className="date-info">
+															<h3>{date}</h3>
+															{groupedBookings[date].length > 0 && (
+																<div className="session-time">
+																	Session starts at: {groupedBookings[date][0].startTime}
+																</div>
+															)}
+														</div>
 														<span className="slot-count">
 															{groupedBookings[date].length} appointment{groupedBookings[date].length !== 1 ? 's' : ''}
 														</span>
@@ -343,19 +350,22 @@ const DoctorDashboard = () => {
 															<div key={booking._id} className="slot-card">
 																<div 
 																	className="slot-header"
-																	onClick={() => handleSlotClick(booking)}
 																>
 																	<div className="slot-info">
 																		<div className="slot-number">
-																			No #{booking.slotNumber}
-																		</div>
-																		<div className="slot-time">
-																			{booking.startTime}
+																			No {booking.slotNumber}
 																		</div>
 																	</div>
-																	<div className="view-text">
+																	<button 
+																		className="view-btn"
+																		onClick={(e) => {
+																			e.preventDefault();
+																			e.stopPropagation();
+																			handleSlotClick(booking);
+																		}}
+																	>
 																		View
-																	</div>
+																	</button>
 																</div>
 
 																{expandedSlot === booking._id && (
@@ -388,7 +398,7 @@ const DoctorDashboard = () => {
 																							<span className="document-name">{doc.originalName}</span>
 																							<button 
 																								className="view-doc-btn"
-																								onClick={() => window.open(`http://localhost:5001/${doc.path}`, '_blank')}
+																								onClick={() => window.open(`http://localhost:5001${doc.path}`, '_blank')}
 																							>
 																								View
 																							</button>

@@ -111,6 +111,26 @@ export async function updateChannel(req, res) {
         Object.keys(update).forEach(k => update[k] === undefined && delete update[k]);
         const updated = await Appointment.findByIdAndUpdate(id, update, { new: true });
         if (!updated) return res.status(404).json({ message: 'Channel not found' });
+        
+        // If reschedule reason is provided, also update all bookings for this appointment
+        if (rescheduleReason) {
+            const Booking = (await import('../models/Booking.js')).default;
+            const bookingUpdate = {
+                rescheduleReason: rescheduleReason,
+                rescheduledAt: new Date()
+            };
+            
+            // Also update the date and time fields if they were provided
+            if (date) bookingUpdate.date = date;
+            if (startTime) bookingUpdate.startTime = startTime;
+            if (endTime) bookingUpdate.endTime = endTime;
+            
+            await Booking.updateMany(
+                { appointmentId: id },
+                bookingUpdate
+            );
+        }
+        
         return res.status(200).json({ message: 'Channel updated', session: updated });
     } catch (error) {
         console.error('Error in updateChannel', error);

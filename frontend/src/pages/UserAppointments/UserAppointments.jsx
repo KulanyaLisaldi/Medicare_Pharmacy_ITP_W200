@@ -349,8 +349,8 @@ const UserAppointments = () => {
               // Debug: Log appointment data to check for reschedule fields
               console.log('Appointment data:', {
                 id: appointment._id,
-                rescheduleReason: appointment.appointmentId?.rescheduleReason,
-                rescheduledAt: appointment.appointmentId?.rescheduledAt,
+                rescheduleReason: appointment.rescheduleReason,
+                rescheduledAt: appointment.rescheduledAt,
                 doctorName: appointment.doctorName
               });
               
@@ -385,7 +385,7 @@ const UserAppointments = () => {
                       </div>
 
                       {/* Reschedule Alert */}
-                      {appointment.appointmentId?.rescheduleReason && (
+                      {appointment.rescheduleReason && (
                         <div className="mb-4">
                           <div className="bg-red-100 border-2 border-red-300 rounded-lg p-4 shadow-sm">
                             <div className="flex items-start gap-3">
@@ -395,11 +395,11 @@ const UserAppointments = () => {
                                 <div className="bg-white rounded p-3 border border-red-200">
                                   <p className="text-sm font-semibold text-red-800 mb-1">Reschedule Reason:</p>
                                   <p className="text-sm text-red-700 font-medium">
-                                    {appointment.appointmentId.rescheduleReason}
+                                    {appointment.rescheduleReason}
                                   </p>
-                                  {appointment.appointmentId.rescheduledAt && (
+                                  {appointment.rescheduledAt && (
                                     <p className="text-xs text-red-600 mt-2 pt-2 border-t border-red-200">
-                                      <strong>Rescheduled on:</strong> {new Date(appointment.appointmentId.rescheduledAt).toLocaleDateString('en-US', {
+                                      <strong>Rescheduled on:</strong> {new Date(appointment.rescheduledAt).toLocaleDateString('en-US', {
                                         weekday: 'long',
                                         year: 'numeric',
                                         month: 'long',

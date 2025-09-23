@@ -569,6 +569,9 @@
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    min-height: 40px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .refresh-btn:hover {
@@ -609,6 +612,22 @@
     margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 2px solid #d1d5db;
+}
+
+.date-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.session-time {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+    background: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
 }
 
 .date-header h3 {
@@ -656,6 +675,8 @@
     border-bottom: 1px solid #e5e7eb;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    min-height: 60px;
+    touch-action: manipulation;
 }
 
 .slot-header:hover {
@@ -690,6 +711,30 @@
 
 .slot-header:hover .view-text {
     color: #1d4ed8;
+}
+
+.view-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    min-height: 28px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.view-btn:hover {
+    background: #1d4ed8;
+}
+
+.view-btn:active {
+    background: #1e40af;
+    transform: scale(0.98);
 }
 
 .slot-details {
@@ -774,6 +819,9 @@
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    min-height: 32px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .view-doc-btn:hover {
@@ -934,11 +982,52 @@
     font-weight: 500;
 }
 
-/* Responsive Design for Appointments */
+/* Enhanced Responsive Design for Appointments */
+@media (max-width: 1200px) {
+    .slots-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+    }
+    
+    .slot-card {
+        min-height: auto;
+    }
+    
+    .appointments-header {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .appointments-filters {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 992px) {
+    .slots-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+    }
+    
+    .date-group {
+        padding: 18px;
+    }
+    
+    .slot-header {
+        padding: 14px 18px;
+    }
+    
+    .slot-details {
+        padding: 18px;
+    }
+}
+
 @media (max-width: 768px) {
     .appointments-header {
         flex-direction: column;
         align-items: flex-start;
+        gap: 16px;
     }
     
     .header-content {
@@ -948,6 +1037,18 @@
     .appointments-filters {
         width: 100%;
         justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .filter-select,
+    .filter-date {
+        min-width: 140px;
+        flex: 1;
+    }
+    
+    .refresh-btn {
+        flex-shrink: 0;
     }
     
     .appointments-by-date {
@@ -964,8 +1065,17 @@
         gap: 8px;
     }
     
+    .date-info {
+        width: 100%;
+    }
+    
     .date-header h3 {
         font-size: 18px;
+    }
+    
+    .session-time {
+        font-size: 13px;
+        margin-top: 4px;
     }
     
     .slots-grid {
@@ -975,6 +1085,87 @@
     
     .slot-header {
         padding: 12px 16px;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .slot-info {
+        flex: 1;
+    }
+    
+    .view-text {
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+    
+    .slot-details {
+        padding: 16px;
+    }
+    
+    .detail-row {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .detail-value {
+        text-align: right;
+        flex-shrink: 0;
+    }
+    
+    .document-item {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .document-name {
+        flex: 1;
+        margin-right: 8px;
+        word-break: break-word;
+    }
+    
+    .view-doc-btn {
+        flex-shrink: 0;
+    }
+    
+    .documents-section {
+        padding: 12px;
+    }
+    
+    .notes-section {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 640px) {
+    .appointments-filters {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .filter-select,
+    .filter-date {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .refresh-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .slots-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .slot-header {
+        padding: 10px 14px;
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
@@ -986,10 +1177,11 @@
     
     .view-text {
         align-self: flex-end;
+        margin-left: 0;
     }
     
     .slot-details {
-        padding: 16px;
+        padding: 14px;
     }
     
     .detail-row {
@@ -1011,54 +1203,120 @@
     .view-doc-btn {
         align-self: flex-end;
     }
-}
-
-@media (max-width: 480px) {
-    .appointments-filters {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .filter-select,
-    .filter-date {
-        width: 100%;
-    }
-    
-    .booking-card {
-        padding: 16px;
-    }
-    
-    .booking-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
-    
-    .info-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-    }
-    
-    .info-item strong {
-        min-width: auto;
-    }
-    
-    .pagination {
-        flex-direction: column;
-        gap: 12px;
-    }
     
     .date-group {
-        padding: 12px;
+        padding: 14px;
     }
     
     .date-header h3 {
         font-size: 16px;
     }
     
+    .session-time {
+        font-size: 12px;
+        padding: 3px 6px;
+    }
+    
     .slot-count {
         font-size: 11px;
         padding: 3px 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .appointments-header {
+        gap: 12px;
+    }
+    
+    .appointments-filters {
+        gap: 8px;
+    }
+    
+    .date-group {
+        padding: 12px;
+    }
+    
+    .date-header {
+        gap: 6px;
+    }
+    
+    .date-header h3 {
+        font-size: 15px;
+    }
+    
+    .slot-header {
+        padding: 8px 12px;
+    }
+    
+    .slot-details {
+        padding: 12px;
+    }
+    
+    .documents-section {
+        padding: 10px;
+    }
+    
+    .notes-section {
+        padding: 10px;
+    }
+    
+    .detail-row {
+        padding: 6px 0;
+    }
+    
+    .document-item {
+        padding: 6px 10px;
+    }
+    
+    .view-doc-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .slot-number {
+        font-size: 16px;
+    }
+    
+    .slot-time {
+        font-size: 13px;
+    }
+    
+    .view-text {
+        font-size: 13px;
+    }
+}
+
+/* Additional responsive improvements */
+@media (max-width: 360px) {
+    .appointments-header h2 {
+        font-size: 20px;
+    }
+    
+    .date-header h3 {
+        font-size: 14px;
+    }
+    
+    .slot-header {
+        padding: 6px 10px;
+    }
+    
+    .slot-details {
+        padding: 10px;
+    }
+    
+    .detail-row {
+        padding: 4px 0;
+    }
+    
+    .document-item {
+        padding: 4px 8px;
+    }
+    
+    .slot-number {
+        font-size: 14px;
+    }
+    
+    .slot-time {
+        font-size: 12px;
     }
 }
