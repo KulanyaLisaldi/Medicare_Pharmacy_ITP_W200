@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
-import { toast } from 'react-hot-toast';
 
 const UserAppointments = () => {
   const { user, token } = useAuth();
@@ -10,8 +9,6 @@ const UserAppointments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all'); // all, upcoming, past, cancelled
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   useEffect(() => {
     if (user && token) {
@@ -50,30 +47,6 @@ const UserAppointments = () => {
     }
   };
 
-  const cancelAppointment = async (appointmentId) => {
-    try {
-      const response = await fetch(`http://localhost:5001/api/bookings/${appointmentId}/cancel`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Appointment cancelled successfully');
-        fetchUserAppointments(); // Refresh the list
-        setShowCancelModal(false);
-        setSelectedAppointment(null);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to cancel appointment');
-      }
-    } catch (err) {
-      toast.error('Network error occurred');
-      console.error('Error cancelling appointment:', err);
-    }
-  };
 
 
   const formatDate = (dateString) => {
@@ -372,7 +345,16 @@ const UserAppointments = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {filteredAppointments.map((appointment) => (
+            {filteredAppointments.map((appointment) => {
+              // Debug: Log appointment data to check for reschedule fields
+              console.log('Appointment data:', {
+                id: appointment._id,
+                rescheduleReason: appointment.appointmentId?.rescheduleReason,
+                rescheduledAt: appointment.appointmentId?.rescheduledAt,
+                doctorName: appointment.doctorName
+              });
+              
+              return (
               <div key={appointment._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
                   <div className="flex items-start justify-between">
@@ -402,15 +384,38 @@ const UserAppointments = () => {
                         </div>
                       </div>
 
-                      {/* Notes */}
-                      {appointment.notes && (
+                      {/* Reschedule Alert */}
+                      {appointment.appointmentId?.rescheduleReason && (
                         <div className="mb-4">
-                          <h4 className="text-sm font-medium text-gray-900 mb-1">Notes</h4>
-                          <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                            {appointment.notes}
-                          </p>
+                          <div className="bg-red-100 border-2 border-red-300 rounded-lg p-4 shadow-sm">
+                            <div className="flex items-start gap-3">
+                              <div className="text-red-600 text-xl">🚨</div>
+                              <div className="flex-1">
+                                <h4 className="text-base font-bold text-red-900 mb-2">⚠️ APPOINTMENT RESCHEDULED</h4>
+                                <div className="bg-white rounded p-3 border border-red-200">
+                                  <p className="text-sm font-semibold text-red-800 mb-1">Reschedule Reason:</p>
+                                  <p className="text-sm text-red-700 font-medium">
+                                    {appointment.appointmentId.rescheduleReason}
+                                  </p>
+                                  {appointment.appointmentId.rescheduledAt && (
+                                    <p className="text-xs text-red-600 mt-2 pt-2 border-t border-red-200">
+                                      <strong>Rescheduled on:</strong> {new Date(appointment.appointmentId.rescheduledAt).toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
+
                     </div>
 
                     {/* Actions */}
@@ -422,60 +427,16 @@ const UserAppointments = () => {
                         📄 Download PDF
                       </button>
                       
-                      {isUpcoming(appointment) && (
-                        <button
-                          onClick={() => {
-                            setSelectedAppointment(appointment);
-                            setShowCancelModal(true);
-                          }}
-                          className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Cancel Confirmation Modal */}
-      {showCancelModal && selectedAppointment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="text-red-500 text-2xl">⚠️</div>
-              <h3 className="text-lg font-semibold text-gray-900">Cancel Appointment</h3>
-            </div>
-            
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to cancel your appointment with Dr. {selectedAppointment.doctorName} 
-              on {formatDate(selectedAppointment.date)} at {selectedAppointment.slotTime ? formatTime(selectedAppointment.slotTime) : formatTime(selectedAppointment.startTime)}?
-            </p>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowCancelModal(false);
-                  setSelectedAppointment(null);
-                }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Keep Appointment
-              </button>
-              <button
-                onClick={() => cancelAppointment(selectedAppointment._id)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Yes, Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <Footer />
     </div>

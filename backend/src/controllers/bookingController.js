@@ -253,7 +253,7 @@ export async function getUserBookings(req, res) {
                 { patientEmail: user.email }
             ]
         })
-        .populate('appointmentId', 'title specialization location mode')
+        .populate('appointmentId', 'title specialization location mode notes rescheduleReason rescheduledAt')
         .sort({ date: -1, startTime: -1 });
         
         return res.status(200).json(bookings);
@@ -315,20 +315,55 @@ export async function cancelUserBooking(req, res) {
     }
 }
 
-// Admin: reschedule booking (change doctor, date, time)
+// Admin: reschedule booking (change date and time only)
 export async function rescheduleBooking(req, res) {
     try {
         const { id } = req.params;
-        const { doctorId, date, startTime, endTime, status } = req.body;
+        const { date, startTime, endTime, reason } = req.body;
+        
+        // Find the booking first to get patient and doctor info
+        const booking = await Booking.findById(id).populate('appointmentId');
+        if (!booking) return res.status(404).json({ message: 'Booking not found' });
+        
         const update = {};
-        if (doctorId) update.doctorId = doctorId;
+        // Only allow date and time changes - keep all other channel details fixed
         if (date) update.date = date;
         if (startTime) update.startTime = startTime;
         if (endTime) update.endTime = endTime;
-        if (status) update.status = status;
+        if (reason) update.rescheduleReason = reason;
+        
+        // Add reschedule timestamp
+        update.rescheduledAt = new Date();
+        
         const updated = await Booking.findByIdAndUpdate(id, update, { new: true });
         if (!updated) return res.status(404).json({ message: 'Booking not found' });
-        return res.status(200).json({ message: 'Updated', booking: updated });
+        
+        // Create notification for the patient
+        const Notification = require('../models/Notification.js');
+        await Notification.create({
+            userId: booking.patientId,
+            type: 'appointment_rescheduled',
+            title: 'Appointment Rescheduled',
+            message: `Your appointment has been rescheduled. New date: ${date || booking.date}, Time: ${startTime || booking.startTime}. Reason: ${reason || 'No reason provided'}`,
+            appointmentId: booking.appointmentId,
+            bookingId: booking._id
+        });
+        
+        // Create notification for the doctor
+        await Notification.create({
+            userId: booking.doctorId,
+            type: 'appointment_rescheduled',
+            title: 'Appointment Rescheduled',
+            message: `An appointment has been rescheduled. Patient: ${booking.patientName}, New date: ${date || booking.date}, Time: ${startTime || booking.startTime}. Reason: ${reason || 'No reason provided'}`,
+            appointmentId: booking.appointmentId,
+            bookingId: booking._id
+        });
+        
+        return res.status(200).json({ 
+            message: 'Appointment rescheduled successfully', 
+            booking: updated,
+            notificationsSent: true
+        });
     } catch (error) {
         console.error('Error in rescheduleBooking', error);
         return res.status(500).json({ message: 'Internal server error' });

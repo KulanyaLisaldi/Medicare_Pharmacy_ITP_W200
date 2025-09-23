@@ -31,7 +31,7 @@ const OrderSchema = new mongoose.Schema(
     total: { type: Number, required: true, min: 0 },
     paymentMethod: { type: String, enum: ['cod', 'online'], default: 'cod' },
     deliveryType: { type: String, enum: ['pickup', 'home_delivery'], default: 'home_delivery' },
-    status: { type: String, enum: ['pending', 'approved', 'processing', 'ready', 'out_for_delivery', 'picked_up', 'delivered', 'completed', 'canceled', 'failed'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'approved', 'processing', 'ready', 'out_for_delivery', 'assigned', 'picked_up', 'delivered', 'completed', 'canceled', 'failed'], default: 'pending' },
     confirmationStatus: { type: String, enum: ['pending', 'confirmed', 'rejected'], default: 'pending' },
     paymentStatus: { type: String, enum: ['paid', 'cod_pending', 'refunded'], default: 'cod_pending' },
     customer: {
@@ -45,6 +45,10 @@ const OrderSchema = new mongoose.Schema(
     deliveryTimeSlot: { type: String, default: '' },
     assignedDeliveryAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     deliveryAssignment: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryAssignment', default: null },
+    // Handover fields
+    handoverReason: { type: String, default: '' },
+    handoverDetails: { type: String, default: '' },
+    handoverAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -14,6 +14,8 @@ const DeliveryDashboard = () => {
 	const [statsLoading, setStatsLoading] = useState(true)
 	const [recentDeliveries, setRecentDeliveries] = useState([])
 	const [recentDeliveriesLoading, setRecentDeliveriesLoading] = useState(true)
+	const [notifications, setNotifications] = useState([])
+	const [notificationCount, setNotificationCount] = useState(0)
 	const { token } = useAuth()
 
 	const sidebar = [
@@ -21,7 +23,7 @@ const DeliveryDashboard = () => {
 		{ id: 'assignments', label: 'Assignments', icon: '🛵' },
 		{ id: 'history', label: 'History', icon: '🗂️' },
 		{ id: 'earnings', label: 'Earnings', icon: '💰' },
-		{ id: 'messages', label: 'Messages', icon: '💬' },
+		{ id: 'messages', label: 'Notifications', icon: '💬' },
 	]
 
 	const fetchDeliveryStats = async () => {
@@ -30,6 +32,13 @@ const DeliveryDashboard = () => {
 			const res = await fetch('http://localhost:5001/api/delivery/stats', {
 				headers: { 'Authorization': `Bearer ${token}` }
 			})
+			
+			// Check if response is HTML (error page) instead of JSON
+			const contentType = res.headers.get('content-type')
+			if (!contentType || !contentType.includes('application/json')) {
+				throw new Error('Server returned HTML instead of JSON. Backend server may not be running.')
+			}
+			
 			const data = await res.json()
 			if (res.ok) {
 				setDeliveryStats(data)
@@ -38,6 +47,13 @@ const DeliveryDashboard = () => {
 			}
 		} catch (error) {
 			console.error('Error fetching delivery stats:', error)
+			// Set default stats to prevent UI issues
+			setDeliveryStats({
+				activeDeliveries: 0,
+				completedToday: 0,
+				pending: 0,
+				todayEarnings: 0
+			})
 		} finally {
 			setStatsLoading(false)
 		}
@@ -49,6 +65,13 @@ const DeliveryDashboard = () => {
 			const res = await fetch('http://localhost:5001/api/delivery/recent', {
 				headers: { 'Authorization': `Bearer ${token}` }
 			})
+			
+			// Check if response is HTML (error page) instead of JSON
+			const contentType = res.headers.get('content-type')
+			if (!contentType || !contentType.includes('application/json')) {
+				throw new Error('Server returned HTML instead of JSON. Backend server may not be running.')
+			}
+			
 			const data = await res.json()
 			if (res.ok) {
 				setRecentDeliveries(data)
@@ -57,13 +80,81 @@ const DeliveryDashboard = () => {
 			}
 		} catch (error) {
 			console.error('Error fetching recent deliveries:', error)
+			// Set empty array to prevent UI issues
+			setRecentDeliveries([])
 		} finally {
 			setRecentDeliveriesLoading(false)
 		}
 	}
 
+	const fetchNotifications = async () => {
+		try {
+			const res = await fetch('http://localhost:5001/api/delivery/notifications', {
+				headers: { 'Authorization': `Bearer ${token}` }
+			})
+			
+			// Check if response is HTML (error page) instead of JSON
+			const contentType = res.headers.get('content-type')
+			if (!contentType || !contentType.includes('application/json')) {
+				throw new Error('Server returned HTML instead of JSON. Backend server may not be running.')
+			}
+			
+			const data = await res.json()
+			if (res.ok) {
+				// Transform notifications to match DashboardLayout expectations
+				const transformedNotifications = data.map(notification => ({
+					id: notification._id,
+					title: notification.title,
+					message: notification.message,
+					icon: notification.type === 'handover' ? '🚨' : '🔔',
+					timestamp: new Date(notification.createdAt),
+					priority: notification.priority || 'medium',
+					read: notification.read,
+					type: notification.type,
+					handoverReason: notification.handoverReason,
+					handoverDetails: notification.handoverDetails
+				}))
+				
+				setNotifications(transformedNotifications)
+				setNotificationCount(transformedNotifications.filter(n => !n.read).length)
+			} else {
+				console.error('Failed to fetch notifications:', data.message)
+			}
+		} catch (error) {
+			console.error('Error fetching notifications:', error)
+			// Set empty array to prevent UI issues
+			setNotifications([])
+			setNotificationCount(0)
+		}
+	}
+
+	const markNotificationAsRead = async (notificationId) => {
+		try {
+			const res = await fetch(`http://localhost:5001/api/delivery/notifications/${notificationId}/read`, {
+				method: 'PATCH',
+				headers: { 'Authorization': `Bearer ${token}` }
+			})
+			
+			if (res.ok) {
+				// Update local state
+				setNotifications(prev => 
+					prev.map(notification => 
+						notification.id === notificationId 
+							? { ...notification, read: true }
+							: notification
+					)
+				)
+				setNotificationCount(prev => Math.max(0, prev - 1))
+			} else {
+				console.error('Failed to mark notification as read')
+			}
+		} catch (error) {
+			console.error('Error marking notification as read:', error)
+		}
+	}
+
 	const fetchAllData = async () => {
-		await Promise.all([fetchDeliveryStats(), fetchRecentDeliveries()])
+		await Promise.all([fetchDeliveryStats(), fetchRecentDeliveries(), fetchNotifications()])
 	}
 
 	const getStatusBadgeColor = (status) => {
@@ -278,8 +369,106 @@ const DeliveryDashboard = () => {
 			case 'messages':
 				return (
 					<div className="messages-section">
-						<h2>Messages</h2>
-						<p>Messages features coming soon...</p>
+						<div className="flex items-center justify-between mb-6">
+							<h2>Notifications</h2>
+							<button 
+								onClick={fetchNotifications}
+								className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+							>
+								Refresh
+							</button>
+						</div>
+
+						{notifications.length === 0 ? (
+							<div className="text-center py-8">
+								<div className="text-gray-400 text-4xl mb-4">🔔</div>
+								<p className="text-gray-500">No notifications at the moment</p>
+							</div>
+						) : (
+							<div className="space-y-4">
+								{notifications.map(notification => (
+									<div 
+										key={notification._id} 
+										className={`p-4 rounded-lg border-l-4 transition-opacity ${
+											notification.priority === 'high' 
+												? 'border-red-500 bg-red-50' 
+												: notification.priority === 'medium'
+												? 'border-yellow-500 bg-yellow-50'
+												: 'border-blue-500 bg-blue-50'
+										} ${notification.read ? 'opacity-60' : ''}`}
+									>
+										<div className="flex items-start gap-3">
+											<div className="text-2xl">{notification.icon || '🔔'}</div>
+											<div className="flex-1">
+												<div className="flex items-center justify-between">
+													<div className="flex items-center gap-2">
+														<h3 className={`font-semibold ${notification.read ? 'text-gray-600' : 'text-gray-900'}`}>
+															{notification.title}
+														</h3>
+														{!notification.read && (
+															<span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+														)}
+													</div>
+													<span className="text-xs text-gray-500">
+														{notification.timestamp ? notification.timestamp.toLocaleString() : 'Just now'}
+													</span>
+												</div>
+												<div className={`mt-1 ${notification.read ? 'text-gray-500' : 'text-gray-700'}`}>
+													{notification.type === 'handover' ? (
+														<div className="space-y-2">
+															<p className="whitespace-pre-line">{notification.message}</p>
+															{notification.handoverReason && (
+																<div className="bg-orange-100 border border-orange-200 rounded-lg p-3 mt-2">
+																	<div className="flex items-start gap-2">
+																		<span className="text-orange-600 font-semibold">📝 Handover Notes:</span>
+																	</div>
+																	<div className="mt-1 text-sm">
+																		<p><strong>Reason:</strong> {notification.handoverReason}</p>
+																		{notification.handoverDetails && (
+																			<p className="mt-1"><strong>Details:</strong> {notification.handoverDetails}</p>
+																		)}
+																	</div>
+																</div>
+															)}
+														</div>
+													) : (
+														<p>{notification.message}</p>
+													)}
+												</div>
+												<div className="flex items-center gap-2 mt-2">
+													<span className={`px-2 py-1 rounded-full text-xs font-medium ${
+														notification.priority === 'high' 
+															? 'bg-red-100 text-red-800' 
+															: notification.priority === 'medium'
+															? 'bg-yellow-100 text-yellow-800'
+															: 'bg-blue-100 text-blue-800'
+													}`}>
+														{notification.priority === 'high' ? 'High Priority' : 
+														 notification.priority === 'medium' ? 'Medium Priority' : 'Low Priority'}
+													</span>
+													<span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+														{notification.type === 'handover' ? 'Handover Request' : 
+														 notification.type === 'order' ? 'New Order' : 'System'}
+													</span>
+													{notification.read ? (
+														<span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+															Read
+														</span>
+													) : (
+														<button
+															onClick={() => markNotificationAsRead(notification.id)}
+															className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+														>
+															Mark as Read
+														</button>
+													)}
+												</div>
+											</div>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
 					</div>
 				);
 
@@ -294,6 +483,8 @@ const DeliveryDashboard = () => {
 			sidebarItems={sidebar}
 			onSectionChange={setActiveSection}
 			activeSection={activeSection}
+			notificationCount={notificationCount}
+			notifications={notifications.filter(n => !n.read)}
 		>
 			<div className="delivery-dashboard">
 				{renderSection()}
@@ -317,17 +508,39 @@ function AssignmentsSection() {
     const [newStatus, setNewStatus] = useState('');
     const [failureReason, setFailureReason] = useState('');
     const [activeTab, setActiveTab] = useState('available'); // 'available' or 'assigned'
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
+    const [handoverReason, setHandoverReason] = useState('');
+    const [handoverDetails, setHandoverDetails] = useState('');
+    const [selectedAssignmentForHandover, setSelectedAssignmentForHandover] = useState(null);
+    const [openDropdowns, setOpenDropdowns] = useState(new Set());
+    const [availableAgents, setAvailableAgents] = useState([]);
+    const [selectedAgentId, setSelectedAgentId] = useState('');
 
     const loadAvailableOrders = async () => {
         try {
             const res = await fetch('http://localhost:5001/api/delivery/available', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
+            // Check if response is HTML (error page) instead of JSON
+            const contentType = res.headers.get('content-type')
+            if (!contentType || !contentType.includes('application/json')) {
+                console.warn('Server returned HTML instead of JSON. Backend server may not be running.')
+                setAvailableOrders([]);
+                return;
+            }
+            
             const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed to load available orders');
+            if (!res.ok) {
+                console.warn('Failed to load available orders:', data.message);
+                setAvailableOrders([]);
+                return;
+            }
             setAvailableOrders(data);
         } catch (e) {
-            setError(e.message);
+            console.error('Error loading available orders:', e);
+            // Don't set global error for this function to avoid interfering with handover
+            setAvailableOrders([]);
         }
     };
 
@@ -336,11 +549,52 @@ function AssignmentsSection() {
             const res = await fetch('http://localhost:5001/api/delivery/assigned', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
+            // Check if response is HTML (error page) instead of JSON
+            const contentType = res.headers.get('content-type')
+            if (!contentType || !contentType.includes('application/json')) {
+                console.warn('Server returned HTML instead of JSON. Backend server may not be running.')
+                setAssignedOrders([]);
+                return;
+            }
+            
             const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Failed to load assigned orders');
+            if (!res.ok) {
+                console.warn('Failed to load assigned orders:', data.message);
+                setAssignedOrders([]);
+                return;
+            }
             setAssignedOrders(data);
         } catch (e) {
-            setError(e.message);
+            console.error('Error loading assigned orders:', e);
+            // Don't set global error for this function to avoid interfering with handover
+            setAssignedOrders([]);
+        }
+    };
+
+    const loadAvailableDeliveryAgents = async () => {
+        try {
+            const res = await fetch('http://localhost:5001/api/delivery/agents/available', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const contentType = res.headers.get('content-type')
+            if (!contentType || !contentType.includes('application/json')) {
+                console.warn('Server returned HTML instead of JSON. Backend server may not be running.')
+                setAvailableAgents([]);
+                return;
+            }
+            
+            const data = await res.json();
+            if (!res.ok) {
+                console.warn('Failed to load available agents:', data.message);
+                setAvailableAgents([]);
+                return;
+            }
+            setAvailableAgents(data);
+        } catch (e) {
+            console.error('Error loading available agents:', e);
+            setAvailableAgents([]);
         }
     };
 
@@ -377,6 +631,35 @@ function AssignmentsSection() {
                 throw new Error(data.message || 'Failed to accept order');
             }
         } catch (error) {
+            setError(error.message);
+        }
+    };
+
+    const acceptHandoverOrder = async (orderId) => {
+        try {
+            const res = await fetch(`http://localhost:5001/api/delivery/orders/${orderId}/accept-handover`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                console.error('Accept handover error:', errorData);
+                throw new Error(errorData.message || 'Failed to accept handover order');
+            }
+            
+            const data = await res.json();
+            
+            // Remove from available orders and add to assigned orders
+            setAvailableOrders(prev => prev.filter(order => order._id !== orderId));
+            setAssignedOrders(prev => [data.assignment, ...prev]);
+            alert('Handover order accepted successfully! You are now responsible for this delivery.');
+        } catch (error) {
+            console.error('Accept handover error:', error);
             setError(error.message);
         }
     };
@@ -435,6 +718,197 @@ function AssignmentsSection() {
         } catch (error) {
             setError(error.message);
         }
+    };
+
+    const initiateHandover = async (assignment) => {
+        setSelectedAssignmentForHandover(assignment);
+        setShowHandoverModal(true);
+        setError(''); // Clear any existing errors
+        setSelectedAgentId(''); // Reset agent selection
+        // Load available agents when opening modal
+        await loadAvailableDeliveryAgents();
+    };
+
+    const closeHandoverModal = () => {
+        setShowHandoverModal(false);
+        setSelectedAssignmentForHandover(null);
+        setHandoverReason('');
+        setHandoverDetails('');
+        setSelectedAgentId('');
+        setError(''); // Clear any errors when closing
+    };
+
+    const submitHandover = async () => {
+        
+        if (!handoverReason.trim()) {
+            setError('Please select a reason for handover from the dropdown menu.');
+            return;
+        }
+
+        if (!selectedAgentId) {
+            setError('Please select a delivery agent to hand over to.');
+            return;
+        }
+
+        if (!selectedAssignmentForHandover || !selectedAssignmentForHandover.order) {
+            setError('No assignment selected for handover. Please try again.');
+            return;
+        }
+
+        // Clear any existing errors at the start
+        setError('');
+
+        try {
+            console.log('Starting handover process...');
+            
+            // Call the backend API for handover
+            console.log('Calling backend handover API...');
+            console.log('Assignment ID being sent:', selectedAssignmentForHandover._id);
+            console.log('Full assignment object:', selectedAssignmentForHandover);
+            const res = await fetch(`http://localhost:5001/api/delivery/assignments/${selectedAssignmentForHandover._id}/handover`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    reason: handoverReason,
+                    details: handoverDetails,
+                    targetAgentId: selectedAgentId
+                })
+            });
+            
+            console.log('Backend API response status:', res.status);
+            
+            if (!res.ok) {
+                let errorData;
+                try {
+                    errorData = await res.json();
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                    errorData = { message: `HTTP ${res.status}: ${res.statusText}` };
+                }
+                console.error('Backend API error:', errorData);
+                console.error('Response status:', res.status);
+                console.error('Response headers:', Object.fromEntries(res.headers.entries()));
+                throw new Error(errorData.message || `Failed to handover order (HTTP ${res.status})`);
+            }
+            
+            const data = await res.json();
+            console.log('Backend API success:', data);
+            
+            // Clear error state immediately after successful API call
+            setError('');
+            console.log('Cleared error state after successful API call');
+            
+            // Remove from assigned orders (backend has already processed the handover)
+            console.log('Removing from assigned orders...');
+            setAssignedOrders(prev => {
+                const filtered = prev.filter(assignment => assignment._id !== selectedAssignmentForHandover._id);
+                console.log('Assigned orders after removal:', filtered);
+                return filtered;
+            });
+            
+            // Refresh available orders to show the handed-over order to other agents
+            console.log('Refreshing available orders...');
+            try {
+                await loadAvailableOrders();
+                console.log('Available orders refreshed successfully');
+            } catch (refreshError) {
+                console.warn('Failed to refresh available orders, but handover was successful:', refreshError);
+                // Don't set error state here since handover was successful
+            }
+            
+            // Create notification for other delivery agents
+            console.log('Creating notification...');
+            const handoverNotification = {
+                _id: `handover-${Date.now()}`,
+                title: '🚨 Handover Request Available',
+                message: `Order #${selectedAssignmentForHandover.order._id.slice(-8)} has been handed over due to: ${handoverReason}`,
+                type: 'handover',
+                priority: 'high',
+                icon: '🚨',
+                read: false,
+                createdAt: new Date().toISOString(),
+                orderId: selectedAssignmentForHandover.order._id,
+                handoverReason: handoverReason,
+                handoverDetails: handoverDetails
+            };
+            console.log('Notification created:', handoverNotification);
+            
+            // Add notification to the list
+            console.log('Adding notification to list...');
+            setNotifications(prev => {
+                const updated = [handoverNotification, ...prev];
+                console.log('Notifications after addition:', updated);
+                return updated;
+            });
+            setNotificationCount(prev => {
+                const newCount = prev + 1;
+                console.log('Notification count updated to:', newCount);
+                return newCount;
+            });
+            
+            // Clear error state again before closing modal
+            setError('');
+            console.log('Cleared error state before closing modal');
+            
+            console.log('Cleaning up modal state...');
+            setShowHandoverModal(false);
+            setHandoverReason('');
+            setHandoverDetails('');
+            setSelectedAssignmentForHandover(null);
+            
+            // Ensure error state is cleared after a short delay to handle any async state updates
+            setTimeout(() => {
+                setError('');
+                console.log('Final error state clear after timeout');
+            }, 100);
+            
+            // Additional error clearing after a longer delay to catch any late async operations
+            setTimeout(() => {
+                setError('');
+                console.log('Additional error state clear after longer timeout');
+            }, 500);
+            
+            console.log('Showing success message...');
+            
+            // Final error state clear before showing success message
+            setError('');
+            console.log('Final error state clear before success message');
+            
+            // Show success message
+            const selectedAgent = availableAgents.find(agent => agent._id === selectedAgentId);
+            const agentName = selectedAgent ? `${selectedAgent.firstName} ${selectedAgent.lastName}` : 'Selected Agent';
+            alert(`Handover request submitted successfully!\nReason: ${handoverReason}\nDetails: ${handoverDetails}\n\nOrder has been directly assigned to ${agentName}.`);
+            
+            console.log('=== HANDOVER DEBUG END - SUCCESS ===');
+            
+        } catch (error) {
+            console.error('=== HANDOVER DEBUG END - ERROR ===');
+            console.error('Handover error details:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            
+            // Only set error if it's actually a handover-related error
+            if (error.message && !error.message.includes('loadAvailableOrders')) {
+                setError('Failed to submit handover request. Please try again.');
+            } else {
+                console.warn('Non-critical error during handover, not setting error state:', error.message);
+            }
+        }
+    };
+
+    const toggleDropdown = (assignmentId) => {
+        setOpenDropdowns(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(assignmentId)) {
+                newSet.delete(assignmentId);
+            } else {
+                newSet.add(assignmentId);
+            }
+            return newSet;
+        });
     };
 
     const openStatusModal = (order, status) => {
@@ -563,7 +1037,22 @@ function AssignmentsSection() {
                                         {availableOrders.map(order => (
                                             <tr key={order._id} className="border-t hover:bg-gray-50">
                                                 <td className="p-4 font-mono text-blue-600">
-                                                    #{order._id.slice(-8)}
+                                                    <div className="flex items-center gap-2">
+                                                        #{order._id.slice(-8)}
+                                                        {order.isHandover && (
+                                                            <span 
+                                                                className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium"
+                                                                title={`Handover Reason: ${order.handoverReason}\nDetails: ${order.handoverDetails || 'No additional details'}`}
+                                                            >
+                                                                🚨 Handover
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {order.isHandover && (
+                                                        <div className="text-xs text-orange-600 mt-1">
+                                                            Reason: {order.handoverReason}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="p-4 font-medium">
                                                     {order.user?.firstName} {order.user?.lastName}
@@ -596,10 +1085,14 @@ function AssignmentsSection() {
                                                 </td>
                                                 <td className="p-4 whitespace-nowrap">
                                                     <button
-                                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-2"
-                                                        onClick={() => acceptOrder(order._id)}
+                                                        className={`px-3 py-1 text-white rounded text-xs mr-2 ${
+                                                            order.isHandover 
+                                                                ? 'bg-orange-600 hover:bg-orange-700' 
+                                                                : 'bg-green-600 hover:bg-green-700'
+                                                        }`}
+                                                        onClick={() => order.isHandover ? acceptHandoverOrder(order._id) : acceptOrder(order._id)}
                                                     >
-                                                        Accept
+                                                        {order.isHandover ? 'Accept Handover' : 'Accept'}
                                                     </button>
                                                     <button
                                                         className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
@@ -669,54 +1162,99 @@ function AssignmentsSection() {
                                                         {getStatusText(assignment.status)}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 whitespace-nowrap">
-                                                    <button
-                                                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 mr-2 disabled:opacity-50"
-                                                        disabled={loadingDetails}
-                                                        onClick={async () => {
-                                                            setLoadingDetails(true);
-                                                            try {
-                                                                const res = await fetch(`http://localhost:5001/api/delivery/orders/${assignment.order._id}/details`, {
-                                                                    headers: { 'Authorization': `Bearer ${token}` }
-                                                                });
-                                                                const data = await res.json();
-                                                                if (res.ok) {
-                                                                    setSelectedOrder(data);
-                                                                    setShowOrderDetails(true);
-                                                                } else {
-                                                                    throw new Error(data.message || 'Failed to fetch order details');
+                                                <td className="p-4">
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                                                            disabled={loadingDetails}
+                                                            onClick={async () => {
+                                                                setLoadingDetails(true);
+                                                                try {
+                                                                    const res = await fetch(`http://localhost:5001/api/delivery/orders/${assignment.order._id}/details`, {
+                                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                                    });
+                                                                    const data = await res.json();
+                                                                    if (res.ok) {
+                                                                        setSelectedOrder(data);
+                                                                        setShowOrderDetails(true);
+                                                                    } else {
+                                                                        throw new Error(data.message || 'Failed to fetch order details');
+                                                                    }
+                                                                } catch (error) {
+                                                                    setError(error.message);
+                                                                } finally {
+                                                                    setLoadingDetails(false);
                                                                 }
-                                                            } catch (error) {
-                                                                setError(error.message);
-                                                            } finally {
-                                                                setLoadingDetails(false);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {loadingDetails ? 'Loading...' : 'View Details'}
-                                                    </button>
-                                                    {assignment.status === 'assigned' && (
-                                                        <button
-                                                            className="px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 mr-2"
-                                                            onClick={() => openStatusModal(assignment, 'picked_up')}
+                                                            }}
                                                         >
-                                                            Picked Up
+                                                            {loadingDetails ? 'Loading...' : 'View Details'}
                                                         </button>
-                                                    )}
-                                                    {assignment.status === 'picked_up' && (
-                                                        <button
-                                                            className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-2"
-                                                            onClick={() => openStatusModal(assignment, 'delivered')}
-                                                        >
-                                                            Delivered
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                                                        onClick={() => openStatusModal(assignment, 'failed')}
-                                                    >
-                                                        Failed
-                                                    </button>
+                                                        
+                                                        <div className="flex flex-col gap-1">
+                                                            {/* Only show Update Status and Hand Over buttons if status is not delivered */}
+                                                            {assignment.status !== 'delivered' && (
+                                                                <>
+                                                                    <button
+                                                                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                                        onClick={() => toggleDropdown(assignment._id)}
+                                                                    >
+                                                                        Update Status
+                                                                    </button>
+                                                                    
+                                                                    {openDropdowns.has(assignment._id) && (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {assignment.status === 'assigned' && (
+                                                                                <button
+                                                                                    className="px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700"
+                                                                                    onClick={() => {
+                                                                                        openStatusModal(assignment, 'picked_up');
+                                                                                        setOpenDropdowns(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            newSet.delete(assignment._id);
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }}
+                                                                                >
+                                                                                    Picked Up
+                                                                                </button>
+                                                                            )}
+                                                                            {assignment.status === 'picked_up' && (
+                                                                                <button
+                                                                                    className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                                                    onClick={() => {
+                                                                                        openStatusModal(assignment, 'delivered');
+                                                                                        setOpenDropdowns(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            newSet.delete(assignment._id);
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }}
+                                                                                >
+                                                                                    Delivered
+                                                                                </button>
+                                                                            )}
+                                                                            <button
+                                                                                className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+                                                                                onClick={() => {
+                                                                                    initiateHandover(assignment);
+                                                                                    setOpenDropdowns(prev => {
+                                                                                        const newSet = new Set(prev);
+                                                                                        newSet.delete(assignment._id);
+                                                                                        return newSet;
+                                                                                    });
+                                                                                }}
+                                                                                title="Emergency handover due to accident or emergency"
+                                                                            >
+                                                                                Hand Over Delivery
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            
+                                                            
+                                                        </div>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -768,6 +1306,39 @@ function AssignmentsSection() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Handover Information */}
+                            {selectedOrder.handoverReason && (
+                                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                    <h4 className="font-semibold text-lg mb-3 text-orange-600 flex items-center gap-2">
+                                        🚨 Handover Information
+                                    </h4>
+                                    <div className="space-y-2">
+                                        <div>
+                                            <span className="font-medium">Handover Reason:</span> 
+                                            <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+                                                {selectedOrder.handoverReason}
+                                            </span>
+                                        </div>
+                                        {selectedOrder.handoverDetails && (
+                                            <div>
+                                                <span className="font-medium">Additional Notes:</span>
+                                                <p className="mt-1 text-sm text-gray-700 bg-white p-2 rounded border">
+                                                    {selectedOrder.handoverDetails}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {selectedOrder.handoverAt && (
+                                            <div>
+                                                <span className="font-medium">Handed Over At:</span> 
+                                                <span className="ml-2 text-sm text-gray-600">
+                                                    {new Date(selectedOrder.handoverAt).toLocaleString()}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Order Information */}
                             <div className="bg-gray-50 p-4 rounded-lg">
@@ -945,6 +1516,126 @@ function AssignmentsSection() {
                                 }`}
                             >
                                 Update Status
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Emergency Handover Modal */}
+            {showHandoverModal && selectedAssignmentForHandover && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white w-full max-w-md rounded-xl shadow-lg p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-orange-600">
+                                🚨 Emergency Handover
+                            </h3>
+                            <button
+                                onClick={closeHandoverModal}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                            <h4 className="font-medium text-orange-800 mb-2">Order Details</h4>
+                            <p className="text-sm text-orange-700">
+                                <strong>Order ID:</strong> #{selectedAssignmentForHandover.order?._id?.slice(-8)}<br/>
+                                <strong>Customer:</strong> {selectedAssignmentForHandover.order?.user?.firstName} {selectedAssignmentForHandover.order?.user?.lastName}<br/>
+                                <strong>Address:</strong> {selectedAssignmentForHandover.order?.customer?.address}
+                            </p>
+                        </div>
+
+                        {error && (
+                            <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 rounded-lg">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Reason for Handover *
+                            </label>
+                            <select
+                                value={handoverReason}
+                                onChange={(e) => {
+                                    setHandoverReason(e.target.value);
+                                    if (error) setError(''); // Clear error when user selects a reason
+                                }}
+                                className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+                                    error && !handoverReason.trim() 
+                                        ? 'border-red-300 focus:ring-red-500' 
+                                        : 'border-gray-300 focus:ring-orange-500'
+                                }`}
+                            >
+                                <option value="">Select reason...</option>
+                                <option value="accident">Vehicle Accident</option>
+                                <option value="medical_emergency">Medical Emergency</option>
+                                <option value="vehicle_breakdown">Vehicle Breakdown</option>
+                                <option value="personal_emergency">Personal Emergency</option>
+                                <option value="weather_conditions">Severe Weather Conditions</option>
+                                <option value="other">Other Emergency</option>
+                            </select>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Delivery Agent *
+                            </label>
+                            <select
+                                value={selectedAgentId}
+                                onChange={(e) => {
+                                    setSelectedAgentId(e.target.value);
+                                    if (error) setError(''); // Clear error when user selects an agent
+                                }}
+                                className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+                                    error && !selectedAgentId 
+                                        ? 'border-red-300 focus:ring-red-500' 
+                                        : 'border-gray-300 focus:ring-orange-500'
+                                }`}
+                            >
+                                <option value="">Select delivery agent...</option>
+                                {availableAgents.map((agent) => (
+                                    <option key={agent._id} value={agent._id}>
+                                        {agent.firstName} {agent.lastName} ({agent.phone})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Additional Details (Optional)
+                            </label>
+                            <textarea
+                                value={handoverDetails}
+                                onChange={(e) => setHandoverDetails(e.target.value)}
+                                placeholder="Provide additional details about the emergency..."
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                rows="3"
+                            />
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                            <p className="text-sm text-blue-700">
+                                <strong>Note:</strong> The selected delivery agent will be directly assigned this order and will receive a notification. 
+                                The order will be removed from your dashboard and assigned to the selected agent.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={closeHandoverModal}
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={submitHandover}
+                                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                            >
+                                Submit Handover Request
                             </button>
                         </div>
                     </div>

@@ -1426,6 +1426,20 @@ function ChannelCreator() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        
+        // Auto-populate specialization when doctor is selected
+        if (name === 'doctorId' && value) {
+            const selectedDoctor = doctors.find(d => d._id === value);
+            if (selectedDoctor && selectedDoctor.specialization) {
+                setForm(prev => ({ 
+                    ...prev, 
+                    [name]: value, 
+                    specialization: selectedDoctor.specialization 
+                }));
+                return;
+            }
+        }
+        
         setForm(prev => ({ ...prev, [name]: value }));
     };
 
@@ -1457,6 +1471,10 @@ function ChannelCreator() {
             if (!res.ok) throw new Error(data.message || 'Failed to create channel');
             setMessage('Channel created');
             setForm({ doctorId: '', title: 'Consultation', specialization: '', location: '', date: '', startTime: '', endTime: '', capacity: 10, price: 0, paymentType: 'online', mode: 'physical', notes: '', slotDuration: 10 });
+            // Auto-refresh page after successful appointment creation
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } catch (e) {
             setError(e.message);
         }
@@ -1503,7 +1521,17 @@ function ChannelCreator() {
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Specialization</label>
-                                <input name="specialization" value={form.specialization} onChange={handleChange} placeholder="Defaults to doctor's" className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    name="specialization" 
+                                    value={form.specialization} 
+                                    onChange={handleChange} 
+                                    placeholder="Auto-filled from selected doctor" 
+                                    className="mt-1 w-full border rounded-lg px-3 py-2 bg-gray-50" 
+                                    readOnly={form.doctorId ? true : false}
+                                />
+                                {form.doctorId && (
+                                    <p className="text-xs text-gray-500 mt-1">✓ Auto-filled from doctor's specialization</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1651,8 +1679,8 @@ function AdminAppointments() {
     const [error, setError] = useState('');
     const [showReschedule, setShowReschedule] = useState(false);
     const [selected, setSelected] = useState(null);
-    const [filters, setFilters] = useState({ status: '', from: '', to: '', doctorName: '', upcomingDate: '' });
-    const [resForm, setResForm] = useState({ doctorId: '', date: '', startTime: '', endTime: '', status: '' });
+    const [filters, setFilters] = useState({ status: '', from: '', to: '', doctorName: '' });
+    const [resForm, setResForm] = useState({ date: '', startTime: '', endTime: '', reason: '' });
 
     useEffect(() => {
         const load = async () => {
@@ -1769,46 +1797,40 @@ function AdminAppointments() {
         if (res.ok) setBookings(data);
     };
 
-    // Filter upcoming appointments by doctor name and date
-    const getFilteredUpcoming = () => {
-        let filtered = stats.upcoming || [];
-        
-        // Filter out past appointments (before current date and time)
-        const now = new Date();
-        filtered = filtered.filter(appointment => {
-            const appointmentDate = new Date(appointment.date);
-            const appointmentDateTime = new Date(`${appointment.date}T${appointment.startTime}`);
-            
-            // Check if appointment is in the future
-            return appointmentDateTime > now;
-        });
-        
-        if (filters.doctorName) {
-            filtered = filtered.filter(appointment => 
-                appointment.doctorName?.toLowerCase().includes(filters.doctorName.toLowerCase())
-            );
-        }
-        
-        if (filters.upcomingDate) {
-            filtered = filtered.filter(appointment => 
-                appointment.date === filters.upcomingDate
-            );
-        }
-        
-        return filtered;
-    };
 
-    const openReschedule = (b) => { setSelected(b); setResForm({ doctorId: b.doctorId || '', date: b.date?.slice(0,10) || '', startTime: b.startTime || '', endTime: b.endTime || '', status: b.status }); setShowReschedule(true); };
+    const openReschedule = (b) => { setSelected(b); setResForm({ date: b.date?.slice(0,10) || '', startTime: b.startTime || '', endTime: b.endTime || '', reason: '' }); setShowReschedule(true); };
 
     const submitReschedule = async (e) => {
         e.preventDefault();
-        const res = await fetch(`http://localhost:5001/api/bookings/${selected._id}`, {
-            method: 'PATCH', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(resForm)
-        });
-        const data = await res.json();
-        if (res.ok) {
-            setBookings(prev => prev.map(x => x._id === selected._id ? data.booking : x));
-            setShowReschedule(false);
+        
+        // Validate required fields
+        if (!resForm.reason.trim()) {
+            alert('Please provide a reschedule reason');
+            return;
+        }
+        
+        try {
+            const res = await fetch(`http://localhost:5001/api/appointments/${selected._id}`, {
+                method: 'PATCH', 
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({
+                    date: resForm.date,
+                    startTime: resForm.startTime,
+                    endTime: resForm.endTime,
+                    rescheduleReason: resForm.reason // Store the reason in rescheduleReason field
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setShowReschedule(false);
+                // Auto-refresh page after successful reschedule
+                window.location.reload();
+            } else {
+                alert(`Error: ${data.message || 'Failed to reschedule appointment'}`);
+            }
+        } catch (error) {
+            console.error('Reschedule error:', error);
+            alert('Network error occurred. Please try again.');
         }
     };
 
@@ -1834,40 +1856,6 @@ function AdminAppointments() {
             </div>
 
 
-            <div className="bg-white rounded-xl shadow p-4 mb-8">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-                    <div className="text-gray-800 font-semibold">Upcoming Appointments</div>
-                    <div className="flex flex-wrap gap-2">
-                        <input
-                            type="text"
-                            placeholder="Filter by doctor name..."
-                            value={filters.doctorName}
-                            onChange={e => setFilters({ ...filters, doctorName: e.target.value })}
-                            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                            type="date"
-                            value={filters.upcomingDate}
-                            onChange={e => setFilters({ ...filters, upcomingDate: e.target.value })}
-                            className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                            onClick={() => setFilters({ ...filters, doctorName: '', upcomingDate: '' })}
-                            className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
-                        >
-                            Clear
-                        </button>
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    {getFilteredUpcoming().length ? getFilteredUpcoming().map(u => (
-                        <div key={u._id} className="flex items-center justify-between text-sm">
-                            <div>{new Date(u.date).toLocaleDateString()} • {u.startTime}</div>
-                            <div className="text-gray-600">{u.patientName || '-'} with Dr. {u.doctorName || ''}</div>
-                        </div>
-                    )) : <div className="text-gray-500 text-sm">No upcoming bookings</div>}
-                </div>
-            </div>
 
             <div className="bg-white rounded-xl shadow p-4">
                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-3">
@@ -1982,6 +1970,13 @@ function AdminAppointments() {
                                     <td className="p-2">
                                         <div className="flex gap-1">
                                             <button 
+                                                className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700" 
+                                                onClick={() => openReschedule(c)}
+                                                title="Reschedule Channel"
+                                            >
+                                                📅 Reschedule
+                                            </button>
+                                            <button 
                                                 className="btn-outline text-xs px-2 py-1" 
                                                 onClick={() => deleteChannel(c._id)}
                                                 title="Delete Channel"
@@ -2008,8 +2003,44 @@ function AdminAppointments() {
                 <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
                     <div className="bg-white w-full max-w-lg rounded-xl shadow-lg p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold">Reschedule</h2>
+                            <h2 className="text-xl font-semibold">Reschedule Channel</h2>
                             <button onClick={() => setShowReschedule(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                        </div>
+                        
+                        {/* Fixed Channel Details */}
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-3">Channel Details (Fixed)</h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <span className="text-gray-600">Channel ID:</span>
+                                    <span className="ml-2 font-medium">{selected.appointmentNo}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Doctor:</span>
+                                    <span className="ml-2 font-medium">Dr. {selected.doctorId?.firstName} {selected.doctorId?.lastName}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Specialty:</span>
+                                    <span className="ml-2 font-medium">{selected.specialization || 'General'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Slots:</span>
+                                    <span className="ml-2 font-medium">{selected.bookedCount}/{selected.capacity}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Fee:</span>
+                                    <span className="ml-2 font-medium">LKR {selected.price}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Mode:</span>
+                                    <span className="ml-2 font-medium capitalize">{selected.mode}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Changeable Fields */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-3">Reschedule Details (Changeable)</h3>
                         </div>
                         <form onSubmit={submitReschedule} className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
@@ -2024,19 +2055,20 @@ function AdminAppointments() {
                                 <label className="block text-sm text-gray-700">End</label>
                                 <input type="time" value={resForm.endTime} onChange={e => setResForm({ ...resForm, endTime: e.target.value })} />
                             </div>
-                            <div>
-                                <label className="block text-sm text-gray-700">Status</label>
-                                <select value={resForm.status} onChange={e => setResForm({ ...resForm, status: e.target.value })}>
-                                    <option value="pending">Pending</option>
-                                    <option value="confirmed">Confirmed</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Canceled</option>
-                                    <option value="no_show">No-Show</option>
-                                </select>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm text-gray-700">Reschedule Reason *</label>
+                                <textarea 
+                                    value={resForm.reason} 
+                                    onChange={e => setResForm({ ...resForm, reason: e.target.value })} 
+                                    placeholder="Please provide a reason for rescheduling this appointment..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    rows="3"
+                                    required
+                                />
                             </div>
                             <div className="md:col-span-2 flex justify-end gap-3 mt-2">
                                 <button type="button" className="btn-outline" onClick={() => setShowReschedule(false)}>Close</button>
-                                <button className="btn-primary">Save</button>
+                                <button type="submit" className="btn-primary">Save</button>
                             </div>
                         </form>
                     </div>

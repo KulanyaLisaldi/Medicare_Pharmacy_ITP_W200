@@ -16,6 +16,9 @@ const appointmentSchema = new mongoose.Schema({
     mode: { type: String, enum: ['physical', 'video', 'audio'], default: 'physical' },
     notes: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
+    // reschedule fields
+    rescheduleReason: { type: String, default: '' },
+    rescheduledAt: { type: Date, default: null },
     // New fields for Doc990-style channel setup
     timeSlots: [{ 
         slotNumber: { type: Number, required: true },
