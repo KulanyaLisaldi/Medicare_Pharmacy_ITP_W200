@@ -15,7 +15,7 @@ const DeliveryAssignmentSchema = new mongoose.Schema({
     },
     status: { 
         type: String, 
-        enum: ['available', 'assigned', 'accepted', 'rejected', 'picked_up', 'delivered', 'failed'], 
+        enum: ['available', 'assigned', 'accepted', 'rejected', 'picked_up', 'delivered', 'failed', 'handed_over'], 
         default: 'available' 
     },
     assignedAt: { type: Date, default: null },
@@ -27,7 +27,14 @@ const DeliveryAssignmentSchema = new mongoose.Schema({
     deliveryNotes: { type: String, default: '' },
     distance: { type: Number, default: 0 }, // in kilometers
     estimatedDeliveryTime: { type: Date, default: null },
-    actualDeliveryTime: { type: Date, default: null }
+    actualDeliveryTime: { type: Date, default: null },
+    // Handover fields
+    handoverReason: { type: String, default: '' },
+    handoverDetails: { type: String, default: '' },
+    handoverAt: { type: Date, default: null },
+    handoverBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    isHandover: { type: Boolean, default: false },
+    handoverAcceptedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 // Index for efficient queries

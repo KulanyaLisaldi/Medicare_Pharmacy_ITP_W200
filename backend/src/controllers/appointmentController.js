@@ -99,8 +99,15 @@ export async function listChannels(req, res) {
 export async function updateChannel(req, res) {
     try {
         const { id } = req.params;
-        const { title, specialization, location, date, startTime, endTime, capacity, price, paymentType, mode, notes, isActive } = req.body;
+        const { title, specialization, location, date, startTime, endTime, capacity, price, paymentType, mode, notes, isActive, rescheduleReason } = req.body;
         const update = { title, specialization, location, date, startTime, endTime, capacity, price, paymentType, mode, notes, isActive };
+        
+        // Handle reschedule reason
+        if (rescheduleReason) {
+            update.rescheduleReason = rescheduleReason;
+            update.rescheduledAt = new Date();
+        }
+        
         Object.keys(update).forEach(k => update[k] === undefined && delete update[k]);
         const updated = await Appointment.findByIdAndUpdate(id, update, { new: true });
         if (!updated) return res.status(404).json({ message: 'Channel not found' });

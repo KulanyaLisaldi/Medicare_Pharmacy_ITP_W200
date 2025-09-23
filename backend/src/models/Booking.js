@@ -30,7 +30,11 @@ const bookingSchema = new mongoose.Schema({
     paymentStatus: { type: String, enum: ['paid', 'cod', 'pending'], default: 'pending' },
     channel: { type: String, enum: ['online', 'walk_in', 'phone'], default: 'online' },
     slotNumber: { type: Number, default: null }, // Slot number in the appointment session
-    slotTime: { type: String, default: null } // Actual time of the booked slot
+    slotTime: { type: String, default: null }, // Actual time of the booked slot
+    
+    // reschedule fields
+    rescheduleReason: { type: String, default: '' },
+    rescheduledAt: { type: Date, default: null }
 }, { timestamps: true });
 
 bookingSchema.pre('validate', function(next) {
