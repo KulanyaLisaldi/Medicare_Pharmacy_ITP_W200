@@ -104,10 +104,51 @@ export const sendProductListToCustomer = async (req, res) => {
       return res.status(400).json({ message: 'Product list is required' });
     }
 
+    // Import Product model for stock validation
+    const Product = (await import('../models/Product.js')).default;
+    
+    // Validate stock availability for each product
+    const stockValidation = [];
+    let allInStock = true;
+    
+    for (const item of orderList) {
+      if (item.productId) {
+        const product = await Product.findById(item.productId);
+        if (product) {
+          const availableStock = (product.stock || 0) - (product.reservedStock || 0);
+          const isAvailable = availableStock >= (item.quantity || 1);
+          
+          stockValidation.push({
+            productId: item.productId,
+            name: item.name,
+            requestedQuantity: item.quantity || 1,
+            available: isAvailable,
+            availableStock,
+            message: isAvailable ? 'Available' : 'Out of Stock'
+          });
+          
+          if (!isAvailable) {
+            allInStock = false;
+          }
+        }
+      }
+    }
+
+    // If any items are out of stock, return error with details
+    if (!allInStock) {
+      return res.status(400).json({
+        message: 'Some products are out of stock',
+        stockCheck: {
+          allInStock: false,
+          items: stockValidation
+        }
+      });
+    }
+
     // Calculate total amount
     const totalAmount = orderList.reduce((sum, item) => sum + (item.lineTotal || 0), 0);
 
-    // Update the order with the product list and total (keep status as pending until customer confirms)
+    // All items are in stock, update the order
     const order = await Order.findByIdAndUpdate(
       orderId,
       {
@@ -125,10 +166,13 @@ export const sendProductListToCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-
     res.json({
       message: 'Product list sent to customer successfully',
-      order: order
+      order: order,
+      stockValidation: {
+        allInStock: true,
+        items: stockValidation
+      }
     });
   } catch (error) {
     console.error('Send product list error:', error);
@@ -155,12 +199,14 @@ export const confirmPrescriptionOrder = async (req, res) => {
       // Import Product model
       const Product = (await import('../models/Product.js')).default;
       
-      // Reduce stock for each product in the order list
+      // Reserve stock temporarily for prescription order
       for (const item of order.orderList) {
-        await Product.findByIdAndUpdate(
-          item.productId,
-          { $inc: { stockQuantity: -item.quantity } }
-        );
+        if (item.productId) {
+          await Product.findByIdAndUpdate(
+            item.productId,
+            { $inc: { reservedStock: item.quantity } }
+          );
+        }
       }
 
       // Update order status
@@ -172,10 +218,23 @@ export const confirmPrescriptionOrder = async (req, res) => {
       });
 
       res.json({
-        message: 'Order confirmed successfully. Stock has been reduced.',
+        message: 'Order confirmed successfully. Stock has been reserved.',
         order: await Order.findById(orderId)
       });
     } else if (action === 'reject') {
+      // Release any reserved stock if order was previously confirmed
+      if (order.confirmationStatus === 'confirmed') {
+        const Product = (await import('../models/Product.js')).default;
+        for (const item of order.orderList) {
+          if (item.productId) {
+            await Product.findByIdAndUpdate(
+              item.productId,
+              { $inc: { reservedStock: -(item.quantity || 0) } }
+            );
+          }
+        }
+      }
+      
       // Update order status to rejected
       await Order.findByIdAndUpdate(orderId, {
         $set: {

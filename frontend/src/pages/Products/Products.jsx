@@ -26,10 +26,27 @@ const Products = () => {
 
   useEffect(() => { load() }, [])
 
+  // Refresh products when cart is updated (to show updated stock)
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      // Show a brief loading state to indicate stock is being updated
+      setLoading(true)
+      load()
+    }
+    
+    window.addEventListener('cart:update', handleCartUpdate)
+    window.addEventListener('order:placed', handleCartUpdate)
+    
+    return () => {
+      window.removeEventListener('cart:update', handleCartUpdate)
+      window.removeEventListener('order:placed', handleCartUpdate)
+    }
+  }, [])
+
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const addToCart = (p) => {
+  const addToCart = async (p) => {
     if (!user) {
       navigate('/login')
       return
@@ -46,6 +63,7 @@ const Products = () => {
     const cart = raw ? JSON.parse(raw) : []
     const idx = cart.findIndex(i => i._id === p._id)
     
+    let quantityToReserve = 1
     if (idx >= 0) {
       // Check if adding one more would exceed available stock
       const currentQuantity = cart[idx].quantity || 1
@@ -54,14 +72,45 @@ const Products = () => {
         alert(`Cannot add more items. Only ${availableStock} units available in stock.`)
         return
       }
-      cart[idx].quantity = newQuantity
-    } else {
-      cart.push({ _id: p._id, name: p.name, price: p.price, quantity: 1 })
+      quantityToReserve = 1 // Only reserve the additional quantity
     }
     
-    localStorage.setItem('cart', JSON.stringify(cart))
-    // notify navbar to update badge
-    window.dispatchEvent(new Event('cart:update'))
+    try {
+      // Reserve stock immediately when adding to cart
+      const response = await fetch('http://localhost:5001/api/orders/reserve-stock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          productId: p._id,
+          quantity: quantityToReserve
+        })
+      })
+      
+      const data = await response.json()
+      if (!response.ok) {
+        alert(data.message || 'Failed to reserve stock')
+        return
+      }
+      
+      // Update cart after successful stock reservation
+      if (idx >= 0) {
+        cart[idx].quantity = cart[idx].quantity + 1
+      } else {
+        cart.push({ _id: p._id, name: p.name, price: p.price, quantity: 1 })
+      }
+      
+      localStorage.setItem('cart', JSON.stringify(cart))
+      // notify navbar to update badge and refresh products
+      window.dispatchEvent(new Event('cart:update'))
+      window.dispatchEvent(new Event('order:placed'))
+      
+    } catch (error) {
+      alert('Failed to add item to cart. Please try again.')
+      console.error('Add to cart error:', error)
+    }
   }
 
   const activeCategory = searchParams.get('category') || ''
