@@ -431,7 +431,73 @@ function InventorySection() {
     const emptyForm = { name: '', category: '', subcategory: '', brand: '', dosageForm: '', strength: '', packSize: '', batchNumber: '', manufacturingDate: '', expiryDate: '', description: '', price: 0, stock: 0, prescriptionRequired: false, tags: [] };
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState(emptyForm);
+    const [fieldErrors, setFieldErrors] = useState({
+        price: '',
+        stock: ''
+    });
     const [editing, setEditing] = useState(null);
+
+    // Validation functions for price and stock fields
+    const handleNumericKeyDown = (e) => {
+        const { name } = e.target;
+        if (name === 'price' || name === 'stock') {
+            const key = e.key || '';
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            
+            // Block minus (-) character
+            if (key === '-') {
+                e.preventDefault();
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            }
+        }
+    };
+
+    const handleNumericPaste = (e) => {
+        const { name } = e.target;
+        if (name === 'price' || name === 'stock') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            
+            // Block if contains minus
+            if (pastedText.includes('-')) {
+                e.preventDefault();
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            }
+        }
+    };
+
+    const handleNumericChange = (e) => {
+        const { name, value } = e.target;
+        
+        // Convert to number and ensure it's not negative
+        const numericValue = parseFloat(value);
+        
+        if (value.trim() && (isNaN(numericValue) || numericValue < 0)) {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: 'Cannot enter negative values'
+            }));
+        } else if (value.trim() && numericValue === 0 && value !== '0') {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: 'Value must be a valid number'
+            }));
+        } else {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Update the form with the numeric value
+        setForm(prev => ({ ...prev, [name]: numericValue || 0 }));
+    };
 
     const load = async () => {
         try {
@@ -453,6 +519,31 @@ function InventorySection() {
 
     const save = async (e) => {
         e.preventDefault();
+        
+        // Validate price and stock fields
+        let hasErrors = false;
+        const newFieldErrors = {};
+        
+        if (form.price < 0) {
+            newFieldErrors.price = 'Price cannot be negative';
+            hasErrors = true;
+        } else {
+            newFieldErrors.price = '';
+        }
+        
+        if (form.stock < 0) {
+            newFieldErrors.stock = 'Stock cannot be negative';
+            hasErrors = true;
+        } else {
+            newFieldErrors.stock = '';
+        }
+        
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            return;
+        }
+        
         const method = editing ? 'PUT' : 'POST';
         const url = editing ? `http://localhost:5001/api/products/${editing._id}` : 'http://localhost:5001/api/products';
         const res = await fetch(url, { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
@@ -461,6 +552,7 @@ function InventorySection() {
             setShowForm(false);
             setEditing(null);
             setForm(emptyForm);
+            setFieldErrors({ price: '', stock: '' });
             load();
         } else {
             setError(data.message || 'Save failed');
@@ -614,7 +706,14 @@ function InventorySection() {
                             {/* Removed Added Date field; createdAt is automatic */}
                             <div>
                                 <label className="block text-sm text-gray-600">Expiry Date</label>
-                                <input type="date" className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
+                                <input 
+                                    type="date" 
+                                    className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" 
+                                    value={form.expiryDate} 
+                                    onChange={e => setForm({ ...form, expiryDate: e.target.value })} 
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                />
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm text-gray-600">Description</label>
@@ -637,11 +736,36 @@ function InventorySection() {
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Unit Price</label>
-                                <input type="number" min="0" step="0.01" className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
+                                <input 
+                                    type="number" 
+                                    name="price"
+                                    min="0" 
+                                    step="0.01" 
+                                    className={`mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400 ${fieldErrors.price ? 'border-red-500 bg-red-50' : ''}`} 
+                                    value={form.price} 
+                                    onChange={handleNumericChange}
+                                    onKeyDown={handleNumericKeyDown}
+                                    onPaste={handleNumericPaste}
+                                />
+                                {fieldErrors.price && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.price}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Quantity</label>
-                                <input type="number" min="0" className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" value={form.stock} onChange={e => setForm({ ...form, stock: Number(e.target.value) })} />
+                                <input 
+                                    type="number" 
+                                    name="stock"
+                                    min="0" 
+                                    className={`mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400 ${fieldErrors.stock ? 'border-red-500 bg-red-50' : ''}`} 
+                                    value={form.stock} 
+                                    onChange={handleNumericChange}
+                                    onKeyDown={handleNumericKeyDown}
+                                    onPaste={handleNumericPaste}
+                                />
+                                {fieldErrors.stock && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.stock}</p>
+                                )}
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm text-gray-600">Prescription Required</label>

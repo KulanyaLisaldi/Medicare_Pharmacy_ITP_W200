@@ -1,4 +1,31 @@
 /* Dashboard Layout */
+
+/* Field Error Styling */
+.form-group input.error {
+    border-color: #dc2626;
+    background: #fef2f2;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.form-group input.error:focus {
+    border-color: #dc2626;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.field-error {
+    color: #dc2626;
+    font-size: 12px;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.field-error::before {
+    content: '';
+    font-size: 14px;
+}
 .dash { 
     display: grid; 
     grid-template-columns: 260px 1fr; 

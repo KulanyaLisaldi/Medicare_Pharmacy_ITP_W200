@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import './Auth.css';
 import { toast } from 'react-hot-toast';
 import { GoogleLogin } from '@react-oauth/google';
+import slide2 from '../../assets/slide2.jpg';
 
 const Login = () => {
     const [formData, setFormData] = useState({
@@ -12,20 +13,98 @@ const Login = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({
+        email: '',
+        password: ''
+    });
     
     const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
+        const { name, value } = e.target;
+        
         setFormData({
             ...formData,
-            [e.target.name]: e.target.value
+            [name]: value
         });
-        setError(''); // Clear error when user types
+        
+        // Clear general error when user types
+        setError('');
+        
+        // Clear field-specific error when user types
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Real-time validation for email field
+        if (name === 'email') {
+            if (value.trim() && !value.includes('@')) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Email must contain @ symbol'
+                }));
+            } else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Please enter a valid email address'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+    };
+
+    const validateForm = () => {
+        let hasErrors = false;
+        const newFieldErrors = { ...fieldErrors };
+        
+        // Email validation
+        if (!formData.email.trim()) {
+            newFieldErrors.email = 'Email is required';
+            hasErrors = true;
+        } else if (!formData.email.includes('@')) {
+            newFieldErrors.email = 'Email must contain @ symbol';
+            hasErrors = true;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newFieldErrors.email = 'Please enter a valid email address';
+            hasErrors = true;
+        } else {
+            newFieldErrors.email = '';
+        }
+        
+        // Password validation
+        if (!formData.password.trim()) {
+            newFieldErrors.password = 'Password is required';
+            hasErrors = true;
+        } else {
+            newFieldErrors.password = '';
+        }
+        
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            setError('Please fix the errors in the form');
+            return false;
+        }
+        
+        return true;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validate form before submission
+        if (!validateForm()) {
+            return;
+        }
+        
         setLoading(true);
         setError('');
 
@@ -76,8 +155,17 @@ const Login = () => {
     };
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
+        <div className="auth-container" style={{
+            backgroundImage: `url(${slide2})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+        }}>
+            <div className="auth-card" style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
                 <div className="auth-header">
                     <div className="auth-logo">
                         <div className="logo-icon">M</div>
@@ -129,7 +217,13 @@ const Login = () => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your email"
+                            className={fieldErrors.email ? 'error' : ''}
                         />
+                        {fieldErrors.email && (
+                            <div className="field-error">
+                                {fieldErrors.email}
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-group">
@@ -142,7 +236,13 @@ const Login = () => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your password"
+                            className={fieldErrors.password ? 'error' : ''}
                         />
+                        {fieldErrors.password && (
+                            <div className="field-error">
+                                {fieldErrors.password}
+                            </div>
+                        )}
                     </div>
 
                     <button 

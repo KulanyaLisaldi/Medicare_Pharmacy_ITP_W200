@@ -153,7 +153,13 @@ const Products = () => {
                     if (v) setSearchParams({ category: v })
                     else setSearchParams({})
                   }}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400"
+                  className="border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-0 focus:border-gray-400 appearance-none bg-white cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em'
+                  }}
                 >
                   <option value="">All Categories</option>
                   {categoryOptions.map(c => (
@@ -171,8 +177,8 @@ const Products = () => {
                   to="/upload-prescription" 
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
                 >
-                  <span>📄</span>
-                  + Order with Prescription
+                  
+                  Order with Prescription
                 </Link>
               </div>
             </div>

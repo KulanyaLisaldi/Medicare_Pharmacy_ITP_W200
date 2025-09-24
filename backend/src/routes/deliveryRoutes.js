@@ -14,7 +14,8 @@ import {
   getAvailableDeliveryAgents,
   getDeliveryNotifications,
   markNotificationAsRead,
-  deleteAssignment
+  deleteAssignment,
+  getCompletedDeliveries
 } from '../controllers/deliveryController.js';
 
 const router = express.Router();
@@ -64,5 +65,8 @@ router.patch('/notifications/:notificationId/read', markNotificationAsRead);
 
 // Delete assignment (before picked up)
 router.delete('/assignments/:assignmentId', deleteAssignment);
+
+// Get completed delivery history
+router.get('/completed', getCompletedDeliveries);
 
 export default router;

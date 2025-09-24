@@ -28,9 +28,221 @@ const Appointments = () => {
   const [message, setMessage] = useState('')
   const [doctorInfo, setDoctorInfo] = useState(null)
   const [showDoctorProfile, setShowDoctorProfile] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({
+    patientFirstName: '',
+    patientLastName: '',
+    patientEmail: '',
+    patientPhone: ''
+  })
   
   const { user, isCustomer } = useAuth()
   const navigate = useNavigate()
+  
+  // Validation functions
+  const preventInvalidFirstChar = (e) => {
+    const isNameField = e.target.name === 'patientFirstName' || e.target.name === 'patientLastName';
+    if (!isNameField) return;
+    const key = e.key || '';
+    if (e.type === 'keydown') {
+      const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+      if (controlKeys.includes(key)) return;
+      // Block any non-letter characters (including numbers, symbols, etc.)
+      if (!/^[A-Za-z ]$/.test(key)) {
+        e.preventDefault();
+        if (/^[0-9]$/.test(key)) {
+          setFieldErrors(prev => ({
+            ...prev,
+            [e.target.name]: 'Numbers are not allowed in name fields'
+          }));
+        } else {
+          setFieldErrors(prev => ({
+            ...prev,
+            [e.target.name]: 'Only letters and spaces are allowed'
+          }));
+        }
+      }
+    }
+  };
+
+  const preventInvalidPasteFirstChar = (e) => {
+    const isNameField = e.target.name === 'patientFirstName' || e.target.name === 'patientLastName';
+    if (!isNameField) return;
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+      e.preventDefault();
+      if (/[0-9]/.test(pasted)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [e.target.name]: 'Numbers are not allowed in name fields'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [e.target.name]: 'Only letters and spaces are allowed'
+        }));
+      }
+    }
+  };
+
+  const handlePhoneKeyDown = (e) => {
+    const { name } = e.target;
+    if (name === 'patientPhone') {
+      const current = e.target.value || '';
+      const key = e.key || '';
+      
+      // Allow control keys
+      const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+      if (controlKeys.includes(key)) return;
+      
+      // Block any non-digit characters (letters, symbols, etc.)
+      if (!/^[0-9]$/.test(key)) {
+        e.preventDefault();
+        if (/^[A-Za-z]$/.test(key)) {
+          setFieldErrors(prev => ({
+            ...prev,
+            [name]: 'Letters are not allowed in phone number'
+          }));
+        } else if (key === '-') {
+          setFieldErrors(prev => ({
+            ...prev,
+            [name]: 'Minus (-) values are not allowed'
+          }));
+        } else {
+          setFieldErrors(prev => ({
+            ...prev,
+            [name]: 'Only numbers are allowed in phone number'
+          }));
+        }
+        return;
+      }
+      
+      // Check length limit - exactly 10 digits
+      if (/^[0-9]$/.test(key) && current.length >= 10) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Phone number must be exactly 10 digits'
+        }));
+      }
+    }
+  };
+
+  const handlePhonePaste = (e) => {
+    const { name } = e.target;
+    if (name === 'patientPhone') {
+      const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      const digitsOnly = pastedText.replace(/\D/g, '');
+      
+      // Block if contains letters
+      if (/[A-Za-z]/.test(pastedText)) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Letters are not allowed in phone number'
+        }));
+      } else if (pastedText.includes('-')) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Minus (-) values are not allowed'
+        }));
+      } else if (digitsOnly.length > 10) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Phone number must be exactly 10 digits'
+        }));
+      } else if (!/^[0-9]+$/.test(pastedText)) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Only numbers are allowed in phone number'
+        }));
+      }
+    }
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    
+    setForm(prev => ({ ...prev, [name]: value }));
+    
+    // Clear field-specific error when user types
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+    
+    // Real-time validation for name fields
+    if (name === 'patientFirstName' || name === 'patientLastName') {
+      if (/[0-9]/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Numbers are not allowed in name fields'
+        }));
+      } else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Only letters and spaces are allowed'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    }
+    
+    // Real-time validation for email field
+    if (name === 'patientEmail') {
+      if (value.trim() && !value.includes('@')) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Email must contain @ symbol'
+        }));
+      } else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Please enter a valid email address'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    }
+    
+    // Real-time validation for phone field
+    if (name === 'patientPhone') {
+      // Remove all non-digit characters and limit to 10 digits
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+      
+      // Update the form with cleaned value
+      setForm(prev => ({ ...prev, [name]: digitsOnly }));
+      
+      // Check for letters in original input
+      if (/[A-Za-z]/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Letters are not allowed in phone number'
+        }));
+      } else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+      return; // Exit early to prevent double setting
+    }
+  };
   
   // Helper function to get slot time based on slot number
   const getSlotTime = (session, slotNumber) => {
@@ -241,21 +453,33 @@ const Appointments = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                   <input 
                     required 
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    name="patientFirstName"
+                    className={`mt-1 w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldErrors.patientFirstName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                     value={form.patientFirstName} 
-                    onChange={e => setForm({ ...form, patientFirstName: e.target.value })} 
+                    onChange={handleFormChange}
+                    onKeyDown={preventInvalidFirstChar}
+                    onPaste={preventInvalidPasteFirstChar}
                     placeholder="Enter your first name"
                   />
+                  {fieldErrors.patientFirstName && (
+                    <p className="text-xs text-red-600 mt-1">{fieldErrors.patientFirstName}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
                   <input 
                     required 
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    name="patientLastName"
+                    className={`mt-1 w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldErrors.patientLastName ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                     value={form.patientLastName} 
-                    onChange={e => setForm({ ...form, patientLastName: e.target.value })} 
+                    onChange={handleFormChange}
+                    onKeyDown={preventInvalidFirstChar}
+                    onPaste={preventInvalidPasteFirstChar}
                     placeholder="Enter your last name"
                   />
+                  {fieldErrors.patientLastName && (
+                    <p className="text-xs text-red-600 mt-1">{fieldErrors.patientLastName}</p>
+                  )}
                 </div>
               </div>
 
@@ -266,21 +490,31 @@ const Appointments = () => {
                   <input 
                     type="email" 
                     required 
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    name="patientEmail"
+                    className={`mt-1 w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldErrors.patientEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                     value={form.patientEmail} 
-                    onChange={e => setForm({ ...form, patientEmail: e.target.value })} 
+                    onChange={handleFormChange}
                     placeholder="your.email@example.com"
                   />
+                  {fieldErrors.patientEmail && (
+                    <p className="text-xs text-red-600 mt-1">{fieldErrors.patientEmail}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
                   <input 
                     required 
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    name="patientPhone"
+                    className={`mt-1 w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${fieldErrors.patientPhone ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                     value={form.patientPhone} 
-                    onChange={e => setForm({ ...form, patientPhone: e.target.value })} 
-                    placeholder="+94 77 123 4567"
+                    onChange={handleFormChange}
+                    onKeyDown={handlePhoneKeyDown}
+                    onPaste={handlePhonePaste}
+                    placeholder="07XXXXXXXX"
                   />
+                  {fieldErrors.patientPhone && (
+                    <p className="text-xs text-red-600 mt-1">{fieldErrors.patientPhone}</p>
+                  )}
                 </div>
               </div>
 

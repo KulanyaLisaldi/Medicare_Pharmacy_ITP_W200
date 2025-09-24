@@ -777,3 +777,115 @@ export const deleteAssignment = async (req, res) => {
     return res.status(500).json({ message: 'Failed to delete assignment' });
   }
 };
+
+// Get completed delivery history for delivery agent
+export const getCompletedDeliveries = async (req, res) => {
+  try {
+    const deliveryAgentId = req.userId;
+    const { page = 1, limit = 20, status = 'all', startDate, endDate } = req.query;
+    
+    // Build query based on status filter
+    let statusFilter = {};
+    if (status === 'delivered') {
+      statusFilter = { status: 'delivered' };
+    } else if (status === 'failed') {
+      statusFilter = { status: 'failed' };
+    } else if (status === 'completed') {
+      statusFilter = { status: { $in: ['delivered', 'failed'] } };
+    } else {
+      // Default: get all completed deliveries (delivered and failed)
+      statusFilter = { status: { $in: ['delivered', 'failed'] } };
+    }
+
+    // Build date filter based on delivery completion dates
+    let dateFilter = {};
+    if (startDate || endDate) {
+      const dateQuery = {};
+      if (startDate) {
+        dateQuery.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        // Add one day to endDate to include the entire end date
+        const endDateObj = new Date(endDate);
+        endDateObj.setDate(endDateObj.getDate() + 1);
+        dateQuery.$lt = endDateObj;
+      }
+      
+      // Filter by deliveredAt or failedAt dates
+      dateFilter = {
+        $or: [
+          { deliveredAt: dateQuery },
+          { failedAt: dateQuery }
+        ]
+      };
+    }
+
+    // Get completed assignments with pagination
+    const assignments = await DeliveryAssignment.find({
+      deliveryAgent: deliveryAgentId,
+      ...statusFilter,
+      ...dateFilter
+    })
+    .populate({
+      path: 'order',
+      populate: {
+        path: 'user',
+        select: 'firstName lastName email phone'
+      }
+    })
+    .sort({ deliveredAt: -1, failedAt: -1, createdAt: -1 })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
+
+    // Get total count for pagination
+    const totalCount = await DeliveryAssignment.countDocuments({
+      deliveryAgent: deliveryAgentId,
+      ...statusFilter,
+      ...dateFilter
+    });
+
+    // Format the response with detailed information
+    const formattedDeliveries = assignments.map(assignment => ({
+      _id: assignment._id,
+      orderId: assignment.order?._id,
+      orderNumber: `#${assignment.order?._id?.toString().slice(-8)}`,
+      customerName: `${assignment.order?.user?.firstName || ''} ${assignment.order?.user?.lastName || ''}`.trim(),
+      customerPhone: assignment.order?.user?.phone,
+      address: assignment.order?.customer?.address || 'N/A',
+      status: assignment.status,
+      totalAmount: assignment.order?.total || 0,
+      paymentMethod: assignment.order?.paymentMethod,
+      deliveryType: assignment.order?.deliveryType,
+      orderType: assignment.order?.orderType,
+      items: assignment.order?.items || assignment.order?.orderList || [],
+      assignedAt: assignment.assignedAt,
+      pickedUpAt: assignment.pickedUpAt,
+      deliveredAt: assignment.deliveredAt,
+      failedAt: assignment.failedAt,
+      failureReason: assignment.failureReason,
+      deliveryNotes: assignment.deliveryNotes,
+      distance: assignment.distance,
+      estimatedDeliveryTime: assignment.estimatedDeliveryTime,
+      actualDeliveryTime: assignment.actualDeliveryTime,
+      handoverReason: assignment.handoverReason,
+      handoverDetails: assignment.handoverDetails,
+      isHandover: assignment.isHandover,
+      createdAt: assignment.createdAt,
+      updatedAt: assignment.updatedAt
+    }));
+
+    return res.status(200).json({
+      deliveries: formattedDeliveries,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPrevPage: page > 1
+      }
+    });
+  } catch (err) {
+    console.error('getCompletedDeliveries error:', err);
+    return res.status(500).json({ message: 'Failed to fetch completed deliveries' });
+  }
+};

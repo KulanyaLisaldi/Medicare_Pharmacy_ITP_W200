@@ -76,6 +76,15 @@ const AdminDashboard = () => {
         experience: '',
         vehicleNumber: ''
     });
+    const [createFormErrors, setCreateFormErrors] = useState({
+        firstName: '',
+        lastName: '',
+        phone: '',
+        password: '',
+        email: '',
+        experienceYears: '',
+        experience: ''
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [activeSection, setActiveSection] = useState('overview');
     const [recentUsers, setRecentUsers] = useState([]);
@@ -142,6 +151,60 @@ const AdminDashboard = () => {
 
     const handleCreateStaff = async (e) => {
         e.preventDefault();
+        
+        // Validate email before submission
+        if (!createForm.email.trim()) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                email: 'Email is required'
+            }));
+            toast.error('Please enter an email address');
+            return;
+        } else if (!createForm.email.includes('@')) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                email: 'Email must contain @ symbol'
+            }));
+            toast.error('Please enter a valid email address');
+            return;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createForm.email)) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                email: 'Please enter a valid email address'
+            }));
+            toast.error('Please enter a valid email address');
+            return;
+        }
+        
+        // Validate password before submission
+        const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+        if (!pwRegex.test(createForm.password)) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                password: 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)'
+            }));
+            toast.error('Please fix the password requirements');
+            return;
+        }
+        
+        // Validate experience fields for negative values
+        if (createForm.experienceYears && parseFloat(createForm.experienceYears) < 0) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                experienceYears: 'Cannot enter negative values'
+            }));
+            toast.error('Experience years cannot be negative');
+            return;
+        }
+        
+        if (createForm.experience && parseFloat(createForm.experience) < 0) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                experience: 'Cannot enter negative values'
+            }));
+            toast.error('Experience cannot be negative');
+            return;
+        }
         
         try {
             const formData = {
@@ -227,6 +290,297 @@ const AdminDashboard = () => {
             } catch (error) {
                 console.error('Error deleting user:', error);
                 toast.error('Failed to delete user');
+            }
+        }
+    };
+
+    // Validation functions for create form
+    const preventInvalidNameChar = (e, formType = 'create') => {
+        const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+        if (!isNameField) return;
+        const key = e.key || '';
+        if (e.type === 'keydown') {
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            // Block any non-letter characters (including numbers, symbols, etc.)
+            if (!/^[A-Za-z ]$/.test(key)) {
+                e.preventDefault();
+                if (/^[0-9]$/.test(key)) {
+                    const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                    errorSetter(prev => ({
+                        ...prev,
+                        [e.target.name]: 'Numbers are not allowed in name fields'
+                    }));
+                } else {
+                    const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                    errorSetter(prev => ({
+                        ...prev,
+                        [e.target.name]: 'Only letters and spaces are allowed'
+                    }));
+                }
+            }
+        }
+    };
+
+    const preventInvalidNamePaste = (e, formType = 'create') => {
+        const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+        if (!isNameField) return;
+        const pasted = (e.clipboardData || window.clipboardData).getData('text');
+        if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+            e.preventDefault();
+            if (/[0-9]/.test(pasted)) {
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                errorSetter(prev => ({
+                    ...prev,
+                    [e.target.name]: 'Numbers are not allowed in name fields'
+                }));
+            } else {
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                errorSetter(prev => ({
+                    ...prev,
+                    [e.target.name]: 'Only letters and spaces are allowed'
+                }));
+            }
+        }
+    };
+
+    const handlePhoneKeyDown = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'phone') {
+            const current = e.target.value || '';
+            const key = e.key || '';
+            
+            // Allow control keys
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            
+            // Block any non-digit characters (letters, symbols, etc.)
+            if (!/^[0-9]$/.test(key)) {
+                e.preventDefault();
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                if (/^[A-Za-z]$/.test(key)) {
+                    errorSetter(prev => ({
+                        ...prev,
+                        [name]: 'Letters are not allowed in phone number'
+                    }));
+                } else if (key === '-') {
+                    errorSetter(prev => ({
+                        ...prev,
+                        [name]: 'Minus (-) values are not allowed'
+                    }));
+                } else {
+                    errorSetter(prev => ({
+                        ...prev,
+                        [name]: 'Only numbers are allowed in phone number'
+                    }));
+                }
+                return;
+            }
+            
+            // Check length limit - exactly 10 digits
+            if (/^[0-9]$/.test(key) && current.length >= 10) {
+                e.preventDefault();
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Phone number must be exactly 10 digits'
+                }));
+            }
+        }
+    };
+
+    const handlePhonePaste = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'phone') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const digitsOnly = pastedText.replace(/\D/g, '');
+            const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+            
+            // Block if contains letters
+            if (/[A-Za-z]/.test(pastedText)) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Letters are not allowed in phone number'
+                }));
+            } else if (pastedText.includes('-')) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Minus (-) values are not allowed'
+                }));
+            } else if (digitsOnly.length > 10) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Phone number must be exactly 10 digits'
+                }));
+            } else if (!/^[0-9]+$/.test(pastedText)) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Only numbers are allowed in phone number'
+                }));
+            }
+        }
+    };
+
+    const handleExperienceKeyDown = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'experienceYears' || name === 'experience') {
+            const key = e.key || '';
+            const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+            
+            // Allow control keys
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            
+            // Block minus (-) character
+            if (key === '-') {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            }
+        }
+    };
+
+    const handleExperiencePaste = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'experienceYears' || name === 'experience') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+            
+            // Block if contains minus
+            if (pastedText.includes('-')) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            }
+        }
+    };
+
+    const handleCreateFormChange = (e) => {
+        const { name, value } = e.target;
+        
+        setCreateForm(prev => ({ ...prev, [name]: value }));
+        
+        // Clear field-specific error when user types
+        if (createFormErrors[name]) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Real-time validation for name fields
+        if (name === 'firstName' || name === 'lastName') {
+            if (/[0-9]/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Numbers are not allowed in name fields'
+                }));
+            } else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Only letters and spaces are allowed'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for phone field
+        if (name === 'phone') {
+            // Remove all non-digit characters and limit to 10 digits
+            const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+            
+            // Update the form with cleaned value
+            setCreateForm(prev => ({ ...prev, [name]: digitsOnly }));
+            
+            // Check for letters in original input
+            if (/[A-Za-z]/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Letters are not allowed in phone number'
+                }));
+            } else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+            return; // Exit early to prevent double setting
+        }
+        
+        // Real-time validation for email field
+        if (name === 'email') {
+            if (value.trim() && !value.includes('@')) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Email must contain @ symbol'
+                }));
+            } else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Please enter a valid email address'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for password field
+        if (name === 'password') {
+            // Password complexity validation
+            const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+            
+            if (value.trim() && !pwRegex.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for experience fields
+        if (name === 'experienceYears' || name === 'experience') {
+            const numericValue = parseFloat(value);
+            
+            if (value.trim() && (isNaN(numericValue) || numericValue < 0)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            } else if (value.trim() && numericValue === 0 && value !== '0') {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Experience must be a valid number'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
             }
         }
     };
@@ -882,43 +1236,33 @@ const AdminDashboard = () => {
                                         <label>First Name</label>
                                         <input
                                             type="text"
+                                            name="firstName"
                                             value={createForm.firstName}
-                                            onChange={(e) => setCreateForm({...createForm, firstName: e.target.value})}
-                                            onKeyDown={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
-                                                    if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault();
-                                                }
-                                            }}
-                                            onPaste={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
-                                                    if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault();
-                                                }
-                                            }}
+                                            onChange={handleCreateFormChange}
+                                            onKeyDown={(e) => preventInvalidNameChar(e, 'create')}
+                                            onPaste={(e) => preventInvalidNamePaste(e, 'create')}
                                             required
+                                            className={createFormErrors.firstName ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.firstName && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.firstName}</p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Last Name</label>
                                         <input
                                             type="text"
+                                            name="lastName"
                                             value={createForm.lastName}
-                                            onChange={(e) => setCreateForm({...createForm, lastName: e.target.value})}
-                                            onKeyDown={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
-                                                    if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault();
-                                                }
-                                            }}
-                                            onPaste={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
-                                                    if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault();
-                                                }
-                                            }}
+                                            onChange={handleCreateFormChange}
+                                            onKeyDown={(e) => preventInvalidNameChar(e, 'create')}
+                                            onPaste={(e) => preventInvalidNamePaste(e, 'create')}
                                             required
+                                            className={createFormErrors.lastName ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.lastName && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.lastName}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -927,19 +1271,29 @@ const AdminDashboard = () => {
                                         <label>Email</label>
                                         <input
                                             type="email"
+                                            name="email"
                                             value={createForm.email}
-                                            onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                                            onChange={handleCreateFormChange}
                                             required
+                                            className={createFormErrors.email ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.email && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.email}</p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Password</label>
                                         <input
                                             type="password"
+                                            name="password"
                                             value={createForm.password}
-                                            onChange={(e) => setCreateForm({...createForm, password: e.target.value})}
+                                            onChange={handleCreateFormChange}
                                             required
+                                            className={createFormErrors.password ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.password && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.password}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -948,10 +1302,18 @@ const AdminDashboard = () => {
                                         <label>Phone</label>
                                         <input
                                             type="tel"
+                                            name="phone"
                                             value={createForm.phone}
-                                            onChange={(e) => setCreateForm({...createForm, phone: e.target.value})}
+                                            onChange={handleCreateFormChange}
+                                            onKeyDown={(e) => handlePhoneKeyDown(e, 'create')}
+                                            onPaste={(e) => handlePhonePaste(e, 'create')}
                                             required
+                                            className={createFormErrors.phone ? 'border-red-500 bg-red-50' : ''}
+                                            placeholder="07XXXXXXXX"
                                         />
+                                        {createFormErrors.phone && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.phone}</p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Registration Number</label>
@@ -1002,10 +1364,17 @@ const AdminDashboard = () => {
                                                 <label>Experience (Years)</label>
                                                 <input
                                                     type="number"
+                                                    name="experienceYears"
                                                     value={createForm.experienceYears}
-                                                    onChange={(e) => setCreateForm({...createForm, experienceYears: e.target.value})}
+                                                    onChange={handleCreateFormChange}
+                                                    onKeyDown={(e) => handleExperienceKeyDown(e, 'create')}
+                                                    onPaste={(e) => handleExperiencePaste(e, 'create')}
                                                     required
+                                                    className={createFormErrors.experienceYears ? 'border-red-500 bg-red-50' : ''}
                                                 />
+                                                {createFormErrors.experienceYears && (
+                                                    <p className="text-xs text-red-600 mt-1">{createFormErrors.experienceYears}</p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1076,10 +1445,17 @@ const AdminDashboard = () => {
                                                 <label>Experience (years)</label>
                                                 <input
                                                     type="number"
+                                                    name="experience"
                                                     value={createForm.experience}
-                                                    onChange={(e) => setCreateForm({...createForm, experience: e.target.value})}
+                                                    onChange={handleCreateFormChange}
+                                                    onKeyDown={(e) => handleExperienceKeyDown(e, 'create')}
+                                                    onPaste={(e) => handleExperiencePaste(e, 'create')}
                                                     required
+                                                    className={createFormErrors.experience ? 'border-red-500 bg-red-50' : ''}
                                                 />
+                                                {createFormErrors.experience && (
+                                                    <p className="text-xs text-red-600 mt-1">{createFormErrors.experience}</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1407,6 +1783,11 @@ function ChannelCreator() {
     });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({
+        capacity: '',
+        price: '',
+        slotDuration: ''
+    });
 
     useEffect(() => {
         const loadDoctors = async () => {
@@ -1424,6 +1805,35 @@ function ChannelCreator() {
         loadDoctors();
     }, [token]);
 
+    const handleKeyDown = (e) => {
+        const { name } = e.target;
+        
+        // Prevent minus (-) character in numeric fields
+        if ((name === 'capacity' || name === 'price' || name === 'slotDuration') && e.key === '-') {
+            e.preventDefault();
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: 'Minus (-) values are not allowed'
+            }));
+        }
+    };
+
+    const handlePaste = (e) => {
+        const { name } = e.target;
+        
+        // Prevent pasting content with minus (-) in numeric fields
+        if (name === 'capacity' || name === 'price' || name === 'slotDuration') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            if (pastedText.includes('-')) {
+                e.preventDefault();
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Minus (-) values are not allowed'
+                }));
+            }
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         
@@ -1437,6 +1847,36 @@ function ChannelCreator() {
                     specialization: selectedDoctor.specialization 
                 }));
                 return;
+            }
+        }
+        
+        // Clear field-specific error when user types
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Real-time validation for numeric fields
+        if (name === 'capacity' || name === 'price' || name === 'slotDuration') {
+            const numericValue = parseFloat(value);
+            
+            if (value.trim() && (isNaN(numericValue) || numericValue < 0)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            } else if (value.trim() && numericValue === 0 && (name === 'capacity' || name === 'slotDuration')) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Value must be greater than 0'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
             }
         }
         
@@ -1481,10 +1921,53 @@ function ChannelCreator() {
     };
 
     const validate = () => {
+        let hasErrors = false;
+        const newFieldErrors = { ...fieldErrors };
+        
         if (!form.doctorId) { setError('Please select a doctor'); return false; }
         if (!form.date || !form.startTime || !form.endTime) { setError('Please provide date and time'); return false; }
         if (form.startTime >= form.endTime) { setError('End time must be after start time'); return false; }
-        if (Number(form.capacity) < 1) { setError('Capacity must be at least 1'); return false; }
+        
+        // Validate capacity
+        const capacity = Number(form.capacity);
+        if (isNaN(capacity) || capacity < 0) {
+            newFieldErrors.capacity = 'Cannot enter negative values';
+            hasErrors = true;
+        } else if (capacity < 1) {
+            newFieldErrors.capacity = 'Capacity must be at least 1';
+            hasErrors = true;
+        } else {
+            newFieldErrors.capacity = '';
+        }
+        
+        // Validate price
+        const price = Number(form.price);
+        if (isNaN(price) || price < 0) {
+            newFieldErrors.price = 'Cannot enter negative values';
+            hasErrors = true;
+        } else {
+            newFieldErrors.price = '';
+        }
+        
+        // Validate slot duration
+        const slotDuration = Number(form.slotDuration);
+        if (isNaN(slotDuration) || slotDuration < 0) {
+            newFieldErrors.slotDuration = 'Cannot enter negative values';
+            hasErrors = true;
+        } else if (slotDuration < 1) {
+            newFieldErrors.slotDuration = 'Slot duration must be at least 1 minute';
+            hasErrors = true;
+        } else {
+            newFieldErrors.slotDuration = '';
+        }
+        
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            setError('Please fix the errors in the form');
+            return false;
+        }
+        
         return true;
     };
 
@@ -1569,17 +2052,55 @@ function ChannelCreator() {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label className="block text-sm text-gray-600">Max Patients</label>
-                                <input type="number" min="1" name="capacity" value={form.capacity} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    name="capacity" 
+                                    value={form.capacity} 
+                                    onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.capacity ? 'border-red-500 bg-red-50' : ''}`} 
+                                />
+                                {fieldErrors.capacity && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.capacity}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-1">Total slots available</p>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Slot Duration (min)</label>
-                                <input type="number" min="5" max="60" name="slotDuration" value={form.slotDuration} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    type="number" 
+                                    min="5" 
+                                    max="60" 
+                                    name="slotDuration" 
+                                    value={form.slotDuration} 
+                                    onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.slotDuration ? 'border-red-500 bg-red-50' : ''}`} 
+                                />
+                                {fieldErrors.slotDuration && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.slotDuration}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-1">Time per appointment</p>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Consultation Fee</label>
-                                <input type="number" min="0" step="0.01" name="price" value={form.price} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    type="number" 
+                                    min="0" 
+                                    step="0.01" 
+                                    name="price" 
+                                    value={form.price} 
+                                    onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.price ? 'border-red-500 bg-red-50' : ''}`} 
+                                />
+                                {fieldErrors.price && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.price}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-1">LKR per appointment</p>
                             </div>
                             <div>
@@ -2045,7 +2566,13 @@ function AdminAppointments() {
                         <form onSubmit={submitReschedule} className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-sm text-gray-700">Date</label>
-                                <input type="date" value={resForm.date} onChange={e => setResForm({ ...resForm, date: e.target.value })} />
+                                <input 
+                                    type="date" 
+                                    value={resForm.date} 
+                                    onChange={e => setResForm({ ...resForm, date: e.target.value })} 
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-700">Start</label>

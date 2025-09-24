@@ -24,11 +24,271 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 		newPassword: '',
 		confirmPassword: ''
 	})
+	const [fieldErrors, setFieldErrors] = useState({
+		firstName: '',
+		lastName: '',
+		email: '',
+		phone: '',
+		newPassword: '',
+		confirmPassword: ''
+	})
 
 	const handleLogout = () => {
 		logout()
 		navigate('/login')
 	}
+
+	// Validation functions for account form
+	const preventInvalidNameChar = (e) => {
+		const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+		if (!isNameField) return;
+		const key = e.key || '';
+		if (e.type === 'keydown') {
+			const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+			if (controlKeys.includes(key)) return;
+			// Block any non-letter characters (including numbers, symbols, etc.)
+			if (!/^[A-Za-z ]$/.test(key)) {
+				e.preventDefault();
+				if (/^[0-9]$/.test(key)) {
+					setFieldErrors(prev => ({
+						...prev,
+						[e.target.name]: 'Numbers are not allowed in name fields'
+					}));
+				} else {
+					setFieldErrors(prev => ({
+						...prev,
+						[e.target.name]: 'Only letters and spaces are allowed'
+					}));
+				}
+			}
+		}
+	};
+
+	const preventInvalidNamePaste = (e) => {
+		const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+		if (!isNameField) return;
+		const pasted = (e.clipboardData || window.clipboardData).getData('text');
+		if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+			e.preventDefault();
+			if (/[0-9]/.test(pasted)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[e.target.name]: 'Numbers are not allowed in name fields'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[e.target.name]: 'Only letters and spaces are allowed'
+				}));
+			}
+		}
+	};
+
+	const handlePhoneKeyDown = (e) => {
+		const { name } = e.target;
+		if (name === 'phone') {
+			const current = e.target.value || '';
+			const key = e.key || '';
+			
+			// Allow control keys
+			const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+			if (controlKeys.includes(key)) return;
+			
+			// Block any non-digit characters (letters, symbols, etc.)
+			if (!/^[0-9]$/.test(key)) {
+				e.preventDefault();
+				if (/^[A-Za-z]$/.test(key)) {
+					setFieldErrors(prev => ({
+						...prev,
+						[name]: 'Letters are not allowed in phone number'
+					}));
+				} else if (key === '-') {
+					setFieldErrors(prev => ({
+						...prev,
+						[name]: 'Minus (-) values are not allowed'
+					}));
+				} else {
+					setFieldErrors(prev => ({
+						...prev,
+						[name]: 'Only numbers are allowed in phone number'
+					}));
+				}
+				return;
+			}
+			
+			// Check length limit - exactly 10 digits
+			if (/^[0-9]$/.test(key) && current.length >= 10) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Phone number must be exactly 10 digits'
+				}));
+			}
+		}
+	};
+
+	const handlePhonePaste = (e) => {
+		const { name } = e.target;
+		if (name === 'phone') {
+			const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+			const digitsOnly = pastedText.replace(/\D/g, '');
+			
+			// Block if contains letters
+			if (/[A-Za-z]/.test(pastedText)) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Letters are not allowed in phone number'
+				}));
+			} else if (pastedText.includes('-')) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Minus (-) values are not allowed'
+				}));
+			} else if (digitsOnly.length > 10) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Phone number must be exactly 10 digits'
+				}));
+			} else if (!/^[0-9]+$/.test(pastedText)) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Only numbers are allowed in phone number'
+				}));
+			}
+		}
+	};
+
+	const handleAccountFormChange = (e) => {
+		const { name, value } = e.target;
+		
+		// Special handling for phone field - clean and limit input
+		if (name === 'phone') {
+			// Remove all non-digit characters and limit to 10 digits
+			const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+			
+			// Update the form with cleaned value
+			setAccountForm(prev => ({ ...prev, [name]: digitsOnly }));
+			
+			// Check for letters in original input
+			if (/[A-Za-z]/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Letters are not allowed in phone number'
+				}));
+			} else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+			return; // Exit early to prevent double setting
+		}
+		
+		setAccountForm(prev => ({ ...prev, [name]: value }));
+		
+		// Clear field-specific error when user types
+		if (fieldErrors[name]) {
+			setFieldErrors(prev => ({
+				...prev,
+				[name]: ''
+			}));
+		}
+		
+		// Real-time validation for name fields
+		if (name === 'firstName' || name === 'lastName') {
+			if (/[0-9]/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Numbers are not allowed in name fields'
+				}));
+			} else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Only letters and spaces are allowed'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+		
+		// Real-time validation for email field
+		if (name === 'email') {
+			if (value.trim() && !value.includes('@')) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Email must contain @ symbol'
+				}));
+			} else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Please enter a valid email address'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+	};
+
+	const handlePasswordFormChange = (e) => {
+		const { name, value } = e.target;
+		
+		setPasswordForm(prev => ({ ...prev, [name]: value }));
+		
+		// Clear field-specific error when user types
+		if (fieldErrors[name]) {
+			setFieldErrors(prev => ({
+				...prev,
+				[name]: ''
+			}));
+		}
+		
+		// Real-time validation for new password field
+		if (name === 'newPassword') {
+			const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+			
+			if (value.trim() && !pwRegex.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+		
+		// Real-time validation for confirm password field
+		if (name === 'confirmPassword') {
+			if (value.trim() && value !== passwordForm.newPassword) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Passwords do not match'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+	};
 
 	const handleSidebarItemClick = (item) => {
 		if (item.path) {
@@ -51,16 +311,96 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 
     const handleAccountUpdate = async (e) => {
         e.preventDefault()
-        // Client-side validation: names letters/spaces, address required, SL phone
-        const nameRegex = /^[A-Za-z ]+$/
-        if (!nameRegex.test(accountForm.firstName)) { alert('First name should contain only letters and spaces'); return }
-        if (!nameRegex.test(accountForm.lastName)) { alert('Last name should contain only letters and spaces'); return }
-        if (!accountForm.address.trim()) { alert('Address is required'); return }
-        const phoneRegex = /^07\d{8}$/
-        if (accountForm.phone && !phoneRegex.test(accountForm.phone)) { alert('Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'); return }
+        
+        // Comprehensive validation
+        let hasErrors = false;
+        const newFieldErrors = {};
+        
+        // First name validation
+        if (!accountForm.firstName.trim()) {
+            newFieldErrors.firstName = 'First name is required';
+            hasErrors = true;
+        } else if (/[0-9]/.test(accountForm.firstName)) {
+            newFieldErrors.firstName = 'Numbers are not allowed in name fields';
+            hasErrors = true;
+        } else if (!/^[A-Za-z ]+$/.test(accountForm.firstName)) {
+            newFieldErrors.firstName = 'Only letters and spaces are allowed';
+            hasErrors = true;
+        } else {
+            newFieldErrors.firstName = '';
+        }
+        
+        // Last name validation
+        if (!accountForm.lastName.trim()) {
+            newFieldErrors.lastName = 'Last name is required';
+            hasErrors = true;
+        } else if (/[0-9]/.test(accountForm.lastName)) {
+            newFieldErrors.lastName = 'Numbers are not allowed in name fields';
+            hasErrors = true;
+        } else if (!/^[A-Za-z ]+$/.test(accountForm.lastName)) {
+            newFieldErrors.lastName = 'Only letters and spaces are allowed';
+            hasErrors = true;
+        } else {
+            newFieldErrors.lastName = '';
+        }
+        
+        // Email validation
+        if (!accountForm.email.trim()) {
+            newFieldErrors.email = 'Email is required';
+            hasErrors = true;
+        } else if (!accountForm.email.includes('@')) {
+            newFieldErrors.email = 'Email must contain @ symbol';
+            hasErrors = true;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountForm.email)) {
+            newFieldErrors.email = 'Please enter a valid email address';
+            hasErrors = true;
+        } else {
+            newFieldErrors.email = '';
+        }
+        
+        // Phone validation
+        if (accountForm.phone.trim()) {
+            const digitsOnly = accountForm.phone.replace(/\D/g, '');
+            if (/[A-Za-z]/.test(accountForm.phone)) {
+                newFieldErrors.phone = 'Letters are not allowed in phone number';
+                hasErrors = true;
+            } else if (digitsOnly.length !== 10) {
+                newFieldErrors.phone = 'Phone number must be exactly 10 digits';
+                hasErrors = true;
+            } else if (!/^07\d{8}$/.test(digitsOnly)) {
+                newFieldErrors.phone = 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)';
+                hasErrors = true;
+            } else {
+                newFieldErrors.phone = '';
+            }
+        } else {
+            newFieldErrors.phone = '';
+        }
+        
+        // Address validation
+        if (!accountForm.address.trim()) {
+            alert('Address is required');
+            return;
+        }
+        
+        // Set field errors
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            return;
+        }
+        
         try {
             await updateProfile(accountForm)
             setShowAccountManagement(false)
+            setFieldErrors({
+                firstName: '',
+                lastName: '',
+                email: '',
+                phone: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
         } catch (error) {
             console.error('Error updating profile:', error)
         }
@@ -68,14 +408,59 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 
 	const handleChangePassword = async (e) => {
 		e.preventDefault()
-		if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-			alert('New passwords do not match')
-			return
+		
+		// Comprehensive password validation
+		let hasErrors = false;
+		const newFieldErrors = {};
+		
+		// Current password validation
+		if (!passwordForm.currentPassword.trim()) {
+			alert('Current password is required');
+			return;
 		}
+		
+		// New password validation
+		const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+		if (!passwordForm.newPassword.trim()) {
+			newFieldErrors.newPassword = 'New password is required';
+			hasErrors = true;
+		} else if (!pwRegex.test(passwordForm.newPassword)) {
+			newFieldErrors.newPassword = 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)';
+			hasErrors = true;
+		} else {
+			newFieldErrors.newPassword = '';
+		}
+		
+		// Confirm password validation
+		if (!passwordForm.confirmPassword.trim()) {
+			newFieldErrors.confirmPassword = 'Please confirm your new password';
+			hasErrors = true;
+		} else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+			newFieldErrors.confirmPassword = 'Passwords do not match';
+			hasErrors = true;
+		} else {
+			newFieldErrors.confirmPassword = '';
+		}
+		
+		// Set field errors
+		setFieldErrors(prev => ({
+			...prev,
+			...newFieldErrors
+		}));
+		
+		if (hasErrors) {
+			return;
+		}
+		
 		try {
 			// Implement password change logic here
 			setShowPasswordChange(false)
 			setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+			setFieldErrors(prev => ({
+				...prev,
+				newPassword: '',
+				confirmPassword: ''
+			}));
 			// You can add a success toast here
 		} catch (error) {
 			console.error('Error changing password:', error)
@@ -284,60 +669,63 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 											<label>First Name</label>
                                             <input
 												type="text"
+												name="firstName"
 												value={accountForm.firstName}
-                                                onChange={(e) => setAccountForm({...accountForm, firstName: e.target.value})}
-                                                onKeyDown={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete']
-                                                        if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault()
-                                                    }
-                                                }}
-                                                onPaste={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const pasted = (e.clipboardData || window.clipboardData).getData('text')
-                                                        if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault()
-                                                    }
-                                                }}
+                                                onChange={handleAccountFormChange}
+                                                onKeyDown={preventInvalidNameChar}
+                                                onPaste={preventInvalidNamePaste}
 												required
+												className={fieldErrors.firstName ? 'error' : ''}
 											/>
+											{fieldErrors.firstName && (
+												<p className="field-error">{fieldErrors.firstName}</p>
+											)}
 										</div>
 										<div className="form-group">
 											<label>Last Name</label>
                                             <input
 												type="text"
+												name="lastName"
 												value={accountForm.lastName}
-                                                onChange={(e) => setAccountForm({...accountForm, lastName: e.target.value})}
-                                                onKeyDown={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete']
-                                                        if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault()
-                                                    }
-                                                }}
-                                                onPaste={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const pasted = (e.clipboardData || window.clipboardData).getData('text')
-                                                        if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault()
-                                                    }
-                                                }}
+                                                onChange={handleAccountFormChange}
+                                                onKeyDown={preventInvalidNameChar}
+                                                onPaste={preventInvalidNamePaste}
 												required
+												className={fieldErrors.lastName ? 'error' : ''}
 											/>
+											{fieldErrors.lastName && (
+												<p className="field-error">{fieldErrors.lastName}</p>
+											)}
 										</div>
 										<div className="form-group">
 											<label>Email</label>
 											<input
 												type="email"
+												name="email"
 												value={accountForm.email}
-												onChange={(e) => setAccountForm({...accountForm, email: e.target.value})}
+												onChange={handleAccountFormChange}
 												required
+												className={fieldErrors.email ? 'error' : ''}
 											/>
+											{fieldErrors.email && (
+												<p className="field-error">{fieldErrors.email}</p>
+											)}
 										</div>
 										<div className="form-group">
 											<label>Phone</label>
                                             <input
 												type="tel"
+												name="phone"
 												value={accountForm.phone}
-												onChange={(e) => setAccountForm({...accountForm, phone: e.target.value})}
+												onChange={handleAccountFormChange}
+												onKeyDown={handlePhoneKeyDown}
+												onPaste={handlePhonePaste}
+												className={fieldErrors.phone ? 'error' : ''}
+												placeholder="07XXXXXXXX"
 											/>
+											{fieldErrors.phone && (
+												<p className="field-error">{fieldErrors.phone}</p>
+											)}
 										</div>
 										<div className="form-group">
 											<label>Address</label>
@@ -374,19 +762,29 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 										<label>New Password</label>
 										<input
 											type="password"
+											name="newPassword"
 											value={passwordForm.newPassword}
-											onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+											onChange={handlePasswordFormChange}
 											required
+											className={fieldErrors.newPassword ? 'error' : ''}
 										/>
+										{fieldErrors.newPassword && (
+											<p className="field-error">{fieldErrors.newPassword}</p>
+										)}
 									</div>
 									<div className="form-group">
 										<label>Confirm New Password</label>
 										<input
 											type="password"
+											name="confirmPassword"
 											value={passwordForm.confirmPassword}
-											onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+											onChange={handlePasswordFormChange}
 											required
+											className={fieldErrors.confirmPassword ? 'error' : ''}
 										/>
+										{fieldErrors.confirmPassword && (
+											<p className="field-error">{fieldErrors.confirmPassword}</p>
+										)}
 									</div>
 									<div className="modal-actions">
 										<button type="button" className="cancel-btn" onClick={() => setShowPasswordChange(false)}>
