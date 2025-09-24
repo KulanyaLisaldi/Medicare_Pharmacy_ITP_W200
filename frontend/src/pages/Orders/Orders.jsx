@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Navbar from '../../components/Navbar/Navbar'
 import Footer from '../../components/Footer/Footer'
 import { useAuth } from '../../context/AuthContext'
+import jsPDF from 'jspdf'
 
 const Orders = () => {
   const { user, token } = useAuth()
@@ -159,6 +160,99 @@ const Orders = () => {
     
     // If it's just a filename, add the uploads/prescriptions prefix
     return `http://localhost:5001/uploads/prescriptions/${prescriptionFile}`;
+  };
+
+  const generateInvoicePDF = (order) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(24);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 100, 200);
+    doc.text('MediCare Pharmacy', 20, 30);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Your Trusted Healthcare Partner', 20, 40);
+    
+    // Invoice title
+    doc.setFontSize(20);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
+    doc.text('INVOICE', 20, 55);
+    
+    // Order details section
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Invoice #: ${order._id.slice(-8)}`, 20, 70);
+    doc.text(`Date: ${formatDate(order.date)}`, 20, 80);
+    doc.text(`Order Type: ${order.type === 'prescription' ? 'Prescription Order' : 'Product Order'}`, 20, 90);
+    doc.text(`Status: ${order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}`, 20, 100);
+    doc.text(`Payment: ${order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}`, 20, 110);
+    doc.text(`Delivery: ${order.deliveryType === 'pickup' ? 'Store Pickup' : 'Home Delivery'}`, 20, 120);
+    
+    // Customer information
+    doc.setFont(undefined, 'bold');
+    doc.text('Bill To:', 20, 140);
+    doc.setFont(undefined, 'normal');
+    doc.text(`${order.customer?.name || order.prescriptionDetails?.patientName || 'N/A'}`, 20, 150);
+    doc.text(`${order.customer?.phone || order.prescriptionDetails?.patientPhone || 'N/A'}`, 20, 160);
+    doc.text(`${order.customer?.address || order.prescriptionDetails?.patientAddress || 'N/A'}`, 20, 170);
+    
+    // Products table
+    const items = order.items || order.orderList || [];
+    if (items.length > 0) {
+      let yPosition = 190;
+      
+      // Table header
+      doc.setFont(undefined, 'bold');
+      doc.setFillColor(240, 240, 240);
+      doc.rect(20, yPosition - 5, 170, 10, 'F');
+      doc.text('Product Name', 25, yPosition);
+      doc.text('Qty', 120, yPosition);
+      doc.text('Unit Price', 140, yPosition);
+      doc.text('Total', 170, yPosition);
+      
+      yPosition += 15;
+      
+      // Table content
+      doc.setFont(undefined, 'normal');
+      let subtotal = 0;
+      
+      items.forEach((item, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 30;
+        }
+        
+        const itemTotal = Number(item.lineTotal || item.totalPrice || (item.price || item.unitPrice || 0) * (item.quantity || 1));
+        subtotal += itemTotal;
+        
+        doc.text(item.name || item.productName || 'N/A', 25, yPosition);
+        doc.text(`${item.quantity || 1}`, 120, yPosition);
+        doc.text(`Rs.${Number(item.price || item.unitPrice || 0).toFixed(2)}`, 140, yPosition);
+        doc.text(`Rs.${itemTotal.toFixed(2)}`, 170, yPosition);
+        yPosition += 10;
+      });
+      
+      // Total section
+      yPosition += 10;
+      doc.setFont(undefined, 'bold');
+      doc.text(`Subtotal: Rs.${subtotal.toFixed(2)}`, 140, yPosition);
+      yPosition += 10;
+      doc.text(`Total Amount: Rs.${Number(order.total || 0).toFixed(2)}`, 140, yPosition);
+    }
+    
+    // Footer
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Thank you for choosing MediCare Pharmacy!', 20, 280);
+    doc.text('For any queries, contact us at: support@medicare.com', 20, 290);
+    doc.text('Generated on: ' + new Date().toLocaleString(), 20, 300);
+    
+    // Save the PDF
+    doc.save(`invoice-${order._id.slice(-8)}.pdf`);
   };
 
   const getStatusBadge = (status, type) => {
@@ -407,6 +501,12 @@ const Orders = () => {
 
             {/* Actions */}
             <div className="flex justify-end gap-3">
+              <button
+                onClick={() => generateInvoicePDF(selectedOrder)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Generate Invoice PDF
+              </button>
               {selectedOrder.type === 'prescription' && selectedOrder.status === 'pending' && selectedOrder.orderList && selectedOrder.orderList.length > 0 && (
                 <>
                   <button
