@@ -716,3 +716,64 @@ export const acceptHandoverOrder = async (req, res) => {
     return res.status(500).json({ message: 'Failed to accept handover order' });
   }
 };
+
+// Delete assigned order (before picked up)
+export const deleteAssignment = async (req, res) => {
+  try {
+    console.log('=== DELETE ASSIGNMENT START ===');
+    const { assignmentId } = req.params;
+    const deliveryAgentId = req.userId;
+
+    console.log('Assignment ID:', assignmentId);
+    console.log('Delivery Agent ID:', deliveryAgentId);
+
+    // Find the assignment
+    const assignment = await DeliveryAssignment.findOne({
+      _id: assignmentId,
+      deliveryAgent: deliveryAgentId
+    }).populate('order');
+
+    if (!assignment) {
+      console.log('Assignment not found');
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    console.log('Found assignment:', assignment._id);
+    console.log('Assignment status:', assignment.status);
+    console.log('Order status:', assignment.order.status);
+
+    // Check if assignment can be deleted (only before picked up)
+    if (assignment.status === 'picked_up' || assignment.status === 'delivered' || assignment.status === 'failed') {
+      console.log('Cannot delete assignment - already picked up or completed');
+      return res.status(400).json({ 
+        message: 'Cannot delete assignment. Order has already been picked up or completed.' 
+      });
+    }
+
+    // Update order status to make it available again
+    const order = await Order.findById(assignment.order._id);
+    if (order) {
+      order.assignedDeliveryAgent = null;
+      order.deliveryAssignment = null;
+      order.status = 'out_for_delivery'; // Keep it as out for delivery
+      await order.save();
+      console.log('Order updated - made available for reassignment');
+    }
+
+    // Delete the assignment
+    await DeliveryAssignment.findByIdAndDelete(assignmentId);
+    console.log('Assignment deleted successfully');
+
+    return res.status(200).json({
+      message: 'Assignment deleted successfully. Order is now available for other delivery agents.',
+      orderId: assignment.order._id
+    });
+
+  } catch (err) {
+    console.error('=== DELETE ASSIGNMENT ERROR ===');
+    console.error('deleteAssignment error:', err);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    return res.status(500).json({ message: 'Failed to delete assignment' });
+  }
+};

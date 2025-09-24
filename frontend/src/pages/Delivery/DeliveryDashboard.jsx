@@ -600,6 +600,7 @@ function AssignmentsSection() {
 
     const loadAllData = async () => {
         setLoading(true);
+        setError(''); // Clear any existing errors when loading data
         try {
             await Promise.all([loadAvailableOrders(), loadAssignedOrders()]);
         } finally {
@@ -609,6 +610,18 @@ function AssignmentsSection() {
 
     useEffect(() => {
         if (token) loadAllData();
+    }, [token]);
+
+    // Clear error when handover modal is opened
+    useEffect(() => {
+        if (showHandoverModal) {
+            setError('');
+        }
+    }, [showHandoverModal]);
+
+    // Clear error when component mounts or token changes
+    useEffect(() => {
+        setError('');
     }, [token]);
 
     const acceptOrder = async (orderId) => {
@@ -725,6 +738,8 @@ function AssignmentsSection() {
         setShowHandoverModal(true);
         setError(''); // Clear any existing errors
         setSelectedAgentId(''); // Reset agent selection
+        setHandoverReason(''); // Reset reason
+        setHandoverDetails(''); // Reset details
         // Load available agents when opening modal
         await loadAvailableDeliveryAgents();
     };
@@ -736,6 +751,8 @@ function AssignmentsSection() {
         setHandoverDetails('');
         setSelectedAgentId('');
         setError(''); // Clear any errors when closing
+        // Force clear error state
+        setTimeout(() => setError(''), 0);
     };
 
     const submitHandover = async () => {
@@ -801,6 +818,50 @@ function AssignmentsSection() {
             setError('');
             console.log('Cleared error state after successful API call');
             
+            // Show success message immediately
+            const selectedAgent = availableAgents.find(agent => agent._id === selectedAgentId);
+            const agentName = selectedAgent ? `${selectedAgent.firstName} ${selectedAgent.lastName}` : 'Selected Agent';
+            alert(`Handover request submitted successfully!\nReason: ${handoverReason}\nDetails: ${handoverDetails}\n\nOrder has been directly assigned to ${agentName}.`);
+            
+            // Force clear error state multiple times to prevent race conditions
+            setError('');
+            setTimeout(() => setError(''), 0);
+            setTimeout(() => setError(''), 50);
+            
+            // Close modal immediately after success
+            setShowHandoverModal(false);
+            setHandoverReason('');
+            setHandoverDetails('');
+            setSelectedAssignmentForHandover(null);
+            
+            // Perform non-critical operations after modal is closed
+            setTimeout(() => {
+                performPostHandoverOperations();
+            }, 100);
+            
+        } catch (error) {
+            console.error('=== HANDOVER DEBUG END - ERROR ===');
+            console.error('Handover error details:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            
+            // Only set error if it's actually a handover API error
+            if (error.message && 
+                !error.message.includes('loadAvailableOrders') && 
+                !error.message.includes('refresh') &&
+                !error.message.includes('notification') &&
+                !error.message.includes('assigned orders')) {
+                setError('Failed to submit handover request. Please try again.');
+            } else {
+                console.warn('Non-critical error during handover, not setting error state:', error.message);
+                // Clear error state for non-critical errors
+                setError('');
+            }
+        }
+    };
+
+    const performPostHandoverOperations = async () => {
+        try {
             // Remove from assigned orders (backend has already processed the handover)
             console.log('Removing from assigned orders...');
             setAssignedOrders(prev => {
@@ -811,13 +872,8 @@ function AssignmentsSection() {
             
             // Refresh available orders to show the handed-over order to other agents
             console.log('Refreshing available orders...');
-            try {
-                await loadAvailableOrders();
-                console.log('Available orders refreshed successfully');
-            } catch (refreshError) {
-                console.warn('Failed to refresh available orders, but handover was successful:', refreshError);
-                // Don't set error state here since handover was successful
-            }
+            await loadAvailableOrders();
+            console.log('Available orders refreshed successfully');
             
             // Create notification for other delivery agents
             console.log('Creating notification...');
@@ -849,53 +905,11 @@ function AssignmentsSection() {
                 return newCount;
             });
             
-            // Clear error state again before closing modal
-            setError('');
-            console.log('Cleared error state before closing modal');
-            
-            console.log('Cleaning up modal state...');
-            setShowHandoverModal(false);
-            setHandoverReason('');
-            setHandoverDetails('');
-            setSelectedAssignmentForHandover(null);
-            
-            // Ensure error state is cleared after a short delay to handle any async state updates
-            setTimeout(() => {
-                setError('');
-                console.log('Final error state clear after timeout');
-            }, 100);
-            
-            // Additional error clearing after a longer delay to catch any late async operations
-            setTimeout(() => {
-                setError('');
-                console.log('Additional error state clear after longer timeout');
-            }, 500);
-            
-            console.log('Showing success message...');
-            
-            // Final error state clear before showing success message
-            setError('');
-            console.log('Final error state clear before success message');
-            
-            // Show success message
-            const selectedAgent = availableAgents.find(agent => agent._id === selectedAgentId);
-            const agentName = selectedAgent ? `${selectedAgent.firstName} ${selectedAgent.lastName}` : 'Selected Agent';
-            alert(`Handover request submitted successfully!\nReason: ${handoverReason}\nDetails: ${handoverDetails}\n\nOrder has been directly assigned to ${agentName}.`);
-            
-            console.log('=== HANDOVER DEBUG END - SUCCESS ===');
+            console.log('Post-handover operations completed successfully');
             
         } catch (error) {
-            console.error('=== HANDOVER DEBUG END - ERROR ===');
-            console.error('Handover error details:', error);
-            console.error('Error message:', error.message);
-            console.error('Error stack:', error.stack);
-            
-            // Only set error if it's actually a handover-related error
-            if (error.message && !error.message.includes('loadAvailableOrders')) {
-                setError('Failed to submit handover request. Please try again.');
-            } else {
-                console.warn('Non-critical error during handover, not setting error state:', error.message);
-            }
+            console.warn('Error in post-handover operations (non-critical):', error);
+            // Don't set error state for post-handover operations
         }
     };
 
@@ -962,6 +976,35 @@ function AssignmentsSection() {
                 return 'Rejected';
             default:
                 return status;
+        }
+    };
+
+    const deleteAssignment = async (assignmentId) => {
+        if (!confirm('Are you sure you want to delete this assignment? The order will become available for other delivery agents.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`http://localhost:5001/api/delivery/assignments/${assignmentId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            
+            if (res.ok) {
+                // Remove from assigned orders
+                setAssignedOrders(prev => prev.filter(assignment => assignment._id !== assignmentId));
+                alert('Assignment deleted successfully! Order is now available for other delivery agents.');
+                
+                // Reload available orders to show the order again
+                loadAvailableOrders();
+            } else {
+                throw new Error(data.message || 'Failed to delete assignment');
+            }
+        } catch (error) {
+            console.error('Delete assignment error:', error);
+            alert('Failed to delete assignment: ' + error.message);
         }
     };
 
@@ -1038,7 +1081,7 @@ function AssignmentsSection() {
                                             <tr key={order._id} className="border-t hover:bg-gray-50">
                                                 <td className="p-4 font-mono text-blue-600">
                                                     <div className="flex items-center gap-2">
-                                                        #{order._id.slice(-8)}
+                                                    #{order._id.slice(-8)}
                                                         {order.isHandover && (
                                                             <span 
                                                                 className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium"
@@ -1164,31 +1207,31 @@ function AssignmentsSection() {
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex gap-2">
-                                                        <button
+                                                    <button
                                                             className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
-                                                            disabled={loadingDetails}
-                                                            onClick={async () => {
-                                                                setLoadingDetails(true);
-                                                                try {
-                                                                    const res = await fetch(`http://localhost:5001/api/delivery/orders/${assignment.order._id}/details`, {
-                                                                        headers: { 'Authorization': `Bearer ${token}` }
-                                                                    });
-                                                                    const data = await res.json();
-                                                                    if (res.ok) {
-                                                                        setSelectedOrder(data);
-                                                                        setShowOrderDetails(true);
-                                                                    } else {
-                                                                        throw new Error(data.message || 'Failed to fetch order details');
-                                                                    }
-                                                                } catch (error) {
-                                                                    setError(error.message);
-                                                                } finally {
-                                                                    setLoadingDetails(false);
+                                                        disabled={loadingDetails}
+                                                        onClick={async () => {
+                                                            setLoadingDetails(true);
+                                                            try {
+                                                                const res = await fetch(`http://localhost:5001/api/delivery/orders/${assignment.order._id}/details`, {
+                                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                                });
+                                                                const data = await res.json();
+                                                                if (res.ok) {
+                                                                    setSelectedOrder(data);
+                                                                    setShowOrderDetails(true);
+                                                                } else {
+                                                                    throw new Error(data.message || 'Failed to fetch order details');
                                                                 }
-                                                            }}
-                                                        >
-                                                            {loadingDetails ? 'Loading...' : 'View Details'}
-                                                        </button>
+                                                            } catch (error) {
+                                                                setError(error.message);
+                                                            } finally {
+                                                                setLoadingDetails(false);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {loadingDetails ? 'Loading...' : 'View Details'}
+                                                    </button>
                                                         
                                                         <div className="flex flex-col gap-1">
                                                             {/* Only show Update Status and Hand Over buttons if status is not delivered */}
@@ -1203,8 +1246,8 @@ function AssignmentsSection() {
                                                                     
                                                                     {openDropdowns.has(assignment._id) && (
                                                                         <div className="flex flex-col gap-1">
-                                                                            {assignment.status === 'assigned' && (
-                                                                                <button
+                                                    {assignment.status === 'assigned' && (
+                                                        <button
                                                                                     className="px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700"
                                                                                     onClick={() => {
                                                                                         openStatusModal(assignment, 'picked_up');
@@ -1214,12 +1257,12 @@ function AssignmentsSection() {
                                                                                             return newSet;
                                                                                         });
                                                                                     }}
-                                                                                >
-                                                                                    Picked Up
-                                                                                </button>
-                                                                            )}
-                                                                            {assignment.status === 'picked_up' && (
-                                                                                <button
+                                                        >
+                                                            Picked Up
+                                                        </button>
+                                                    )}
+                                                    {assignment.status === 'picked_up' && (
+                                                        <button
                                                                                     className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                                                                                     onClick={() => {
                                                                                         openStatusModal(assignment, 'delivered');
@@ -1229,10 +1272,10 @@ function AssignmentsSection() {
                                                                                             return newSet;
                                                                                         });
                                                                                     }}
-                                                                                >
-                                                                                    Delivered
-                                                                                </button>
-                                                                            )}
+                                                        >
+                                                            Delivered
+                                                        </button>
+                                                    )}
                                                                             <button
                                                                                 className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
                                                                                 onClick={() => {
@@ -1247,6 +1290,23 @@ function AssignmentsSection() {
                                                                             >
                                                                                 Hand Over Delivery
                                                                             </button>
+                                                                            {/* Delete Assignment Button - Only show if not picked up or delivered */}
+                                                                            {(assignment.status === 'assigned' || assignment.status === 'accepted') && (
+                                                    <button
+                                                        className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                                                                    onClick={() => {
+                                                                                        deleteAssignment(assignment._id);
+                                                                                        setOpenDropdowns(prev => {
+                                                                                            const newSet = new Set(prev);
+                                                                                            newSet.delete(assignment._id);
+                                                                                            return newSet;
+                                                                                        });
+                                                                                    }}
+                                                                                    title="Delete assignment - order will become available for other agents"
+                                                                                >
+                                                                                    Delete Assignment
+                                                    </button>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </>

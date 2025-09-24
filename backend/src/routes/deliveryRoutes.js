@@ -13,7 +13,8 @@ import {
   acceptHandoverOrder,
   getAvailableDeliveryAgents,
   getDeliveryNotifications,
-  markNotificationAsRead
+  markNotificationAsRead,
+  deleteAssignment
 } from '../controllers/deliveryController.js';
 
 const router = express.Router();
@@ -60,5 +61,8 @@ router.get('/notifications', getDeliveryNotifications);
 
 // Mark notification as read
 router.patch('/notifications/:notificationId/read', markNotificationAsRead);
+
+// Delete assignment (before picked up)
+router.delete('/assignments/:assignmentId', deleteAssignment);
 
 export default router;
