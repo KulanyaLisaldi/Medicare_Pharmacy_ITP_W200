@@ -35,14 +35,14 @@ const Register = () => {
     const preventInvalidFirstChar = (e) => {
         const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
         if (!isNameField) return;
-        const key = e.key || '';
-        if (e.type === 'keydown') {
-            // Allow control keys (Backspace, Tab, Arrow keys, etc.)
-            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
-            if (controlKeys.includes(key)) return;
+            const key = e.key || '';
+            if (e.type === 'keydown') {
+                // Allow control keys (Backspace, Tab, Arrow keys, etc.)
+                const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+                if (controlKeys.includes(key)) return;
             // Block any non-letter characters (including numbers, symbols, etc.)
             if (!/^[A-Za-z ]$/.test(key)) {
-                e.preventDefault();
+                    e.preventDefault();
                 // Show error message for numbers
                 if (/^[0-9]$/.test(key)) {
                     setFieldErrors(prev => ({
@@ -62,9 +62,9 @@ const Register = () => {
     const preventInvalidPasteFirstChar = (e) => {
         const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
         if (!isNameField) return;
-        const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
         if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
-            e.preventDefault();
+                e.preventDefault();
             // Show error message for pasted content with numbers
             if (/[0-9]/.test(pasted)) {
                 setFieldErrors(prev => ({
@@ -373,15 +373,71 @@ const Register = () => {
             <div className="auth-card" style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '2rem',
+                alignItems: 'center',
+                minHeight: '500px',
+                maxWidth: '800px',
+                width: '80%',
+                margin: '0 auto'
             }}>
-                <div className="auth-header">
-                    <div className="auth-logo">
-                        <div className="logo-icon">M</div>
-                        <h1>MediCare</h1>
+                {/* Left Side - Text Content */}
+                <div className="auth-text-content" style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '2rem',
+                    color: 'white'
+                }}>
+                    <div className="auth-logo" style={{ marginBottom: '2rem' }}>
+                        <div className="logo-icon" style={{
+                            width: '60px',
+                            height: '60px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            fontWeight: 'bold',
+                            color: 'white',
+                            marginBottom: '1rem'
+                        }}>M</div>
+                        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '0' }}>MediCare</h1>
                     </div>
-                    <h2>Create Account</h2>
-                    <p>Join MediCare for better healthcare</p>
+                    <h2 style={{ fontSize: '2rem', fontWeight: '600', marginBottom: '1rem' }}>Join Our Community</h2>
+                    <p style={{ fontSize: '1.1rem', opacity: '0.9', lineHeight: '1.6' }}>
+                        Create your account and start your healthcare journey with us. 
+                        Get access to medical services, book appointments, and manage your health records.
+                    </p>
+                    <div style={{ marginTop: '2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', marginRight: '12px' }}></div>
+                            <span>Free Registration</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', marginRight: '12px' }}></div>
+                            <span>Secure & Private</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', marginRight: '12px' }}></div>
+                            <span>24/7 Support</span>
+                        </div>
+                    </div>
+                    </div>
+
+                {/* Right Side - Form */}
+                <div className="auth-form-container" style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '2rem'
+                }}>
+                    <div className="auth-header" style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                        <h2 style={{ color: 'black', fontSize: '1.8rem', fontWeight: '600', marginBottom: '0.5rem', textAlign: 'center' }}>Create Account</h2>
+                        <p style={{ color: 'rgba(15, 15, 15, 0.8)', fontSize: '0.9rem', textAlign: 'center' }}>Join MediCare Today!</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="auth-form">
@@ -521,13 +577,14 @@ const Register = () => {
                     </button>
                 </form>
 
-                <div className="auth-footer">
+                    <div className="auth-footer" style={{ marginTop: '1.5rem' }}>
                     <p>
                         Already have an account?{' '}
                         <Link to="/login" className="auth-link">
                             Sign in here
                         </Link>
                     </p>
+                    </div>
                 </div>
             </div>
         </div>

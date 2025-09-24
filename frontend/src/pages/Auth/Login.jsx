@@ -164,16 +164,55 @@ const Login = () => {
             <div className="auth-card" style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '2rem',
+                alignItems: 'center',
+                minHeight: '500px',
+                maxWidth: '800px',
+                width: '80%',
+                margin: '0 auto'
             }}>
-                <div className="auth-header">
-                    <div className="auth-logo">
-                        <div className="logo-icon">M</div>
-                        <h1>MediCare</h1>
+                {/* Left Side - Text Content */}
+                <div className="auth-text-content" style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '2rem',
+                    color: 'white'
+                }}>
+                    <div className="auth-logo" style={{ marginBottom: '2rem' }}>
+                        <div className="logo-icon" style={{
+                            width: '60px',
+                            height: '60px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            fontWeight: 'bold',
+                            color: 'white',
+                            marginBottom: '1rem'
+                        }}>M</div>
+                        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '0' }}>MediCare</h1>
                     </div>
-                    <h2>Welcome Back</h2>
-                    <p>Sign in to your account to continue</p>
-                </div>
+                   
+                   
+                    </div>
+
+                {/* Right Side - Form */}
+                <div className="auth-form-container" style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '2rem'
+                }}>
+                    <div className="auth-header" style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                        <h2 style={{ color: 'black', fontSize: '1.8rem', fontWeight: '600', marginBottom: '0.5rem', textAlign: 'center' }}>Sign In</h2>
+                        <p style={{ color: 'rgba(15, 15, 15, 0.8)', fontSize: '0.9rem', textAlign: 'center' }}>Welcome Back !</p>
+                    </div>
 
                 <form onSubmit={handleSubmit} className="auth-form">
                     {error && (
@@ -254,7 +293,7 @@ const Login = () => {
                     </button>
                 </form>
 
-                <div className="auth-footer">
+                    <div className="auth-footer" style={{ marginTop: '1.5rem' }}>
                     <div style={{ marginBottom: '12px' }}>
                         <GoogleLogin
                             onSuccess={async (credentialResponse) => {
@@ -292,6 +331,7 @@ const Login = () => {
                     <Link to="/forgot-password" className="auth-link">
                         Forgot your password?
                     </Link>
+                    </div>
                 </div>
             </div>
         </div>
