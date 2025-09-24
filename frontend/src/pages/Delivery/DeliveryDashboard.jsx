@@ -351,12 +351,7 @@ const DeliveryDashboard = () => {
 				return <AssignmentsSection />;
 
 			case 'history':
-				return (
-					<div className="history-section">
-						<h2>Delivery History</h2>
-						<p>Delivery history features coming soon...</p>
-					</div>
-				);
+				return <HistorySection />;
 
 			case 'earnings':
 				return (
@@ -1696,6 +1691,798 @@ function AssignmentsSection() {
                                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                             >
                                 Submit Handover Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function HistorySection() {
+    const { token } = useAuth();
+    const [completedDeliveries, setCompletedDeliveries] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [selectedDelivery, setSelectedDelivery] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [dateFilter, setDateFilter] = useState({
+        startDate: '',
+        endDate: ''
+    });
+    const [statusFilter, setStatusFilter] = useState('all');
+
+    const fetchCompletedDeliveries = async (page = 1) => {
+        try {
+            setLoading(true);
+            let url = `http://localhost:5001/api/delivery/completed?page=${page}&limit=10&status=${statusFilter}`;
+            
+            // Add date filters if provided
+            if (dateFilter.startDate) {
+                url += `&startDate=${dateFilter.startDate}`;
+            }
+            if (dateFilter.endDate) {
+                url += `&endDate=${dateFilter.endDate}`;
+            }
+            
+            
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server returned HTML instead of JSON. Backend server may not be running.');
+            }
+            
+            const data = await res.json();
+            if (res.ok) {
+                setCompletedDeliveries(data.deliveries);
+                setTotalPages(data.pagination.totalPages);
+                setCurrentPage(data.pagination.currentPage);
+            } else {
+                throw new Error(data.message || 'Failed to fetch completed deliveries');
+            }
+        } catch (error) {
+            console.error('Error fetching completed deliveries:', error);
+            setError(error.message);
+            setCompletedDeliveries([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (token) {
+            fetchCompletedDeliveries(1);
+        }
+    }, [token, dateFilter, statusFilter]);
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+        fetchCompletedDeliveries(page);
+    };
+
+    const handleDateFilterChange = (field, value) => {
+        setDateFilter(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        setCurrentPage(1); // Reset to first page when filter changes
+    };
+
+    const clearDateFilter = () => {
+        setDateFilter({
+            startDate: '',
+            endDate: ''
+        });
+        setCurrentPage(1);
+    };
+
+    const handleStatusFilterChange = (status) => {
+        setStatusFilter(status);
+        setCurrentPage(1);
+    };
+
+    const clearAllFilters = () => {
+        setDateFilter({
+            startDate: '',
+            endDate: ''
+        });
+        setStatusFilter('all');
+        setCurrentPage(1);
+    };
+
+    const downloadHistory = async () => {
+        try {
+            setIsGeneratingPDF(true);
+            
+            // Generate HTML content for PDF
+            const htmlContent = generatePDFContent();
+            
+            // Create a new window to print the content
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            // Wait for content to load, then trigger print
+            printWindow.onload = () => {
+                printWindow.print();
+                printWindow.close();
+            };
+            
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate PDF. Please try again.');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const generatePDFContent = () => {
+        // Create HTML content for PDF
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Delivery History Report</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        color: #333;
+                    }
+                    .header {
+                        text-align: center;
+                        border-bottom: 2px solid #2563eb;
+                        padding-bottom: 20px;
+                        margin-bottom: 30px;
+                    }
+                    .header h1 {
+                        color: #2563eb;
+                        margin: 0;
+                        font-size: 28px;
+                    }
+                    .header p {
+                        margin: 5px 0;
+                        color: #666;
+                    }
+                    .summary {
+                        background: #f8fafc;
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-bottom: 30px;
+                        border-left: 4px solid #2563eb;
+                    }
+                    .summary h3 {
+                        margin: 0 0 10px 0;
+                        color: #2563eb;
+                    }
+                    .summary-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                        gap: 15px;
+                    }
+                    .summary-item {
+                        background: white;
+                        padding: 10px;
+                        border-radius: 6px;
+                        border: 1px solid #e2e8f0;
+                    }
+                    .summary-label {
+                        font-weight: bold;
+                        color: #64748b;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                        margin-bottom: 5px;
+                    }
+                    .summary-value {
+                        color: #1e293b;
+                        font-size: 16px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 20px;
+                        font-size: 12px;
+                    }
+                    th {
+                        background: #2563eb;
+                        color: white;
+                        padding: 12px 8px;
+                        text-align: left;
+                        font-weight: bold;
+                    }
+                    td {
+                        padding: 10px 8px;
+                        border-bottom: 1px solid #e2e8f0;
+                        vertical-align: top;
+                    }
+                    tr:nth-child(even) {
+                        background: #f8fafc;
+                    }
+                    .status-delivered {
+                        background: #dcfce7;
+                        color: #166534;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                        font-size: 10px;
+                    }
+                    .status-failed {
+                        background: #fef2f2;
+                        color: #dc2626;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                        font-size: 10px;
+                    }
+                    .amount {
+                        font-weight: bold;
+                        color: #059669;
+                    }
+                    .footer {
+                        margin-top: 40px;
+                        text-align: center;
+                        color: #64748b;
+                        font-size: 12px;
+                        border-top: 1px solid #e2e8f0;
+                        padding-top: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Delivery History Report</h1>
+                    <p>Generated on ${new Date().toLocaleString()}</p>
+                    <p>Medicare Pharmacy Delivery System</p>
+                </div>
+
+                <div class="summary">
+                    <h3>Report Summary</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Total Deliveries</div>
+                            <div class="summary-value">${completedDeliveries.length}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Status Filter</div>
+                            <div class="summary-value">${statusFilter === 'all' ? 'All Completed' : statusFilter === 'delivered' ? 'Delivered Only' : 'Failed Only'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Date Range</div>
+                            <div class="summary-value">${dateFilter.startDate ? new Date(dateFilter.startDate).toLocaleDateString() : 'All Time'} - ${dateFilter.endDate ? new Date(dateFilter.endDate).toLocaleDateString() : 'Present'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Total Amount</div>
+                            <div class="summary-value">${formatCurrency(completedDeliveries.reduce((sum, delivery) => sum + (delivery.totalAmount || 0), 0))}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Address</th>
+                            <th>Status</th>
+                            <th>Amount</th>
+                            <th>Payment</th>
+                            <th>Assigned</th>
+                            <th>Completed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${completedDeliveries.map(delivery => `
+                            <tr>
+                                <td><strong>${delivery.orderNumber}</strong></td>
+                                <td>
+                                    <div><strong>${delivery.customerName}</strong></div>
+                                    <div style="color: #64748b; font-size: 11px;">${delivery.customerPhone || 'N/A'}</div>
+                                </td>
+                                <td style="max-width: 200px; word-wrap: break-word;">${delivery.address}</td>
+                                <td>
+                                    <span class="status-${delivery.status}">${getStatusText(delivery.status)}</span>
+                                </td>
+                                <td class="amount">${formatCurrency(delivery.totalAmount)}</td>
+                                <td>${delivery.paymentMethod === 'cod' ? 'COD' : 'Online'}</td>
+                                <td>${formatDate(delivery.assignedAt)}</td>
+                                <td>${delivery.status === 'delivered' ? formatDate(delivery.deliveredAt) : formatDate(delivery.failedAt)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <p>This report was generated automatically by the Medicare Pharmacy Delivery System</p>
+                    <p>For questions or support, please contact the system administrator</p>
+                </div>
+            </body>
+            </html>
+        `;
+
+        return htmlContent;
+    };
+
+    const openDeliveryDetails = (delivery) => {
+        setSelectedDelivery(delivery);
+        setShowDetailsModal(true);
+    };
+
+    const getStatusBadgeColor = (status) => {
+        switch (status) {
+            case 'delivered':
+                return 'bg-green-100 text-green-800';
+            case 'failed':
+                return 'bg-red-100 text-red-800';
+            default:
+                return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    const getStatusText = (status) => {
+        switch (status) {
+            case 'delivered':
+                return 'Delivered';
+            case 'failed':
+                return 'Failed';
+            default:
+                return status;
+        }
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const formatCurrency = (amount) => {
+        return `Rs.${Number(amount).toFixed(2)}`;
+    };
+
+    return (
+        <div className="history-section">
+            <div className="flex items-center justify-between mb-6">
+                <h2>Delivery History</h2>
+                <div className="flex gap-3">
+                    <button 
+                        onClick={downloadHistory}
+                        disabled={isGeneratingPDF || completedDeliveries.length === 0}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {isGeneratingPDF ? (
+                            <>
+                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Generate PDF
+                            </>
+                        )}
+                    </button>
+                    <button 
+                        onClick={() => fetchCompletedDeliveries(currentPage)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div className="mb-6">
+                <div className="bg-white p-4 rounded-lg border">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-800">Filter Deliveries</h3>
+                    
+                    {/* Status Filter */}
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Delivery Status
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => handleStatusFilterChange('all')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    statusFilter === 'all'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                            >
+                                All Completed
+                            </button>
+                            <button
+                                onClick={() => handleStatusFilterChange('delivered')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    statusFilter === 'delivered'
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                            >
+                                Delivered
+                            </button>
+                            <button
+                                onClick={() => handleStatusFilterChange('failed')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    statusFilter === 'failed'
+                                        ? 'bg-red-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                            >
+                                Failed
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Delivery Date Range
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                    Start Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={dateFilter.startDate}
+                                    onChange={(e) => handleDateFilterChange('startDate', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                    End Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={dateFilter.endDate}
+                                    onChange={(e) => handleDateFilterChange('endDate', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={clearDateFilter}
+                                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                                >
+                                    Clear Dates
+                                </button>
+                                <button
+                                    onClick={clearAllFilters}
+                                    className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                                >
+                                    Clear All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Active Filters Display */}
+                    {(dateFilter.startDate || dateFilter.endDate || statusFilter !== 'all') && (
+                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                            <div className="text-sm text-gray-700">
+                                <span className="font-medium">Active filters:</span>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {statusFilter !== 'all' && (
+                                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                            Status: {statusFilter === 'delivered' ? 'Delivered' : 'Failed'}
+                                        </span>
+                                    )}
+                                    {dateFilter.startDate && (
+                                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                            From: {new Date(dateFilter.startDate).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                    {dateFilter.endDate && (
+                                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                            To: {new Date(dateFilter.endDate).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="mt-2 text-xs text-gray-600">
+                                    📄 PDF will include {completedDeliveries.length} delivery record{completedDeliveries.length !== 1 ? 's' : ''} with current filters applied
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {error && (
+                <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow overflow-x-auto">
+                {loading ? (
+                    <div className="p-8 text-center">
+                        <div className="text-gray-500">Loading delivery history...</div>
+                    </div>
+                ) : completedDeliveries.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <div className="text-gray-500">No completed deliveries found</div>
+                    </div>
+                ) : (
+                    <>
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-gray-600 bg-gray-50">
+                                    <th className="p-4">Order ID</th>
+                                    <th className="p-4">Customer</th>
+                                    <th className="p-4">Address</th>
+                                    <th className="p-4">Amount</th>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4">Completed At</th>
+                                    <th className="p-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {completedDeliveries.map((delivery) => (
+                                    <tr key={delivery._id} className="border-t hover:bg-gray-50">
+                                        <td className="p-4 font-mono text-blue-600">
+                                            {delivery.orderNumber}
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="font-medium">{delivery.customerName}</div>
+                                            <div className="text-xs text-gray-500">{delivery.customerPhone}</div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="text-sm max-w-xs truncate" title={delivery.address}>
+                                                {delivery.address}
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="font-medium">{formatCurrency(delivery.totalAmount)}</div>
+                                            <div className="text-xs text-gray-500">
+                                                {delivery.paymentMethod === 'cod' ? 'COD' : 'Online Paid'}
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeColor(delivery.status)}`}>
+                                                {getStatusText(delivery.status)}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-sm text-gray-600">
+                                            {delivery.status === 'delivered' 
+                                                ? formatDate(delivery.deliveredAt)
+                                                : formatDate(delivery.failedAt)
+                                            }
+                                        </td>
+                                        <td className="p-4">
+                                            <button
+                                                onClick={() => openDeliveryDetails(delivery)}
+                                                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                            >
+                                                View Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between px-4 py-3 border-t">
+                                <div className="text-sm text-gray-700">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    >
+                                        Previous
+                                    </button>
+                                    <button
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Delivery Details Modal */}
+            {showDetailsModal && selectedDelivery && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white w-full max-w-4xl rounded-xl shadow-lg p-6 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Delivery Details</h3>
+                            <button
+                                onClick={() => {
+                                    setShowDetailsModal(false);
+                                    setSelectedDelivery(null);
+                                }}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Customer Information */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                                <h4 className="font-semibold text-lg mb-3 text-blue-600">Customer Information</h4>
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="font-medium">Name:</span> {selectedDelivery.customerName}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Phone:</span> {selectedDelivery.customerPhone}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Address:</span> {selectedDelivery.address}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Delivery Information */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                                <h4 className="font-semibold text-lg mb-3 text-blue-600">Delivery Information</h4>
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="font-medium">Order ID:</span> {selectedDelivery.orderNumber}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Status:</span> 
+                                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getStatusBadgeColor(selectedDelivery.status)}`}>
+                                            {getStatusText(selectedDelivery.status)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Assigned At:</span> {formatDate(selectedDelivery.assignedAt)}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Picked Up At:</span> {formatDate(selectedDelivery.pickedUpAt)}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Completed At:</span> {
+                                            selectedDelivery.status === 'delivered' 
+                                                ? formatDate(selectedDelivery.deliveredAt)
+                                                : formatDate(selectedDelivery.failedAt)
+                                        }
+                                    </div>
+                                    {selectedDelivery.failureReason && (
+                                        <div>
+                                            <span className="font-medium">Failure Reason:</span> {selectedDelivery.failureReason}
+                                        </div>
+                                    )}
+                                    {selectedDelivery.deliveryNotes && (
+                                        <div>
+                                            <span className="font-medium">Delivery Notes:</span> {selectedDelivery.deliveryNotes}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Order Information */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                                <h4 className="font-semibold text-lg mb-3 text-blue-600">Order Information</h4>
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="font-medium">Total Amount:</span> {formatCurrency(selectedDelivery.totalAmount)}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Payment Method:</span> 
+                                        {selectedDelivery.paymentMethod === 'cod' ? (
+                                            <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                                COD
+                                            </span>
+                                        ) : (
+                                            <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                                Online Paid
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Delivery Type:</span> {selectedDelivery.deliveryType === 'home_delivery' ? 'Home Delivery' : 'Pickup'}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Order Type:</span> {selectedDelivery.orderType === 'prescription' ? 'Prescription' : 'Product'}
+                                    </div>
+                                    {selectedDelivery.distance && (
+                                        <div>
+                                            <span className="font-medium">Distance:</span> {selectedDelivery.distance.toFixed(1)} km
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Handover Information */}
+                            {selectedDelivery.isHandover && (
+                                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                    <h4 className="font-semibold text-lg mb-3 text-orange-600 flex items-center gap-2">
+                                        🚨 Handover Information
+                                    </h4>
+                                    <div className="space-y-2">
+                                        <div>
+                                            <span className="font-medium">Handover Reason:</span> 
+                                            <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+                                                {selectedDelivery.handoverReason}
+                                            </span>
+                                        </div>
+                                        {selectedDelivery.handoverDetails && (
+                                            <div>
+                                                <span className="font-medium">Additional Notes:</span>
+                                                <p className="mt-1 text-sm text-gray-700 bg-white p-2 rounded border">
+                                                    {selectedDelivery.handoverDetails}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Order Items */}
+                        {selectedDelivery.items && selectedDelivery.items.length > 0 && (
+                            <div className="mt-6">
+                                <h4 className="font-semibold text-lg mb-3 text-blue-600">Order Items</h4>
+                                <div className="bg-white border rounded-lg overflow-hidden">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="p-3 text-left">Product</th>
+                                                <th className="p-3 text-left">Quantity</th>
+                                                <th className="p-3 text-left">Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {selectedDelivery.items.map((item, index) => (
+                                                <tr key={index} className="border-t">
+                                                    <td className="p-3">
+                                                        <div className="font-medium">{item.name}</div>
+                                                        <div className="text-gray-500 text-xs">{item.brand || 'Generic'}</div>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                                                            {item.quantity} {item.quantity > 1 ? 'units' : 'unit'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 font-medium">{formatCurrency(item.price || 0)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="mt-6 flex justify-end space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowDetailsModal(false);
+                                    setSelectedDelivery(null);
+                                }}
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                            >
+                                Close
                             </button>
                         </div>
                     </div>

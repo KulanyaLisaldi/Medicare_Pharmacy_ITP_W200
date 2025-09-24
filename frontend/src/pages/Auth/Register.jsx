@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './Auth.css';
 import { toast } from 'react-hot-toast';
+import slide1 from '../../assets/slide1.jpg';
 
 const Register = () => {
     const [formData, setFormData] = useState({
@@ -18,6 +19,15 @@ const Register = () => {
     const [error, setError] = useState('');
     const [registrationSuccess, setRegistrationSuccess] = useState(false);
     const [userEmail, setUserEmail] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        address: '',
+        phone: ''
+    });
     
     const { register } = useAuth();
     const navigate = useNavigate();
@@ -25,17 +35,25 @@ const Register = () => {
     const preventInvalidFirstChar = (e) => {
         const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
         if (!isNameField) return;
-        const current = e.target.value || '';
-        // Block first character if not a letter (A-Z or a-z)
-        if (current.length === 0) {
-            // Handle key presses
-            const key = e.key || '';
-            if (e.type === 'keydown') {
-                // Allow control keys (Backspace, Tab, Arrow keys, etc.)
-                const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
-                if (controlKeys.includes(key)) return;
-                if (!/^[A-Za-z]$/.test(key)) {
-                    e.preventDefault();
+        const key = e.key || '';
+        if (e.type === 'keydown') {
+            // Allow control keys (Backspace, Tab, Arrow keys, etc.)
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            // Block any non-letter characters (including numbers, symbols, etc.)
+            if (!/^[A-Za-z ]$/.test(key)) {
+                e.preventDefault();
+                // Show error message for numbers
+                if (/^[0-9]$/.test(key)) {
+                    setFieldErrors(prev => ({
+                        ...prev,
+                        [e.target.name]: 'Numbers are not allowed in name fields'
+                    }));
+                } else {
+                    setFieldErrors(prev => ({
+                        ...prev,
+                        [e.target.name]: 'Only letters and spaces are allowed'
+                    }));
                 }
             }
         }
@@ -44,32 +62,159 @@ const Register = () => {
     const preventInvalidPasteFirstChar = (e) => {
         const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
         if (!isNameField) return;
-        const current = e.target.value || '';
-        if (current.length === 0) {
-            const pasted = (e.clipboardData || window.clipboardData).getData('text');
-            if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) {
-                e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text');
+        if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+            e.preventDefault();
+            // Show error message for pasted content with numbers
+            if (/[0-9]/.test(pasted)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [e.target.name]: 'Numbers are not allowed in name fields'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [e.target.name]: 'Only letters and spaces are allowed'
+                }));
             }
         }
     };
 
     const handleChange = (e) => {
+        const { name, value } = e.target;
+        
         setFormData({
             ...formData,
-            [e.target.name]: e.target.value
+            [name]: value
         });
-        setError(''); // Clear error when user types
+        
+        // Clear general error when user types
+        setError('');
+        
+        // Clear field-specific error when user types
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Real-time validation for name fields
+        if (name === 'firstName' || name === 'lastName') {
+            // Check if the value contains numbers
+            if (/[0-9]/.test(value)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Numbers are not allowed in name fields'
+                }));
+            } else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Only letters and spaces are allowed'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for email field
+        if (name === 'email') {
+            if (value.trim() && !value.includes('@')) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Email must contain @ symbol'
+                }));
+            } else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Please enter a valid email address'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for phone field
+        if (name === 'phone') {
+            // Remove all non-digit characters and limit to 10 digits
+            const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+            
+            // Update the form with cleaned value
+            setFormData(prev => ({ ...prev, [name]: digitsOnly }));
+            
+            // Check for letters in original input
+            if (/[A-Za-z]/.test(value)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Letters are not allowed in phone number'
+                }));
+            } else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+            return; // Exit early to prevent double setting
+        }
     };
 
     const validateForm = () => {
+        let hasErrors = false;
+        const newFieldErrors = { ...fieldErrors };
+        
         // Names: letters and spaces only
         const nameRegex = /^[A-Za-z ]+$/;
         if (!nameRegex.test(formData.firstName)) {
-            setError('First name should contain only letters and spaces');
-            return false;
+            if (/[0-9]/.test(formData.firstName)) {
+                newFieldErrors.firstName = 'Numbers are not allowed in first name';
+            } else {
+                newFieldErrors.firstName = 'First name should contain only letters and spaces';
+            }
+            hasErrors = true;
+        } else {
+            newFieldErrors.firstName = '';
         }
+        
         if (!nameRegex.test(formData.lastName)) {
-            setError('Last name should contain only letters and spaces');
+            if (/[0-9]/.test(formData.lastName)) {
+                newFieldErrors.lastName = 'Numbers are not allowed in last name';
+            } else {
+                newFieldErrors.lastName = 'Last name should contain only letters and spaces';
+            }
+            hasErrors = true;
+        } else {
+            newFieldErrors.lastName = '';
+        }
+        
+        // Email validation
+        if (!formData.email.trim()) {
+            newFieldErrors.email = 'Email is required';
+            hasErrors = true;
+        } else if (!formData.email.includes('@')) {
+            newFieldErrors.email = 'Email must contain @ symbol';
+            hasErrors = true;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newFieldErrors.email = 'Please enter a valid email address';
+            hasErrors = true;
+        } else {
+            newFieldErrors.email = '';
+        }
+        
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            setError('Please fix the errors in the form');
             return false;
         }
         // Address required
@@ -77,10 +222,28 @@ const Register = () => {
             setError('Address is required for delivery');
             return false;
         }
-        // Phone: Sri Lanka 10 digits starting with 07
-        const phoneRegex = /^07\d{8}$/;
-        if (!phoneRegex.test(formData.phone)) {
-            setError('Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)');
+        
+        // Phone validation
+        const digitsOnly = formData.phone.replace(/\D/g, '');
+        if (!formData.phone.trim()) {
+            newFieldErrors.phone = 'Phone number is required';
+            hasErrors = true;
+        } else if (/[A-Za-z]/.test(formData.phone)) {
+            newFieldErrors.phone = 'Letters are not allowed in phone number';
+            hasErrors = true;
+        } else if (digitsOnly.length > 10) {
+            newFieldErrors.phone = 'Phone number must be exactly 10 digits';
+            hasErrors = true;
+        } else if (!/^07\d{8}$/.test(formData.phone)) {
+            newFieldErrors.phone = 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)';
+            hasErrors = true;
+        } else {
+            newFieldErrors.phone = '';
+        }
+        
+        if (hasErrors) {
+            setFieldErrors(newFieldErrors);
+            setError('Please fix the errors in the form');
             return false;
         }
         // Password complexity
@@ -126,8 +289,17 @@ const Register = () => {
 
     if (registrationSuccess) {
         return (
-            <div className="auth-container">
-                <div className="auth-card">
+            <div className="auth-container" style={{
+                backgroundImage: `url(${slide1})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+            }}>
+                <div className="auth-card" style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}>
                     <div className="auth-header">
                         <div className="auth-logo">
                             <div className="logo-icon">M</div>
@@ -192,8 +364,17 @@ const Register = () => {
     }
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
+        <div className="auth-container" style={{
+            backgroundImage: `url(${slide1})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+        }}>
+            <div className="auth-card" style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
                 <div className="auth-header">
                     <div className="auth-logo">
                         <div className="logo-icon">M</div>
@@ -222,7 +403,13 @@ const Register = () => {
                             onPaste={preventInvalidPasteFirstChar}
                             required
                             placeholder="Enter your first name"
+                            className={fieldErrors.firstName ? 'error' : ''}
                         />
+                        {fieldErrors.firstName && (
+                            <div className="field-error">
+                                {fieldErrors.firstName}
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-group">
@@ -237,7 +424,13 @@ const Register = () => {
                             onPaste={preventInvalidPasteFirstChar}
                             required
                             placeholder="Enter your last name"
+                            className={fieldErrors.lastName ? 'error' : ''}
                         />
+                        {fieldErrors.lastName && (
+                            <div className="field-error">
+                                {fieldErrors.lastName}
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-group">
@@ -250,7 +443,13 @@ const Register = () => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your email"
+                            className={fieldErrors.email ? 'error' : ''}
                         />
+                        {fieldErrors.email && (
+                            <div className="field-error">
+                                {fieldErrors.email}
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-row">
@@ -304,7 +503,13 @@ const Register = () => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your phone number"
+                            className={fieldErrors.phone ? 'error' : ''}
                         />
+                        {fieldErrors.phone && (
+                            <div className="field-error">
+                                {fieldErrors.phone}
+                            </div>
+                        )}
                     </div>
 
                     <button 
