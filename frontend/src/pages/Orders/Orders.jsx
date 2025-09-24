@@ -118,6 +118,35 @@ const Orders = () => {
     }
   }
 
+  const deleteOrder = async (orderId) => {
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone and the stock will be restored.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5001/api/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        // Refresh orders after deletion
+        await fetchAllOrders();
+        // Notify other components that stock has been updated
+        window.dispatchEvent(new Event('order:placed'));
+        alert(data.message || 'Order deleted successfully');
+      } else {
+        alert(data.message || 'Failed to delete order');
+      }
+    } catch (error) {
+      alert('Network error. Please try again.');
+    }
+  }
+
   // Helper function to clean prescription file path
   const getPrescriptionFileUrl = (prescriptionFile) => {
     if (!prescriptionFile) return '';
@@ -245,12 +274,23 @@ const Orders = () => {
                         {formatDate(order.date)}
                       </td>
                       <td className="p-4">
-                        <button 
-                          onClick={() => openOrderDetails(order)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => openOrderDetails(order)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          >
+                            View Details
+                          </button>
+                          {order.status === 'pending' && (
+                            <button 
+                              onClick={() => deleteOrder(order._id)}
+                              className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                              title="Delete order (only allowed for pending orders)"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -382,6 +422,17 @@ const Orders = () => {
                     Confirm Order
                   </button>
                 </>
+              )}
+              {selectedOrder.status === 'pending' && (
+                <button
+                  onClick={() => {
+                    deleteOrder(selectedOrder._id);
+                    closeOrderDetails();
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Delete Order
+                </button>
               )}
               <button
                 onClick={closeOrderDetails}

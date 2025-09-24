@@ -129,6 +129,7 @@ const Checkout = () => {
       alert('Order placed successfully!')
       localStorage.removeItem('cart')
       window.dispatchEvent(new Event('cart:update'))
+      window.dispatchEvent(new Event('order:placed'))
       navigate('/orders')
     } catch (err) {
       alert(err.message)

@@ -31,17 +31,76 @@ const Cart = () => {
   }, [])
 
 
-  const clearCart = () => {
+  const clearCart = async () => {
+    try {
+      // Release all reserved stock for items in cart
+      for (const item of cart) {
+        try {
+          await fetch('http://localhost:5001/api/orders/release-stock', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              productId: item._id,
+              quantity: item.quantity || 1
+            })
+          })
+        } catch (error) {
+          console.error(`Failed to release stock for ${item.name}:`, error)
+        }
+      }
+    } catch (error) {
+      console.error('Clear cart error:', error)
+    }
+    
     localStorage.removeItem('cart')
     setCart([])
     window.dispatchEvent(new Event('cart:update'))
+    window.dispatchEvent(new Event('order:placed'))
   }
 
-  const removeItem = (productId) => {
-    const updated = cart.filter(it => it._id !== productId)
-    setCart(updated)
-    localStorage.setItem('cart', JSON.stringify(updated))
-    window.dispatchEvent(new Event('cart:update'))
+  const removeItem = async (productId) => {
+    // Find the item to get its quantity
+    const itemToRemove = cart.find(it => it._id === productId)
+    if (!itemToRemove) return
+    
+    try {
+      // Release the reserved stock
+      const response = await fetch('http://localhost:5001/api/orders/release-stock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          productId: productId,
+          quantity: itemToRemove.quantity || 1
+        })
+      })
+      
+      const data = await response.json()
+      if (!response.ok) {
+        console.error('Failed to release stock:', data.message)
+        // Continue with cart removal even if stock release fails
+      }
+      
+      // Remove from cart
+      const updated = cart.filter(it => it._id !== productId)
+      setCart(updated)
+      localStorage.setItem('cart', JSON.stringify(updated))
+      window.dispatchEvent(new Event('cart:update'))
+      window.dispatchEvent(new Event('order:placed'))
+      
+    } catch (error) {
+      console.error('Remove item error:', error)
+      // Continue with cart removal even if stock release fails
+      const updated = cart.filter(it => it._id !== productId)
+      setCart(updated)
+      localStorage.setItem('cart', JSON.stringify(updated))
+      window.dispatchEvent(new Event('cart:update'))
+    }
   }
 
   const proceedToCheckout = () => {

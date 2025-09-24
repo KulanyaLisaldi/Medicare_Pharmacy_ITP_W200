@@ -1,14 +1,17 @@
 import express from 'express'
 import { authenticateToken, requirePharmacist, requireAdmin, requireDeliveryAgent } from '../middleware/auth.js'
-import { createOrder, listMyOrders, listAllOrders, listDeliveryOrders, getOrderById, updateOrder, confirmPreparation, checkStockAvailability, cancelOrder } from '../controllers/orderController.js'
+import { createOrder, listMyOrders, listAllOrders, listDeliveryOrders, getOrderById, updateOrder, confirmPreparation, checkStockAvailability, cancelOrder, deleteOrder, reserveStock, releaseStock } from '../controllers/orderController.js'
 
 const router = express.Router()
 
 router.use(authenticateToken)
 router.post('/check-stock', checkStockAvailability)
+router.post('/reserve-stock', reserveStock)
+router.post('/release-stock', releaseStock)
 router.post('/', createOrder)
 router.get('/mine', listMyOrders)
 router.patch('/:id/cancel', cancelOrder)
+router.delete('/:id', deleteOrder)
 // Delivery Agent endpoints
 router.get('/delivery', requireDeliveryAgent, listDeliveryOrders)
 router.patch('/delivery/:id', requireDeliveryAgent, updateOrder)
