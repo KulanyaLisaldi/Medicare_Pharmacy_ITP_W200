@@ -13,6 +13,7 @@ import {
     deleteUser,
     toggleUserStatus,
     getCurrentUserProfile,
+    deleteOwnAccount,
     adminResendVerificationEmail,
     publicListDoctors,
     publicGetDoctorById
@@ -62,6 +63,7 @@ router.post("/refresh", refreshToken);
 // User profile management
 router.get("/profile", getCurrentUserProfile);
 router.put("/profile/:id", requireOwnershipOrAdmin, validateRequest(updateProfileSchema), updateUserProfile);
+router.delete("/delete-account", deleteOwnAccount);
 
 // Admin only routes
 router.post("/staff", requireAdmin, validateRequest(createStaffSchema), createStaffMember);

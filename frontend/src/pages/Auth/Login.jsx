@@ -162,9 +162,9 @@ const Login = () => {
             backgroundRepeat: 'no-repeat'
         }}>
             <div className="auth-card" style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(10px)',
+                backgroundColor: 'transparent',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(15px)',
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
                 gap: '2rem',
@@ -180,13 +180,23 @@ const Login = () => {
                     flexDirection: 'column',
                     justifyContent: 'center',
                     padding: '2rem',
-                    color: 'white'
+                    color: 'white',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(15px)',
+                    WebkitBackdropFilter: 'blur(15px)',
+                    borderRadius: '15px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                    position: 'relative',
+                    overflow: 'hidden'
                 }}>
                     <div className="auth-logo" style={{ marginBottom: '2rem' }}>
                         <div className="logo-icon" style={{
                             width: '60px',
                             height: '60px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                            backdropFilter: 'blur(10px)',
+                            WebkitBackdropFilter: 'blur(10px)',
                             borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
@@ -194,7 +204,9 @@ const Login = () => {
                             fontSize: '24px',
                             fontWeight: 'bold',
                             color: 'white',
-                            marginBottom: '1rem'
+                            marginBottom: '1rem',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)'
                         }}>M</div>
                         <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '0' }}>MediCare</h1>
                     </div>
@@ -207,7 +219,10 @@ const Login = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    padding: '2rem'
+                    padding: '2rem',
+                    backgroundColor: 'white',
+                    borderRadius: '15px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
                 }}>
                     <div className="auth-header" style={{ marginBottom: '2rem', textAlign: 'center' }}>
                         <h2 style={{ color: 'black', fontSize: '1.8rem', fontWeight: '600', marginBottom: '0.5rem', textAlign: 'center' }}>Sign In</h2>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import DashboardLayout from '../../layouts/DashboardLayout'
 import './DeliveryDashboard.css'
 import { useAuth } from '../../context/AuthContext'
+import { Home, Truck, History, DollarSign, MessageSquare } from 'lucide-react'
 
 const DeliveryDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
@@ -19,11 +20,11 @@ const DeliveryDashboard = () => {
 	const { token } = useAuth()
 
 	const sidebar = [
-		{ id: 'overview', label: 'Overview', icon: '🏠' },
-		{ id: 'assignments', label: 'Assignments', icon: '🛵' },
-		{ id: 'history', label: 'History', icon: '🗂️' },
-		{ id: 'earnings', label: 'Earnings', icon: '💰' },
-		{ id: 'messages', label: 'Notifications', icon: '💬' },
+		{ id: 'overview', label: 'Overview', icon: <Home size={18} /> },
+		{ id: 'assignments', label: 'Assignments', icon: <Truck size={18} /> },
+		{ id: 'history', label: 'History', icon: <History size={18} /> },
+		{ id: 'earnings', label: 'Earnings', icon: <DollarSign size={18} /> },
+		{ id: 'messages', label: 'Notifications', icon: <MessageSquare size={18} /> },
 	]
 
 	const fetchDeliveryStats = async () => {

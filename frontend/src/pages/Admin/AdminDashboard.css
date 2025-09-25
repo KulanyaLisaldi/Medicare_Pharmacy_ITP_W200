@@ -117,17 +117,37 @@
     background: linear-gradient(135deg, #2563eb, #3b82f6);
     color: white;
     border: none;
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
+    white-space: nowrap;
+    min-width: auto;
+    max-width: 120px;
 }
 
 .view-all-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Responsive adjustments for View All button */
+@media (max-width: 768px) {
+    .view-all-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        max-width: 100px;
+    }
+}
+
+@media (max-width: 480px) {
+    .view-all-btn {
+        padding: 3px 6px;
+        font-size: 10px;
+        max-width: 80px;
+    }
 }
 
 .recent-users-list {
