@@ -1,4 +1,8 @@
 import User from "../models/User.js";
+import Booking from "../models/Booking.js";
+import Order from "../models/Order.js";
+import Notification from "../models/Notification.js";
+import DeliveryAssignment from "../models/DeliveryAssignment.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendVerificationEmail, sendWelcomeEmail, sendStaffWelcomeEmail } from "../utils/mailer.js";
@@ -436,6 +440,71 @@ export async function getCurrentUserProfile(req, res) {
     } catch (error) {
         console.error("Error in getCurrentUserProfile controller", error);
         res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+// Delete own account (customers only)
+export async function deleteOwnAccount(req, res) {
+    try {
+        console.log('Delete account request received');
+        const userId = req.userId;
+        console.log('User ID:', userId);
+        
+        // Find the user
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('User not found');
+            return res.status(404).json({ 
+                success: false,
+                message: "User not found" 
+            });
+        }
+
+        console.log('User found:', user.email, 'Role:', user.role);
+
+        // Only allow customers to delete their own accounts
+        if (user.role !== 'customer') {
+            console.log('Access denied - not a customer');
+            return res.status(403).json({ 
+                success: false,
+                message: "Only customers can delete their own accounts. Staff accounts must be managed by administrators." 
+            });
+        }
+
+        // Delete related data first
+        try {
+            // Delete user's bookings
+            await Booking.deleteMany({ userId: userId });
+            
+            // Delete user's orders
+            await Order.deleteMany({ userId: userId });
+            
+            // Delete user's notifications
+            await Notification.deleteMany({ userId: userId });
+            
+            // Delete user's delivery assignments
+            await DeliveryAssignment.deleteMany({ userId: userId });
+            
+        } catch (relatedDataError) {
+            console.error("Error deleting related data:", relatedDataError);
+            // Continue with user deletion even if related data deletion fails
+        }
+
+        // Delete the user account
+        console.log('Deleting user account...');
+        await User.findByIdAndDelete(userId);
+        console.log('User account deleted successfully');
+
+        res.json({ 
+            success: true,
+            message: "Account deleted successfully" 
+        });
+    } catch (error) {
+        console.error("Error in deleteOwnAccount", error);
+        res.status(500).json({ 
+            success: false,
+            message: "Internal server error" 
+        });
     }
 };
 

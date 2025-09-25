@@ -371,12 +371,11 @@ const Register = () => {
             backgroundRepeat: 'no-repeat'
         }}>
             <div className="auth-card" style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backgroundColor: 'transparent',
                 display: 'grid',
+                backdropFilter: 'blur(15px)',
                 gridTemplateColumns: '1fr 1fr',
-                gap: '2rem',
+                gap: '1rem',
                 alignItems: 'center',
                 minHeight: '500px',
                 maxWidth: '800px',
@@ -388,10 +387,13 @@ const Register = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    padding: '2rem',
-                    color: 'white'
+                    padding: '1.5rem',
+                    color: 'white',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    backdropFilter: 'blur(15px)',
+                    WebkitBackdropFilter: 'blur(15px)',
                 }}>
-                    <div className="auth-logo" style={{ marginBottom: '2rem' }}>
+                    <div className="auth-logo" style={{ marginBottom: '1rem' }}>
                         <div className="logo-icon" style={{
                             width: '60px',
                             height: '60px',
@@ -407,25 +409,12 @@ const Register = () => {
                         }}>M</div>
                         <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '0' }}>MediCare</h1>
                     </div>
-                    <h2 style={{ fontSize: '2rem', fontWeight: '600', marginBottom: '1rem' }}>Join Our Community</h2>
+                    <h2 style={{ fontSize: '2rem', fontWeight: '600', marginBottom: '0.5rem' }}>Join Our Community</h2>
                     <p style={{ fontSize: '1.1rem', opacity: '0.9', lineHeight: '1.6' }}>
                         Create your account and start your healthcare journey with us. 
                         Get access to medical services, book appointments, and manage your health records.
                     </p>
-                    <div style={{ marginTop: '2rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', marginRight: '12px' }}></div>
-                            <span>Free Registration</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', marginRight: '12px' }}></div>
-                            <span>Secure & Private</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', marginRight: '12px' }}></div>
-                            <span>24/7 Support</span>
-                        </div>
-                    </div>
+                    
                     </div>
 
                 {/* Right Side - Form */}
@@ -433,14 +422,16 @@ const Register = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    padding: '2rem'
+                    padding: '1.5rem',
+                    backgroundColor: 'white',
+                    borderRadius: '10px'
                 }}>
-                    <div className="auth-header" style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                    <div className="auth-header" style={{ marginBottom: '1rem', textAlign: 'center' }}>
                         <h2 style={{ color: 'black', fontSize: '1.8rem', fontWeight: '600', marginBottom: '0.5rem', textAlign: 'center' }}>Create Account</h2>
                         <p style={{ color: 'rgba(15, 15, 15, 0.8)', fontSize: '0.9rem', textAlign: 'center' }}>Join MediCare Today!</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="auth-form">
+                <form onSubmit={handleSubmit} className="auth-form" style={{ gap: '0.5rem' }}>
                     {error && (
                         <div className="error-message">
                             {error}

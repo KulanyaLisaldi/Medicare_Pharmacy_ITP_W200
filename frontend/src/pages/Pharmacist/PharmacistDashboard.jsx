@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import DashboardLayout from '../../layouts/DashboardLayout'
 import './PharmacistDashboard.css'
 import { useAuth } from '../../context/AuthContext'
+import { Home, Package, ClipboardList, BarChart3, Bell } from 'lucide-react'
 
 const PharmacistDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
@@ -17,11 +18,11 @@ const PharmacistDashboard = () => {
 	const { token } = useAuth()
 
 	const sidebar = [
-		{ id: 'overview', label: 'Overview', icon: '🏠' },
-		{ id: 'orders', label: 'Orders', icon: '📦' },
-		{ id: 'inventory', label: 'Inventory', icon: '📋' },
-		{ id: 'reports', label: 'Reports', icon: '📊' },
-		{ id: 'messages', label: 'Notifications', icon: '💬' },
+		{ id: 'overview', label: 'Overview', icon: <Home size={18} /> },
+		{ id: 'orders', label: 'Orders', icon: <Package size={18} /> },
+		{ id: 'inventory', label: 'Inventory', icon: <ClipboardList size={18} /> },
+		{ id: 'reports', label: 'Reports', icon: <BarChart3 size={18} /> },
+		{ id: 'messages', label: 'Notifications', icon: <Bell size={18} /> },
 	]
 
 	// Fetch orders data

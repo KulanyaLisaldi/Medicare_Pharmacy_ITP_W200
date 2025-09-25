@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import './AdminDashboard.css';
 import DashboardLayout from '../../layouts/DashboardLayout';
+import { BarChart3, Users, Package, ShoppingCart, Calendar, Truck, FileText, Bell } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -91,14 +92,14 @@ const AdminDashboard = () => {
     const [productsCount, setProductsCount] = useState(0);
 
     const sidebarItems = [
-        { id: 'overview', label: 'Overview', icon: '📊' },
-        { id: 'users', label: 'Users', icon: '👥' },
-        { id: 'inventory', label: 'Inventory', icon: '📦' },
-        { id: 'orders', label: 'Orders', icon: '🛒' },
-        { id: 'appointments', label: 'Appointments', icon: '📅' },
-        { id: 'delivery', label: 'Delivery', icon: '🚚' },
-        { id: 'sales', label: 'Sales', icon: '💰' },
-        { id: 'messages', label: 'Messages', icon: '💬' },
+        { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
+        { id: 'users', label: 'Users', icon: <Users size={18} /> },
+        { id: 'inventory', label: 'Inventory', icon: <Package size={18} /> },
+        { id: 'orders', label: 'Orders', icon: <ShoppingCart size={18} /> },
+        { id: 'appointments', label: 'Appointments', icon: <Calendar size={18} /> },
+        { id: 'delivery', label: 'Delivery', icon: <Truck size={18} /> },
+        { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
+        { id: 'messages', label: 'Notifications', icon: <Bell size={18} /> },
     ];
 
     useEffect(() => {
@@ -1167,11 +1168,11 @@ const AdminDashboard = () => {
                     </div>
                 );
 
-            case 'sales':
+            case 'reports':
                 return (
-                    <div className="sales-section">
-                        <h2>Sales Analytics</h2>
-                        <p>Sales analytics features coming soon...</p>
+                    <div className="reports-section">
+                        <h2>Reports & Analytics</h2>
+                        <p>Generate comprehensive reports and analytics...</p>
                     </div>
                 );
 

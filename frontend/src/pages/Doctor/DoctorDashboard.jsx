@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import DashboardLayout from '../../layouts/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import './DoctorDashboard.css'
+import { Home, Calendar, MessageSquare } from 'lucide-react'
 
 const DoctorDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
@@ -143,9 +144,9 @@ const DoctorDashboard = () => {
 	}, [activeSection, token, filters])
 
 	const sidebar = [
-		{ id: 'overview', label: 'Overview', icon: '🏠' },
-		{ id: 'appointments', label: 'Appointments', icon: '📅' },
-		{ id: 'messages', label: 'Notifications', icon: '💬' },
+		{ id: 'overview', label: 'Overview', icon: <Home size={18} /> },
+		{ id: 'appointments', label: 'Appointments', icon: <Calendar size={18} /> },
+		{ id: 'messages', label: 'Notifications', icon: <MessageSquare size={18} /> },
 	]
 
 	const renderSection = () => {

@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './DashboardLayout.css'
 import { useAuth } from '../context/AuthContext'
-import { LogOut } from 'lucide-react'
+import { LogOut, Bell } from 'lucide-react'
 
 const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection, notificationCount = 0, notifications = [] }) => {
 	const location = useLocation()
 	const navigate = useNavigate()
 	const { user, logout, updateProfile } = useAuth()
-	const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 	const [showAccountManagement, setShowAccountManagement] = useState(false)
 	const [showPasswordChange, setShowPasswordChange] = useState(false)
 	const [showNotificationPopup, setShowNotificationPopup] = useState(false)
@@ -524,7 +523,7 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 								onClick={() => setShowNotificationPopup(!showNotificationPopup)}
 								style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}
 							>
-								🔔
+								<Bell size={20} />
 								{notificationCount > 0 && (
 									<span className="notification-badge">{notificationCount}</span>
 								)}
@@ -591,41 +590,17 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 							)}
 						</div>
 						
-						{/* Profile Dropdown */}
-						<div className="profile-dropdown">
+						{/* Profile Section */}
+						<div className="profile-section">
 							<button 
 								className="profile-trigger"
-								onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+								onClick={() => setShowAccountManagement(true)}
 							>
 								<div className="profile-avatar">
 									{user?.firstName?.charAt(0)?.toUpperCase()}
 								</div>
 								<span className="profile-name">{`${user?.firstName} ${user?.lastName}`}</span>
-								<span className="dropdown-arrow">▼</span>
 							</button>
-							
-							{showProfileDropdown && (
-								<div className="profile-dropdown-menu">
-									<button 
-										className="dropdown-item"
-										onClick={() => {
-											setShowAccountManagement(true)
-											setShowProfileDropdown(false)
-										}}
-									>
-										<span className="dropdown-icon">👤</span>
-										View My Profile
-									</button>
-									{/* Show logout in dropdown on mobile */}
-									<div className="mobile-logout">
-										<div className="dropdown-divider"></div>
-										<button className="dropdown-item logout-item" onClick={handleLogout}>
-											<LogOut size={16} />
-											Logout
-										</button>
-									</div>
-								</div>
-							)}
 						</div>
 					</div>
 				</header>
@@ -664,76 +639,92 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 						{!showPasswordChange ? (
 							<div className="account-form-section">
 								<form onSubmit={handleAccountUpdate}>
-									<div className="profile-info-grid">
-										<div className="form-group">
-											<label>First Name</label>
-                                            <input
-												type="text"
-												name="firstName"
-												value={accountForm.firstName}
-                                                onChange={handleAccountFormChange}
-                                                onKeyDown={preventInvalidNameChar}
-                                                onPaste={preventInvalidNamePaste}
-												required
-												className={fieldErrors.firstName ? 'error' : ''}
-											/>
-											{fieldErrors.firstName && (
-												<p className="field-error">{fieldErrors.firstName}</p>
-											)}
+									<div className="profile-layout-grid">
+										{/* Left Side - Profile Section */}
+										<div className="profile-section">
+											<div className="profile-avatar-large">
+												{user?.firstName?.charAt(0)?.toUpperCase()}
+											</div>
+											<div className="profile-name-large">
+												{`${user?.firstName} ${user?.lastName}`}
+											</div>
+											<div className="profile-email">
+												{user?.email}
+											</div>
 										</div>
-										<div className="form-group">
-											<label>Last Name</label>
-                                            <input
-												type="text"
-												name="lastName"
-												value={accountForm.lastName}
-                                                onChange={handleAccountFormChange}
-                                                onKeyDown={preventInvalidNameChar}
-                                                onPaste={preventInvalidNamePaste}
-												required
-												className={fieldErrors.lastName ? 'error' : ''}
-											/>
-											{fieldErrors.lastName && (
-												<p className="field-error">{fieldErrors.lastName}</p>
-											)}
-										</div>
-										<div className="form-group">
-											<label>Email</label>
-											<input
-												type="email"
-												name="email"
-												value={accountForm.email}
-												onChange={handleAccountFormChange}
-												required
-												className={fieldErrors.email ? 'error' : ''}
-											/>
-											{fieldErrors.email && (
-												<p className="field-error">{fieldErrors.email}</p>
-											)}
-										</div>
-										<div className="form-group">
-											<label>Phone</label>
-                                            <input
-												type="tel"
-												name="phone"
-												value={accountForm.phone}
-												onChange={handleAccountFormChange}
-												onKeyDown={handlePhoneKeyDown}
-												onPaste={handlePhonePaste}
-												className={fieldErrors.phone ? 'error' : ''}
-												placeholder="07XXXXXXXX"
-											/>
-											{fieldErrors.phone && (
-												<p className="field-error">{fieldErrors.phone}</p>
-											)}
-										</div>
-										<div className="form-group">
-											<label>Address</label>
-											<input
-												type="text"
-												value={accountForm.address}
-												onChange={(e) => setAccountForm({...accountForm, address: e.target.value})}
-											/>
+										
+										{/* Right Side - Form Fields */}
+										<div className="form-section">
+											<div className="form-group">
+												<label>First Name</label>
+												<input
+													type="text"
+													name="firstName"
+													value={accountForm.firstName}
+													onChange={handleAccountFormChange}
+													onKeyDown={preventInvalidNameChar}
+													onPaste={preventInvalidNamePaste}
+													required
+													className={fieldErrors.firstName ? 'error' : ''}
+												/>
+												{fieldErrors.firstName && (
+													<p className="field-error">{fieldErrors.firstName}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Last Name</label>
+												<input
+													type="text"
+													name="lastName"
+													value={accountForm.lastName}
+													onChange={handleAccountFormChange}
+													onKeyDown={preventInvalidNameChar}
+													onPaste={preventInvalidNamePaste}
+													required
+													className={fieldErrors.lastName ? 'error' : ''}
+												/>
+												{fieldErrors.lastName && (
+													<p className="field-error">{fieldErrors.lastName}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Email</label>
+												<input
+													type="email"
+													name="email"
+													value={accountForm.email}
+													onChange={handleAccountFormChange}
+													required
+													className={fieldErrors.email ? 'error' : ''}
+												/>
+												{fieldErrors.email && (
+													<p className="field-error">{fieldErrors.email}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Phone</label>
+												<input
+													type="tel"
+													name="phone"
+													value={accountForm.phone}
+													onChange={handleAccountFormChange}
+													onKeyDown={handlePhoneKeyDown}
+													onPaste={handlePhonePaste}
+													className={fieldErrors.phone ? 'error' : ''}
+													placeholder="07XXXXXXXX"
+												/>
+												{fieldErrors.phone && (
+													<p className="field-error">{fieldErrors.phone}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Address</label>
+												<input
+													type="text"
+													value={accountForm.address}
+													onChange={(e) => setAccountForm({...accountForm, address: e.target.value})}
+												/>
+											</div>
 										</div>
 									</div>
 									<div className="modal-actions">
