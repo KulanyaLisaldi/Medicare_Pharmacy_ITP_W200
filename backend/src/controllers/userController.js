@@ -209,7 +209,7 @@ export async function createStaffMember(req, res) {
         }
 
     } catch (error) {
-        console.error("❌ Error in createStaffMember controller:", error);
+        console.error(" Error in createStaffMember controller:", error);
         res.status(500).json({ message: "Internal server error while creating staff member" });
     }
 };
@@ -702,7 +702,7 @@ export async function adminResendVerificationEmail(req, res) {
         user.verificationExpires = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
         await user.save();
 
-        console.log(`🔄 Admin resending verification email to: ${user.email}`);
+        console.log(` Admin resending verification email to: ${user.email}`);
 
         // Send verification email
         try {
@@ -721,14 +721,14 @@ export async function adminResendVerificationEmail(req, res) {
                 }
             });
 
-            console.log(`✅ Verification email resent successfully to: ${user.email}`);
+            console.log(` Verification email resent successfully to: ${user.email}`);
             
             res.status(200).json({ 
                 message: `Verification email has been resent to ${user.email}`,
                 emailSent: true
             });
         } catch (emailError) {
-            console.error('❌ Error sending verification email:', emailError);
+            console.error(' Error sending verification email:', emailError);
             
             res.status(500).json({ 
                 message: 'Failed to send verification email',
@@ -738,7 +738,7 @@ export async function adminResendVerificationEmail(req, res) {
         }
 
     } catch (error) {
-        console.error('❌ Error in adminResendVerificationEmail:', error);
+        console.error(' Error in adminResendVerificationEmail:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };

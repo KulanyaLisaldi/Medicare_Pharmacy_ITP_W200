@@ -2,15 +2,14 @@ import React, { useState, useEffect } from 'react'
 import DashboardLayout from '../../layouts/DashboardLayout'
 import './DeliveryDashboard.css'
 import { useAuth } from '../../context/AuthContext'
-import { Home, Truck, History, DollarSign, MessageSquare } from 'lucide-react'
+import { Home, Truck, History, Bell } from 'lucide-react'
 
 const DeliveryDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
 	const [deliveryStats, setDeliveryStats] = useState({
 		activeDeliveries: 0,
 		completedToday: 0,
-		pending: 0,
-		todayEarnings: 0
+		pending: 0
 	})
 	const [statsLoading, setStatsLoading] = useState(true)
 	const [recentDeliveries, setRecentDeliveries] = useState([])
@@ -23,8 +22,7 @@ const DeliveryDashboard = () => {
 		{ id: 'overview', label: 'Overview', icon: <Home size={18} /> },
 		{ id: 'assignments', label: 'Assignments', icon: <Truck size={18} /> },
 		{ id: 'history', label: 'History', icon: <History size={18} /> },
-		{ id: 'earnings', label: 'Earnings', icon: <DollarSign size={18} /> },
-		{ id: 'messages', label: 'Notifications', icon: <MessageSquare size={18} /> },
+		{ id: 'messages', label: 'Notifications', icon: <Bell size={18} /> },
 	]
 
 	const fetchDeliveryStats = async () => {
@@ -52,8 +50,7 @@ const DeliveryDashboard = () => {
 			setDeliveryStats({
 				activeDeliveries: 0,
 				completedToday: 0,
-				pending: 0,
-				todayEarnings: 0
+				pending: 0
 			})
 		} finally {
 			setStatsLoading(false)
@@ -209,18 +206,6 @@ const DeliveryDashboard = () => {
 			case 'overview':
 				return (
 					<div className="delivery-overview">
-						{/* Header with refresh button */}
-						<div className="flex items-center justify-between mb-6">
-							{/*<h2>Delivery Overview</h2>*/}
-							<button 
-								onClick={fetchAllData}
-								disabled={statsLoading || recentDeliveriesLoading}
-								className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-							>
-								<span>🔄</span>
-								{(statsLoading || recentDeliveriesLoading) ? 'Refreshing...' : 'Refresh Data'}
-							</button>
-						</div>
 
 						{/* Stats Grid */}
 						<div className="delivery-stats">
@@ -248,43 +233,8 @@ const DeliveryDashboard = () => {
 								</p>
 								<span className="stat-change neutral">Assigned but not picked up</span>
 							</div>
-							<div className="stat-card">
-								<div className="stat-icon">💰</div>
-								<h3>Today's Earnings</h3>
-								<p className="stat-number">
-									{statsLoading ? '...' : `Rs.${deliveryStats.todayEarnings}`}
-								</p>
-								<span className="stat-change positive">From completed deliveries</span>
-							</div>
 						</div>
 
-						{/* Quick Actions */}
-						<div className="quick-actions-section">
-							<h2>Quick Actions</h2>
-							<div className="action-buttons">
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('assignments')}
-								>
-									<span className="action-icon">📱</span>
-									Update Status
-								</button>
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('assignments')}
-								>
-									<span className="action-icon">📋</span>
-									View Route
-								</button>
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('messages')}
-								>
-									<span className="action-icon">📞</span>
-									Contact Support
-								</button>
-							</div>
-						</div>
 
 						{/* Recent Deliveries */}
 						<div className="recent-deliveries">
@@ -323,28 +273,6 @@ const DeliveryDashboard = () => {
 							</div>
 						</div>
 
-						{/* Performance Summary */}
-						<div className="performance-summary">
-							<h2>This Week's Performance</h2>
-							<div className="performance-metrics">
-								<div className="metric">
-									<span className="metric-label">Total Deliveries</span>
-									<span className="metric-value">67</span>
-								</div>
-								<div className="metric">
-									<span className="metric-label">On-Time Rate</span>
-									<span className="metric-value">94%</span>
-								</div>
-								<div className="metric">
-									<span className="metric-label">Customer Rating</span>
-									<span className="metric-value">4.8/5</span>
-								</div>
-								<div className="metric">
-									<span className="metric-label">Weekly Earnings</span>
-									<span className="metric-value">$312.75</span>
-								</div>
-							</div>
-						</div>
 					</div>
 				);
 
@@ -354,13 +282,6 @@ const DeliveryDashboard = () => {
 			case 'history':
 				return <HistorySection />;
 
-			case 'earnings':
-				return (
-					<div className="earnings-section">
-						<h2>Earnings & Payments</h2>
-						<p>Earnings and payment features coming soon...</p>
-					</div>
-				);
 
 			case 'messages':
 				return (
@@ -1004,10 +925,11 @@ function AssignmentsSection() {
         }
     };
 
+    // Assignments Section
+    //refresh button
     return (
         <div className="assignments-section">
             <div className="flex items-center justify-between mb-6">
-                <h2>Delivery Assignments</h2>
                 <button 
                     onClick={loadAllData}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -2051,7 +1973,7 @@ function HistorySection() {
     return (
         <div className="history-section">
             <div className="flex items-center justify-between mb-6">
-                <h2>Delivery History</h2>
+                <h2 className="text-200px font-bold text-gray-900">Delivery History</h2>
                 <div className="flex gap-3">
                     <button 
                         onClick={downloadHistory}

@@ -118,7 +118,7 @@ const PharmacistDashboard = () => {
 						message: `${order.orderType === 'prescription' ? 'New prescription uploaded by' : 'New product order from'} ${order.customer?.name || 'Customer'}`,
 						timestamp: new Date(order.createdAt),
 						priority: 'high',
-						icon: order.orderType === 'prescription' ? '📄' : '📦'
+						icon: order.orderType === 'prescription' ? '' : ''
 					})
 				})
 			}
@@ -133,7 +133,7 @@ const PharmacistDashboard = () => {
 					message: `${product.name} stock is below threshold (${stock} units left)`,
 					timestamp: new Date(),
 					priority: stock <= 5 ? 'high' : stock <= 10 ? 'medium' : 'low',
-					icon: '⚠️'
+					icon: ''
 				})
 			})
 
@@ -159,7 +159,7 @@ const PharmacistDashboard = () => {
 					message: `${product.name} will expire in ${daysLeft} days`,
 					timestamp: new Date(),
 					priority: daysLeft <= 7 ? 'high' : daysLeft <= 15 ? 'medium' : 'low',
-					icon: '⏰'
+					icon: ''
 				})
 			})
 
@@ -209,33 +209,6 @@ const PharmacistDashboard = () => {
 							</div>
 						</div>
 
-						{/* Quick Actions */}
-						<div className="quick-actions-section">
-							<h2>Quick Actions</h2>
-							<div className="action-buttons">
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('orders')}
-								>
-									<span className="action-icon">📋</span>
-									Process Order
-								</button>
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('inventory')}
-								>
-									<span className="action-icon">📦</span>
-									Check Inventory
-								</button>
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('messages')}
-								>
-									<span className="action-icon">👥</span>
-									Customer Query
-								</button>
-							</div>
-						</div>
 
 						{/* Recent Orders */}
 						<div className="recent-orders">
@@ -248,7 +221,7 @@ const PharmacistDashboard = () => {
 										<div key={order._id} className="order-item">
 											<div className="order-info">
 												<div className="order-id">#{order._id.slice(-8)}</div>
-												<div className="order-customer">{order.customer?.name || 'Unknown'}</div>
+												<div className="order-customer">{order.customer?.name || order.patient?.name || 'Unknown'}</div>
 												<div className="order-items">{order.items?.length || 0} items</div>
 												<div className="order-time">{new Date(order.createdAt).toLocaleTimeString()}</div>
 											</div>
@@ -333,13 +306,7 @@ const PharmacistDashboard = () => {
 									return (
 										<div 
 											key={notification.id} 
-											className={`p-4 rounded-lg border-l-4 transition-opacity ${
-												notification.priority === 'high' 
-													? 'border-red-500 bg-red-50' 
-													: notification.priority === 'medium'
-													? 'border-yellow-500 bg-yellow-50'
-													: 'border-blue-500 bg-blue-50'
-											} ${isRead ? 'opacity-60' : ''}`}
+											className={`p-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 transition-opacity ${isRead ? 'opacity-60' : ''}`}
 										>
 											<div className="flex items-start gap-3">
 												<div className="text-2xl">{notification.icon}</div>
@@ -355,7 +322,7 @@ const PharmacistDashboard = () => {
 														</div>
 														<div className="flex items-center gap-2">
 															<span className="text-xs text-gray-500">
-																{notification.timestamp.toLocaleTimeString()}
+																{notification.timestamp.toLocaleDateString()} {notification.timestamp.toLocaleTimeString()}
 															</span>
 															{!isRead && (
 																<button
@@ -370,27 +337,13 @@ const PharmacistDashboard = () => {
 													<p className={`mt-1 ${isRead ? 'text-gray-500' : 'text-gray-700'}`}>
 														{notification.message}
 													</p>
-													<div className="flex items-center gap-2 mt-2">
-														<span className={`px-2 py-1 rounded-full text-xs font-medium ${
-															notification.priority === 'high' 
-																? 'bg-red-100 text-red-800' 
-																: notification.priority === 'medium'
-																? 'bg-yellow-100 text-yellow-800'
-																: 'bg-blue-100 text-blue-800'
-														}`}>
-															{notification.priority === 'high' ? 'High Priority' : 
-															 notification.priority === 'medium' ? 'Medium Priority' : 'Low Priority'}
-														</span>
-														<span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-															{notification.type === 'order' ? 'Order' : 
-															 notification.type === 'stock' ? 'Stock' : 'Expiry'}
-														</span>
-														{isRead && (
+													{isRead && (
+														<div className="flex items-center gap-2 mt-2">
 															<span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
 																Read
 															</span>
-														)}
-													</div>
+														</div>
+													)}
 												</div>
 											</div>
 										</div>
@@ -567,12 +520,36 @@ function InventorySection() {
 
     return (
         <div className="inventory-section">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
                 {/*<h2>Inventory Management</h2>*/}
-                <div className="flex gap-2">
-                    <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products..." className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" />
-                    <button className="btn-outline" onClick={load}>Search</button>
-                    <button className="btn-primary" onClick={openCreate}>Add Product</button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                    <div className="relative flex-1 sm:flex-none sm:w-80">
+                        <input 
+                            value={query} 
+                            onChange={e => setQuery(e.target.value)} 
+                            placeholder="Search products..." 
+                            className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm min-h-[44px]" 
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        {query && (
+                            <button
+                                onClick={() => setQuery('')}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                            >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex gap-2 sm:flex-nowrap">
+                        <button className="btn-outline flex-1 sm:flex-none px-4 py-3 min-h-[44px]" onClick={load}>Search</button>
+                        <button className="btn-primary flex-1 sm:flex-none px-4 py-3 min-h-[44px]" onClick={openCreate}>Add Product</button>
+                    </div>
                 </div>
             </div>
 
@@ -619,8 +596,20 @@ function InventorySection() {
                                     <td className="p-2 text-xs">{p.prescriptionRequired ? 'Required' : 'Not Required'}</td>
 									<td className="p-2 text-xs">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '-'}</td>
                                     <td className="p-2 whitespace-nowrap">
-										<button className="btn-outline mr-2 px-2 py-1 text-xs" onClick={() => openEdit(p)}>Edit</button>
-										<button className="btn-danger px-2 py-1 text-xs" onClick={() => remove(p._id)}>Delete</button>
+										<div className="flex gap-3 items-center">
+											<button 
+												className="btn-outline px-3 py-1.5 text-xs font-medium rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 hover:shadow-sm" 
+												onClick={() => openEdit(p)}
+											>
+												Edit
+											</button>
+											<button 
+												className="btn-danger px-3 py-1.5 text-xs font-medium rounded-md border border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400 transition-all duration-200 hover:shadow-sm" 
+												onClick={() => remove(p._id)}
+											>
+												Delete
+											</button>
+										</div>
                                     </td>
                                 </tr>
                             ))}
@@ -811,6 +800,7 @@ function OrdersSection() {
     const [loadingProducts, setLoadingProducts] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredProducts, setFilteredProducts] = useState([]);
+    const [orderSearchTerm, setOrderSearchTerm] = useState('');
 
     const load = async () => {
         try {
@@ -1069,10 +1059,23 @@ function OrdersSection() {
         return `http://localhost:5001/uploads/prescriptions/${prescriptionFile}`;
     };
 
-    // Filter orders based on status
+    // Filter orders based on status and search term
     const filteredOrders = orders.filter(order => {
-        if (filterStatus === 'all') return true;
-        return order.status === filterStatus;
+        // Status filter
+        const statusMatch = filterStatus === 'all' || order.status === filterStatus;
+        
+        // Search filter
+        const searchMatch = !orderSearchTerm.trim() || 
+            order._id.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+            (order.customer?.name && order.customer.name.toLowerCase().includes(orderSearchTerm.toLowerCase())) ||
+            (order.customer?.phone && order.customer.phone.includes(orderSearchTerm)) ||
+            (order.customer?.email && order.customer.email.toLowerCase().includes(orderSearchTerm.toLowerCase())) ||
+            (order.patient?.name && order.patient.name.toLowerCase().includes(orderSearchTerm.toLowerCase())) ||
+            (order.prescriptionDetails?.patientName && order.prescriptionDetails.patientName.toLowerCase().includes(orderSearchTerm.toLowerCase())) ||
+            order.status.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+            order.orderType.toLowerCase().includes(orderSearchTerm.toLowerCase());
+        
+        return statusMatch && searchMatch;
     });
 
     // Get order items with product details
@@ -1113,7 +1116,7 @@ function OrdersSection() {
                     <select 
                         value={filterStatus} 
                         onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:border-gray-400"
+                        className="px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:border-gray-400 appearance-none bg-white cursor-pointer"
                     >
                         <option value="all">All Orders</option>
                         <option value="pending">Pending</option>
@@ -1122,6 +1125,34 @@ function OrdersSection() {
                     <button onClick={load} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                         Refresh
                     </button>
+                </div>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="mb-4">
+                <div className="relative">
+                    <input
+                        type="text"
+                        placeholder="Search orders by ID, customer name, phone, email, or status..."
+                        value={orderSearchTerm}
+                        onChange={(e) => setOrderSearchTerm(e.target.value)}
+                        className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    {orderSearchTerm && (
+                        <button
+                            onClick={() => setOrderSearchTerm('')}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                        >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             </div>
             

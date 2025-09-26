@@ -187,9 +187,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: none;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
     border: none;
-    padding: 6px 10px;
     cursor: pointer;
 }
 
@@ -621,15 +622,7 @@
     border-bottom: none;
 }
 
-.notification-item.high-priority {
-    border-left: 3px solid #ef4444;
-}
-
-.notification-item.medium-priority {
-    border-left: 3px solid #f59e0b;
-}
-
-.notification-item.low-priority {
+.notification-item {
     border-left: 3px solid #3b82f6;
 }
 
@@ -667,6 +660,7 @@
     padding: 12px 16px;
     border-top: 1px solid #e5e7eb;
     background: #f9fafb;
+    border-radius: 0 0 8px 8px;
 }
 
 .view-all-btn {
@@ -674,21 +668,56 @@
     background: #3b82f6;
     color: white;
     border: none;
-    padding: 8px 12px;
+    padding: 10px 16px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
+    display: block;
+    text-align: center;
+    min-height: 40px;
+    line-height: 1.2;
+    max-width: fit-content;
 }
 
 .view-all-btn:hover {
     background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.view-all-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
 }
 
 @media (max-width: 768px) {
     .notification-popup {
         width: 300px;
         right: -50px;
+    }
+    
+    .view-all-btn {
+        padding: 12px 16px;
+        font-size: 13px;
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .notification-popup {
+        width: 280px;
+        right: -30px;
+    }
+    
+    .view-all-notifications {
+        padding: 10px 12px;
+    }
+    
+    .view-all-btn {
+        padding: 12px 14px;
+        font-size: 12px;
+        min-height: 42px;
     }
 }

@@ -2201,7 +2201,6 @@ function AdminAppointments() {
     const [error, setError] = useState('');
     const [showReschedule, setShowReschedule] = useState(false);
     const [selected, setSelected] = useState(null);
-    const [filters, setFilters] = useState({ status: '', from: '', to: '', doctorName: '' });
     const [resForm, setResForm] = useState({ date: '', startTime: '', endTime: '', reason: '' });
 
     useEffect(() => {
@@ -2308,16 +2307,6 @@ function AdminAppointments() {
         }
     };
 
-    const applyFilters = async () => {
-        const params = new URLSearchParams();
-        if (filters.status) params.append('status', filters.status);
-        if (filters.from) params.append('from', filters.from);
-        if (filters.to) params.append('to', filters.to);
-        if (filters.doctorName) params.append('doctorName', filters.doctorName);
-        const res = await fetch(`http://localhost:5001/api/bookings?${params.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        if (res.ok) setBookings(data);
-    };
 
 
     const openReschedule = (b) => { setSelected(b); setResForm({ date: b.date?.slice(0,10) || '', startTime: b.startTime || '', endTime: b.endTime || '', reason: '' }); setShowReschedule(true); };
@@ -2380,13 +2369,8 @@ function AdminAppointments() {
 
 
             <div className="bg-white rounded-xl shadow p-4">
-                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-3">
+                <div className="mb-3">
                     <div className="font-semibold text-gray-800">Appointments</div>
-                    <div className="flex flex-wrap gap-2">
-                        <input type="date" value={filters.from} onChange={e => setFilters({ ...filters, from: e.target.value })} />
-                        <input type="date" value={filters.to} onChange={e => setFilters({ ...filters, to: e.target.value })} />
-                        <button onClick={applyFilters} className="btn-primary">Apply</button>
-                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
