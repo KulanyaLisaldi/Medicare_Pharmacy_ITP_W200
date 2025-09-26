@@ -881,8 +881,12 @@ const Appointments = () => {
                       const data = await res.json()
                       if (!res.ok) throw new Error(data.message || 'Failed to book')
                       
-                      // Show success message
-                      setMessage(`✅ Appointment booked successfully! Your appointment number is: ${data.booking?.appointmentNumber || 'Generated'}`)
+                      // Show success message and alert to the customer
+                      const appointmentNumber = data.booking?.appointmentNumber || 'Generated'
+                      setMessage(`✅ Appointment booked successfully! Your appointment number is: ${appointmentNumber}`)
+                      if (typeof window !== 'undefined') {
+                        alert(`Appointment booked successfully! Your appointment number is: ${appointmentNumber}`)
+                      }
                       
                       // Refresh sessions data to get accurate booked count
                       const refreshRes = await fetch(`http://localhost:5001/api/appointments/doctor/${doctorId}`)

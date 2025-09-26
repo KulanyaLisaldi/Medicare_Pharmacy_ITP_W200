@@ -35,14 +35,16 @@ const HomePage = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Online Pharmacy */}
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-              <div className="w-32 h-32 mb-6 overflow-hidden rounded-lg">
-                <img 
-                  src={onlinepharmacy} 
-                  alt="Online Pharmacy" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
+            <div 
+              className="relative overflow-hidden p-8 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow flex items-center justify-center min-h-[260px]"
+              style={{
+                backgroundImage: `url(${onlinepharmacy})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            >
+              <div className="absolute inset-0 bg-white bg-opacity-70" />
+              <div className="relative text-center">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Online Pharmacy</h3>
               <p className="text-gray-600 mb-6">
                 Wide range of medicines, health products, and medical supplies with fast delivery.
@@ -50,17 +52,20 @@ const HomePage = () => {
               <Link to="/products" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Shop Now →
               </Link>
+              </div>
             </div>
 
             {/* Doctor Consultations */}
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-              <div className="w-32 h-32 mb-6 overflow-hidden rounded-lg">
-                <img 
-                  src={doctorconsultion} 
-                  alt="Doctor Consultations" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
+            <div 
+              className="relative overflow-hidden p-8 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow flex items-center justify-center min-h-[260px]"
+              style={{
+                backgroundImage: `url(${doctorconsultion})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            >
+              <div className="absolute inset-0 bg-white bg-opacity-70" />
+              <div className="relative text-center">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Doctor Consultations</h3>
               <p className="text-gray-600 mb-6">
                 Connect with qualified healthcare professionals for online consultations and advice.
@@ -68,17 +73,20 @@ const HomePage = () => {
               <Link to="/doctors" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Book Now →
               </Link>
+              </div>
             </div>
 
             {/* Prescription Management */}
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-              <div className="w-32 h-32 mb-6 overflow-hidden rounded-lg">
-                <img 
-                  src={prescriptions} 
-                  alt="Prescription Management" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
+            <div 
+              className="relative overflow-hidden p-8 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow flex items-center justify-center min-h-[260px]"
+              style={{
+                backgroundImage: `url(${prescriptions})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            >
+              <div className="absolute inset-0 bg-white bg-opacity-70" />
+              <div className="relative text-center">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Prescription Management</h3>
               <p className="text-gray-600 mb-6">
                 Upload and manage your prescriptions digitally with our secure platform.
@@ -86,6 +94,7 @@ const HomePage = () => {
               <Link to="/upload-prescription" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Upload Now →
               </Link>
+              </div>
             </div>
 
 
