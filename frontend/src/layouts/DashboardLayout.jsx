@@ -31,6 +31,7 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 		newPassword: '',
 		confirmPassword: ''
 	})
+	const [isChangingPassword, setIsChangingPassword] = useState(false)
 
 	const handleLogout = () => {
 		logout()
@@ -452,18 +453,46 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 		}
 		
 		try {
-			// Implement password change logic here
-			setShowPasswordChange(false)
-			setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-			setFieldErrors(prev => ({
-				...prev,
-				newPassword: '',
-				confirmPassword: ''
-			}));
-			// You can add a success toast here
+			setIsChangingPassword(true);
+			const token = localStorage.getItem('token');
+			if (!token) {
+				alert('Please log in again');
+				return;
+			}
+
+			const response = await fetch('http://localhost:5001/api/users/change-password', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${token}`
+				},
+				body: JSON.stringify({
+					currentPassword: passwordForm.currentPassword,
+					newPassword: passwordForm.newPassword
+				})
+			});
+
+			const data = await response.json();
+
+			if (response.ok) {
+				// Success
+				alert('Password changed successfully!');
+				setShowPasswordChange(false);
+				setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+				setFieldErrors(prev => ({
+					...prev,
+					newPassword: '',
+					confirmPassword: ''
+				}));
+			} else {
+				// Error
+				alert(data.message || 'Failed to change password');
+			}
 		} catch (error) {
-			console.error('Error changing password:', error)
-			// You can add an error toast here
+			console.error('Error changing password:', error);
+			alert('Network error. Please try again.');
+		} finally {
+			setIsChangingPassword(false);
 		}
 	}
 
@@ -771,11 +800,11 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 										)}
 									</div>
 									<div className="modal-actions">
-										<button type="button" className="cancel-btn" onClick={() => setShowPasswordChange(false)}>
+										<button type="button" className="cancel-btn" onClick={() => setShowPasswordChange(false)} disabled={isChangingPassword}>
 											Cancel
 										</button>
-										<button type="submit" className="submit-btn">
-											Change Password
+										<button type="submit" className="submit-btn" disabled={isChangingPassword}>
+											{isChangingPassword ? 'Changing...' : 'Change Password'}
 										</button>
 									</div>
 								</form>
