@@ -462,7 +462,9 @@ const CustomerProfile = () => {
 
     return (
         <div className="customer-profile">
-            <Navbar />
+            <div className="navbar-fixed-wrapper">
+                <Navbar />
+            </div>
             <div className="profile-container">
 
                 {message && (
