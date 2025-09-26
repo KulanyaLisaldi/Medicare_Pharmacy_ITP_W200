@@ -44,12 +44,12 @@ const HomePage = () => {
               }}
             >
               <div className="absolute inset-0 bg-white bg-opacity-70" />
-              <div className="relative text-center">
+              <div className="relative text-center flex flex-col items-center justify-between h-56">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Online Pharmacy</h3>
               <p className="text-gray-600 mb-6">
                 Wide range of medicines, health products, and medical supplies with fast delivery.
               </p>
-              <Link to="/products" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+              <Link to="/products" className="inline-flex items-center justify-center w-40 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Shop Now →
               </Link>
               </div>
@@ -65,12 +65,12 @@ const HomePage = () => {
               }}
             >
               <div className="absolute inset-0 bg-white bg-opacity-70" />
-              <div className="relative text-center">
+              <div className="relative text-center flex flex-col items-center justify-between h-56">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Doctor Consultations</h3>
               <p className="text-gray-600 mb-6">
                 Connect with qualified healthcare professionals for online consultations and advice.
               </p>
-              <Link to="/doctors" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+              <Link to="/doctors" className="inline-flex items-center justify-center w-40 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Book Now →
               </Link>
               </div>
@@ -86,12 +86,12 @@ const HomePage = () => {
               }}
             >
               <div className="absolute inset-0 bg-white bg-opacity-70" />
-              <div className="relative text-center">
+              <div className="relative text-center flex flex-col items-center justify-between h-56">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Prescription Management</h3>
               <p className="text-gray-600 mb-6">
                 Upload and manage your prescriptions digitally with our secure platform.
               </p>
-              <Link to="/upload-prescription" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+              <Link to="/upload-prescription" className="inline-flex items-center justify-center w-40 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Upload Now →
               </Link>
               </div>
