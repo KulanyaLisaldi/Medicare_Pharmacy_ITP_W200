@@ -14,9 +14,16 @@ import ImgAllermine from '../../assets/Allermine.jpg'
 import ImgOmeprazole from '../../assets/omeprazole.jpg'
 import ImgDefault from '../../assets/illustration.jpg'
 
-// Resolve a sensible image for a product using local assets
+// Resolve a sensible image for a product using uploaded images first, then local assets
 function getProductImage(product) {
-	if (!product) return null
+	if (!product) return ImgDefault
+	
+	// First priority: Use uploaded product image if available
+	if (product.image && product.image.trim() !== '') {
+		return product.image
+	}
+	
+	// Second priority: Use local assets based on product name/brand
 	const name = `${product.name || ''} ${product.brand || ''}`.toLowerCase()
 
 	if (name.includes('paracetamol') || name.includes('acetaminophen')) return ImgParacetamol
@@ -27,6 +34,7 @@ function getProductImage(product) {
 	if (name.includes('allermine') || name.includes('cetirizine') || name.includes('antihistamine')) return ImgAllermine
     if (name.includes('omeprazole') || name.includes('prilosec')) return ImgOmeprazole
 
+	// Fallback to default image
 	return ImgDefault
 }
 
@@ -263,9 +271,8 @@ function ProductCard({ p, addToCart }) {
   const inStock = (p.stock ?? 0) > 0
   const availableStock = (p.stock ?? 0) - (p.reservedStock ?? 0)
   const isAvailable = availableStock > 0
-  // For omeprazole, always prefer our asset over any provided URL
-  const mapped = getProductImage(p)
-  const imageSrc = mapped || p.imageUrl
+  // Get product image (prioritizes uploaded images over assets)
+  const imageSrc = getProductImage(p)
   
   return (
     <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden max-w-xs mx-auto w-full">

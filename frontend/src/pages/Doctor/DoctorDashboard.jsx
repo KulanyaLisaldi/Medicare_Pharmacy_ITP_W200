@@ -184,30 +184,6 @@ const DoctorDashboard = () => {
 							</div>
 						</div>
 
-						{/* Quick Actions */}
-						<div className="quick-actions-section">
-							<h2>Quick Actions</h2>
-							<div className="action-buttons">
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('appointments')}
-								>
-									<span className="action-icon">📅</span>
-									Appointments
-								</button>
-								<button className="action-btn secondary">
-									<span className="action-icon">📋</span>
-									View Patient History
-								</button>
-								<button 
-									className="action-btn secondary"
-									onClick={() => setActiveSection('messages')}
-								>
-									<span className="action-icon">💬</span>
-									Notifications
-								</button>
-							</div>
-						</div>
 
 						{/* Today's Appointments */}
 						<div className="today-appointments">
@@ -231,39 +207,6 @@ const DoctorDashboard = () => {
 							</div>
 						</div>
 
-						{/* Recent Patient Updates */}
-						<div className="patient-updates">
-							<h2>Recent Patient Updates</h2>
-							<div className="updates-list">
-								<div className="update-item">
-									<div className="update-icon">📊</div>
-									<div className="update-content">
-										<div className="update-title">Lab Results Ready</div>
-										<div className="update-details">Blood work results for Sarah Wilson are now available</div>
-										<div className="update-time">2 hours ago</div>
-									</div>
-									<button className="update-action">View</button>
-								</div>
-								<div className="update-item">
-									<div className="update-icon">💊</div>
-									<div className="update-content">
-										<div className="update-title">Prescription Refill Request</div>
-										<div className="update-details">Mike Brown requests refill for blood pressure medication</div>
-										<div className="update-time">4 hours ago</div>
-									</div>
-									<button className="update-action">Review</button>
-								</div>
-								<div className="update-item">
-									<div className="update-icon">📱</div>
-									<div className="update-content">
-										<div className="update-title">Patient Message</div>
-										<div className="update-details">New message from Jennifer Lee regarding symptoms</div>
-										<div className="update-time">6 hours ago</div>
-									</div>
-									<button className="update-action">Reply</button>
-								</div>
-							</div>
-						</div>
 
 						{/* Performance Summary */}
 						<div className="performance-summary">

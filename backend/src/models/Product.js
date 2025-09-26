@@ -65,6 +65,11 @@ const productSchema = new mongoose.Schema({
         type: [String], 
         default: [] }, // e.g., Children, Pregnancy Safe, Sugar-Free
 
+    image: {
+        type: String,
+        default: ''
+    }, // Product image URL
+
     isActive: { 
         type: Boolean, 
         default: true }
