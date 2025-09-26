@@ -1148,7 +1148,7 @@ function InventorySection() {
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
 
-    const emptyForm = { name: '', category: '', subcategory: '', brand: '', dosageForm: '', strength: '', packSize: '', batchNumber: '', manufacturingDate: '', expiryDate: '', description: '', price: 0, stock: 0, prescriptionRequired: false, tags: [] };
+    const emptyForm = { name: '', category: '', subcategory: '', brand: '', dosageForm: '', strength: '', packSize: '', batchNumber: '', manufacturingDate: '', expiryDate: '', description: '', price: 0, stock: 0, prescriptionRequired: false, tags: [], image: '' };
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState(emptyForm);
     const [fieldErrors, setFieldErrors] = useState({
@@ -1156,6 +1156,8 @@ function InventorySection() {
         stock: ''
     });
     const [editing, setEditing] = useState(null);
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState('');
 
     // Validation functions for price and stock fields
     const handleNumericKeyDown = (e) => {
@@ -1234,8 +1236,52 @@ function InventorySection() {
 
     useEffect(() => { load(); /* eslint-disable-next-line */ }, [token]);
 
-    const openCreate = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
-    const openEdit = (p) => { setEditing(p); setForm({ ...p }); setShowForm(true); };
+    const openCreate = () => { 
+        setEditing(null); 
+        setForm(emptyForm); 
+        setImageFile(null);
+        setImagePreview('');
+        setShowForm(true); 
+    };
+    const openEdit = (p) => { 
+        setEditing(p); 
+        setForm({ ...p }); 
+        setImagePreview(p.image || '');
+        setImageFile(null);
+        setShowForm(true); 
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setImagePreview(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const uploadImage = async (file) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        const response = await fetch('http://localhost:5001/api/products/upload-image', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.imageUrl;
+        } else {
+            throw new Error('Failed to upload image');
+        }
+    };
 
     const save = async (e) => {
         e.preventDefault();
@@ -1264,21 +1310,44 @@ function InventorySection() {
             return;
         }
         
-        const method = editing ? 'PUT' : 'POST';
-        const url = editing ? `http://localhost:5001/api/products/${editing._id}` : 'http://localhost:5001/api/products';
-        const res = await fetch(url, { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-        const data = await res.json();
-        if (res.ok) {
-            // Show localhost alert for successful product addition
-            alert(`Product ${editing ? 'updated' : 'added'} successfully!\n\nProduct: ${form.name}\nPrice: Rs.${form.price}\nStock: ${form.stock} units\nCategory: ${form.category || 'N/A'}\n\nGenerated at: ${new Date().toLocaleString()}`);
+        try {
+            let imageUrl = form.image;
             
-            setShowForm(false);
-            setEditing(null);
-            setForm(emptyForm);
-            setFieldErrors({ price: '', stock: '' });
-            load();
-        } else {
-            setError(data.message || 'Save failed');
+            // Upload image if a new file is selected
+            if (imageFile) {
+                imageUrl = await uploadImage(imageFile);
+            }
+            
+            const productData = {
+                ...form,
+                image: imageUrl
+            };
+            
+            const method = editing ? 'PUT' : 'POST';
+            const url = editing ? `http://localhost:5001/api/products/${editing._id}` : 'http://localhost:5001/api/products';
+            const res = await fetch(url, { 
+                method, 
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(productData) 
+            });
+            const data = await res.json();
+            
+            if (res.ok) {
+                // Show localhost alert for successful product addition
+                alert(`Product ${editing ? 'updated' : 'added'} successfully!\n\nProduct: ${form.name}\nPrice: Rs.${form.price}\nStock: ${form.stock} units\nCategory: ${form.category || 'N/A'}\nImage: ${imageUrl ? 'Uploaded' : 'None'}\n\nGenerated at: ${new Date().toLocaleString()}`);
+                
+                setShowForm(false);
+                setEditing(null);
+                setForm(emptyForm);
+                setImageFile(null);
+                setImagePreview('');
+                setFieldErrors({ price: '', stock: '' });
+                load();
+            } else {
+                setError(data.message || 'Save failed');
+            }
+        } catch (error) {
+            setError('Failed to upload image: ' + error.message);
         }
     };
 
@@ -1546,6 +1615,26 @@ function InventorySection() {
                             <div className="md:col-span-2">
                                 <label className="block text-sm text-gray-600">Description</label>
                                 <textarea className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm text-gray-600">Product Image</label>
+                                <div className="mt-1">
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={handleImageChange}
+                                        className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400"
+                                    />
+                                    {imagePreview && (
+                                        <div className="mt-2">
+                                            <img 
+                                                src={imagePreview} 
+                                                alt="Product preview" 
+                                                className="w-32 h-32 object-cover rounded border"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm text-gray-600">Tags</label>
