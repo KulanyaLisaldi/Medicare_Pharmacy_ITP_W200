@@ -12,6 +12,7 @@ import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import deliveryRoutes from "./routes/deliveryRoutes.js";
 import prescriptionRoutes from "./routes/prescriptionRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 import rateLimiter from "./middleware/rateLimiter.js";
 
 dotenv.config(); // Load .env first
@@ -51,6 +52,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
+app.use("/api/reports", reportRoutes);
 
 // Connect DB and start server
 connectDB().then(() => {

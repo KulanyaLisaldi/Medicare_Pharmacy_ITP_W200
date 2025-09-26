@@ -2,7 +2,782 @@ import React, { useEffect, useState } from 'react'
 import DashboardLayout from '../../layouts/DashboardLayout'
 import './PharmacistDashboard.css'
 import { useAuth } from '../../context/AuthContext'
-import { Home, Package, ClipboardList, BarChart3, Bell } from 'lucide-react'
+import { Home, Package, ClipboardList, BarChart3, Bell, Download } from 'lucide-react'
+import PDFReportGenerator from '../../utils/pdfGenerator'
+
+// Reports Section Component
+const ReportsSection = () => {
+    const [reportData, setReportData] = useState({
+        lowStockProducts: [],
+        expiredProducts: [],
+        nearExpiryProducts: [],
+        orderStats: {
+            fulfilled: 0,
+            pending: 0,
+            canceled: 0,
+            total: 0
+        },
+        summary: {},
+        orderTrends: [],
+        topSellingProducts: [],
+        categoryAnalysis: []
+    });
+    const [loading, setLoading] = useState(true);
+    const [generatingPDF, setGeneratingPDF] = useState(false);
+    const [showNotification, setShowNotification] = useState(false);
+    const [filters, setFilters] = useState({
+        reportType: 'all',
+        startDate: '',
+        endDate: ''
+    });
+
+    useEffect(() => {
+        loadReportData();
+    }, [filters]);
+
+    const handleFilterChange = (key, value) => {
+        setFilters(prev => ({
+            ...prev,
+            [key]: value
+        }));
+    };
+
+    const handleDateRangeChange = (startDate, endDate) => {
+        setFilters(prev => ({
+            ...prev,
+            startDate,
+            endDate
+        }));
+    };
+
+    const resetFilters = () => {
+        setFilters({
+            reportType: 'all',
+            startDate: '',
+            endDate: ''
+        });
+    };
+
+    const generatePDF = async () => {
+        try {
+            setGeneratingPDF(true);
+            
+            const pdfGenerator = new PDFReportGenerator();
+            const filename = `pharmacy-report-${new Date().toISOString().split('T')[0]}.pdf`;
+            
+            // Generate the PDF with current data and filters
+            pdfGenerator.generateReport(reportData, filters);
+            
+            // Download the PDF
+            pdfGenerator.downloadPDF(filename);
+            
+            // Show success notification
+            setShowNotification(true);
+            setTimeout(() => setShowNotification(false), 3000);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate PDF. Please try again.');
+        } finally {
+            setGeneratingPDF(false);
+        }
+    };
+
+    const loadReportData = async () => {
+        try {
+            setLoading(true);
+            
+            // Build query parameters
+            const queryParams = new URLSearchParams();
+            if (filters.reportType !== 'all') {
+                queryParams.append('reportType', filters.reportType);
+            }
+            if (filters.startDate) {
+                queryParams.append('startDate', filters.startDate);
+            }
+            if (filters.endDate) {
+                queryParams.append('endDate', filters.endDate);
+            }
+            
+            const queryString = queryParams.toString();
+            const url = `http://localhost:5001/api/reports/pharmacy${queryString ? `?${queryString}` : ''}`;
+            
+            // Fetch comprehensive reports from backend
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch reports');
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const data = result.data;
+                setReportData({
+                    lowStockProducts: [...data.stockAnalysis.lowStockProducts, ...data.stockAnalysis.outOfStockProducts],
+                    expiredProducts: data.stockAnalysis.expiredProducts,
+                    nearExpiryProducts: data.stockAnalysis.nearExpiryProducts,
+                    orderStats: data.orderAnalysis.orderStats,
+                    summary: data.summary,
+                    orderTrends: data.orderAnalysis.orderTrends,
+                    topSellingProducts: data.orderAnalysis.topSellingProducts,
+                    categoryAnalysis: data.categoryAnalysis
+                });
+            } else {
+                throw new Error(result.message || 'Failed to load reports');
+            }
+        } catch (error) {
+            console.error('Error loading report data:', error);
+            // Fallback to basic data structure
+            setReportData({
+                lowStockProducts: [],
+                expiredProducts: [],
+                nearExpiryProducts: [],
+                orderStats: { fulfilled: 0, pending: 0, canceled: 0, total: 0 },
+                summary: {},
+                orderTrends: [],
+                topSellingProducts: [],
+                categoryAnalysis: []
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="reports-section">
+                <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading reports...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="reports-section">
+            {/* Success Notification */}
+            {showNotification && (
+                <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    PDF generated and downloaded successfully!
+                </div>
+            )}
+
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2>
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={generatePDF}
+                        className="btn-outline px-4 py-2 text-sm flex items-center gap-2 hover:bg-gray-50"
+                        disabled={loading || generatingPDF}
+                    >
+                        {generatingPDF ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Download size={16} />
+                                Download PDF
+                            </>
+                        )}
+                    </button>
+                    <button 
+                        onClick={loadReportData}
+                        className="btn-primary px-4 py-2 text-sm"
+                        disabled={loading}
+                    >
+                        {loading ? 'Loading...' : 'Refresh Reports'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Report Filters */}
+            <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Report Filters</h3>
+                    <button 
+                        onClick={resetFilters}
+                        className="text-sm text-gray-500 hover:text-gray-700 underline"
+                    >
+                        Reset Filters
+                    </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Report Type Filter */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Report Type
+                        </label>
+                        <select
+                            value={filters.reportType}
+                            onChange={(e) => handleFilterChange('reportType', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="all">All Reports</option>
+                            <option value="stock">Stock Analysis</option>
+                            <option value="orders">Order Analytics</option>
+                            <option value="revenue">Revenue Reports</option>
+                        </select>
+                    </div>
+
+                    {/* Start Date Filter */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Start Date
+                        </label>
+                        <input
+                            type="date"
+                            value={filters.startDate}
+                            onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    {/* End Date Filter */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            value={filters.endDate}
+                            onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
+                    {/* Quick Date Range Buttons */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Quick Range
+                        </label>
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => {
+                                    const today = new Date();
+                                    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                                    handleDateRangeChange(
+                                        lastWeek.toISOString().split('T')[0],
+                                        today.toISOString().split('T')[0]
+                                    );
+                                }}
+                                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            >
+                                Last 7 Days
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const today = new Date();
+                                    const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                                    handleDateRangeChange(
+                                        lastMonth.toISOString().split('T')[0],
+                                        today.toISOString().split('T')[0]
+                                    );
+                                }}
+                                className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                            >
+                                Last 30 Days
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Active Filters Display */}
+                {(filters.reportType !== 'all' || filters.startDate || filters.endDate) && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2 text-sm text-blue-700">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            <span className="font-medium">Active Filters:</span>
+                            {filters.reportType !== 'all' && (
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                                    {filters.reportType.charAt(0).toUpperCase() + filters.reportType.slice(1)} Reports
+                                </span>
+                            )}
+                            {filters.startDate && filters.endDate && (
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                                    {filters.startDate} to {filters.endDate}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* PDF Preview Info */}
+                <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-green-700">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="font-medium">PDF Report will include:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                            {filters.reportType === 'all' || filters.reportType === 'stock' ? (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Stock Analysis</span>
+                            ) : null}
+                            {filters.reportType === 'all' || filters.reportType === 'orders' || filters.reportType === 'revenue' ? (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Order Statistics</span>
+                            ) : null}
+                            {filters.reportType === 'all' || filters.reportType === 'revenue' ? (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Revenue Data</span>
+                            ) : null}
+                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Summary Cards</span>
+                            {filters.reportType === 'all' || filters.reportType === 'stock' ? (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Category Analysis</span>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <div className="flex items-center">
+                        <div className="p-2 bg-red-100 rounded-lg">
+                            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                        </div>
+                        <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-600">Low/Out of Stock</p>
+                            <p className="text-2xl font-bold text-red-600">{reportData.lowStockProducts.length}</p>
+                            <p className="text-xs text-gray-500">
+                                {reportData.summary.totalProducts ? 
+                                    `${Math.round((reportData.lowStockProducts.length / reportData.summary.totalProducts) * 100)}% of total products` 
+                                    : ''
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <div className="flex items-center">
+                        <div className="p-2 bg-orange-100 rounded-lg">
+                            <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-600">Expired</p>
+                            <p className="text-2xl font-bold text-orange-600">{reportData.expiredProducts.length}</p>
+                            <p className="text-xs text-gray-500">
+                                {reportData.summary.totalProducts ? 
+                                    `${Math.round((reportData.expiredProducts.length / reportData.summary.totalProducts) * 100)}% of total products` 
+                                    : ''
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <div className="flex items-center">
+                        <div className="p-2 bg-yellow-100 rounded-lg">
+                            <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                        </div>
+                        <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-600">Near Expiry</p>
+                            <p className="text-2xl font-bold text-yellow-600">{reportData.nearExpiryProducts.length}</p>
+                            <p className="text-xs text-gray-500">
+                                {reportData.summary.totalProducts ? 
+                                    `${Math.round((reportData.nearExpiryProducts.length / reportData.summary.totalProducts) * 100)}% of total products` 
+                                    : ''
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <div className="flex items-center">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                        <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                            <p className="text-2xl font-bold text-blue-600">{reportData.orderStats.total}</p>
+                            <p className="text-xs text-gray-500">
+                                {reportData.summary.fulfillmentRate ? 
+                                    `${reportData.summary.fulfillmentRate}% fulfillment rate` 
+                                    : ''
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Additional Analytics Cards */}
+            {reportData.summary && Object.keys(reportData.summary).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-white p-6 rounded-lg shadow-sm border">
+                        <div className="flex items-center">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                    Rs.{reportData.summary.totalRevenue ? reportData.summary.totalRevenue.toLocaleString() : '0'}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    Avg: Rs.{reportData.summary.averageOrderValue ? reportData.summary.averageOrderValue.toFixed(2) : '0'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-lg shadow-sm border">
+                        <div className="flex items-center">
+                            <div className="p-2 bg-purple-100 rounded-lg">
+                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Total Products</p>
+                                <p className="text-2xl font-bold text-purple-600">{reportData.summary.totalProducts || 0}</p>
+                                <p className="text-xs text-gray-500">
+                                    {reportData.summary.recentRevenue ? 
+                                        `Rs.${reportData.summary.recentRevenue.toLocaleString()} this week` 
+                                        : ''
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-lg shadow-sm border">
+                        <div className="flex items-center">
+                            <div className="p-2 bg-indigo-100 rounded-lg">
+                                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Fulfillment Rate</p>
+                                <p className="text-2xl font-bold text-indigo-600">
+                                    {reportData.summary.fulfillmentRate ? `${reportData.summary.fulfillmentRate}%` : '0%'}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    {reportData.orderStats.fulfilled} of {reportData.orderStats.total} orders
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Low Stock / Out of Stock Products - Show for 'all' and 'stock' */}
+                {(filters.reportType === 'all' || filters.reportType === 'stock') && (
+                    <div className="bg-white rounded-lg shadow-sm border">
+                    <div className="p-6 border-b">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            Low Stock / Out of Stock Medicines
+                        </h3>
+                    </div>
+                    <div className="p-6">
+                        {reportData.lowStockProducts.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <svg className="w-12 h-12 text-green-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p>All medicines are well stocked!</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {reportData.lowStockProducts.map(product => (
+                                    <div key={product._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div className="flex-1">
+                                            <h4 className="font-medium text-gray-900">{product.name}</h4>
+                                            <p className="text-sm text-gray-600">{product.description}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                (product.stock || 0) === 0 
+                                                    ? 'bg-red-100 text-red-800' 
+                                                    : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                                {product.stock || 0} units
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                )}
+
+                {/* Expired / Near Expiry Products - Show for 'all' and 'stock' */}
+                {(filters.reportType === 'all' || filters.reportType === 'stock') && (
+                    <div className="bg-white rounded-lg shadow-sm border">
+                    <div className="p-6 border-b">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <svg className="w-5 h-5 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Expired / Near Expiry Medicines
+                        </h3>
+                    </div>
+                    <div className="p-6">
+                        <div className="space-y-4">
+                            {/* Expired Products */}
+                            <div>
+                                <h4 className="font-medium text-red-600 mb-2">Expired ({reportData.expiredProducts.length})</h4>
+                                {reportData.expiredProducts.length === 0 ? (
+                                    <p className="text-sm text-gray-500">No expired medicines</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                                        {reportData.expiredProducts.map(product => (
+                                            <div key={product._id} className="flex items-center justify-between p-2 bg-red-50 rounded">
+                                                <div>
+                                                    <p className="font-medium text-sm">{product.name}</p>
+                                                    <p className="text-xs text-gray-600">
+                                                        Expired: {new Date(product.expiryDate).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                                    Expired
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Near Expiry Products */}
+                            <div>
+                                <h4 className="font-medium text-yellow-600 mb-2">Near Expiry ({reportData.nearExpiryProducts.length})</h4>
+                                {reportData.nearExpiryProducts.length === 0 ? (
+                                    <p className="text-sm text-gray-500">No medicines near expiry</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                                        {reportData.nearExpiryProducts.map(product => (
+                                            <div key={product._id} className="flex items-center justify-between p-2 bg-yellow-50 rounded">
+                                                <div>
+                                                    <p className="font-medium text-sm">{product.name}</p>
+                                                    <p className="text-xs text-gray-600">
+                                                        Expires: {new Date(product.expiryDate).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                                    Near Expiry
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                )}
+
+                {/* Order Fulfillment Statistics - Show for 'all', 'orders', and 'revenue' */}
+                {(filters.reportType === 'all' || filters.reportType === 'orders' || filters.reportType === 'revenue') && (
+                    <div className="bg-white rounded-lg shadow-sm border lg:col-span-2">
+                    <div className="p-6 border-b">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Order Fulfillment Statistics
+                        </h3>
+                    </div>
+                    <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <h4 className="text-2xl font-bold text-green-600">{reportData.orderStats.fulfilled}</h4>
+                                <p className="text-sm text-gray-600">Fulfilled Orders</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {reportData.orderStats.total > 0 
+                                        ? `${Math.round((reportData.orderStats.fulfilled / reportData.orderStats.total) * 100)}% of total`
+                                        : '0% of total'
+                                    }
+                                </p>
+                            </div>
+
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <h4 className="text-2xl font-bold text-yellow-600">{reportData.orderStats.pending}</h4>
+                                <p className="text-sm text-gray-600">Pending Orders</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {reportData.orderStats.total > 0 
+                                        ? `${Math.round((reportData.orderStats.pending / reportData.orderStats.total) * 100)}% of total`
+                                        : '0% of total'
+                                    }
+                                </p>
+                            </div>
+
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </div>
+                                <h4 className="text-2xl font-bold text-red-600">{reportData.orderStats.canceled}</h4>
+                                <p className="text-sm text-gray-600">Canceled Orders</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {reportData.orderStats.total > 0 
+                                        ? `${Math.round((reportData.orderStats.canceled / reportData.orderStats.total) * 100)}% of total`
+                                        : '0% of total'
+                                    }
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="mt-6">
+                            <div className="flex justify-between text-sm text-gray-600 mb-2">
+                                <span>Order Status Distribution</span>
+                                <span>{reportData.orderStats.total} total orders</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3">
+                                <div className="flex h-3 rounded-full overflow-hidden">
+                                    <div 
+                                        className="bg-green-500" 
+                                        style={{ 
+                                            width: `${reportData.orderStats.total > 0 ? (reportData.orderStats.fulfilled / reportData.orderStats.total) * 100 : 0}%` 
+                                        }}
+                                    ></div>
+                                    <div 
+                                        className="bg-yellow-500" 
+                                        style={{ 
+                                            width: `${reportData.orderStats.total > 0 ? (reportData.orderStats.pending / reportData.orderStats.total) * 100 : 0}%` 
+                                        }}
+                                    ></div>
+                                    <div 
+                                        className="bg-red-500" 
+                                        style={{ 
+                                            width: `${reportData.orderStats.total > 0 ? (reportData.orderStats.canceled / reportData.orderStats.total) * 100 : 0}%` 
+                                        }}
+                                    ></div>
+                                </div>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                <span>Fulfilled</span>
+                                <span>Pending</span>
+                                <span>Canceled</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                )}
+
+                {/* Top Selling Products - Show for 'all', 'orders', and 'revenue' */}
+                {(filters.reportType === 'all' || filters.reportType === 'orders' || filters.reportType === 'revenue') && reportData.topSellingProducts && reportData.topSellingProducts.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border">
+                        <div className="p-6 border-b">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                                Top Selling Products
+                            </h3>
+                        </div>
+                        <div className="p-6">
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {reportData.topSellingProducts.map((product, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div className="flex items-center">
+                                            <div className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-bold mr-3">
+                                                {index + 1}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium text-gray-900">{product.name}</h4>
+                                                <p className="text-sm text-gray-600">Quantity Sold</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-lg font-bold text-green-600">{product.quantity}</span>
+                                            <p className="text-xs text-gray-500">units</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Category Analysis - Show for 'all' and 'stock' */}
+                {(filters.reportType === 'all' || filters.reportType === 'stock') && reportData.categoryAnalysis && reportData.categoryAnalysis.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border">
+                        <div className="p-6 border-b">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                Category Analysis
+                            </h3>
+                        </div>
+                        <div className="p-6">
+                            <div className="space-y-4 max-h-96 overflow-y-auto">
+                                {reportData.categoryAnalysis.map((category, index) => (
+                                    <div key={index} className="border rounded-lg p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="font-semibold text-gray-900">{category.category}</h4>
+                                            <span className="text-sm text-gray-500">{category.total} products</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                            <div className="bg-green-50 p-3 rounded">
+                                                <p className="text-2xl font-bold text-green-600">{category.healthy || 0}</p>
+                                                <p className="text-xs text-green-600">Healthy</p>
+                                            </div>
+                                            <div className="bg-yellow-50 p-3 rounded">
+                                                <p className="text-2xl font-bold text-yellow-600">{category.low || 0}</p>
+                                                <p className="text-xs text-yellow-600">Low Stock</p>
+                                            </div>
+                                            <div className="bg-red-50 p-3 rounded">
+                                                <p className="text-2xl font-bold text-red-600">{category.out || 0}</p>
+                                                <p className="text-xs text-red-600">Out of Stock</p>
+                                            </div>
+                                            <div className="bg-orange-50 p-3 rounded">
+                                                <p className="text-2xl font-bold text-orange-600">{category.expired || 0}</p>
+                                                <p className="text-xs text-orange-600">Expired</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const PharmacistDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
@@ -270,12 +1045,7 @@ const PharmacistDashboard = () => {
 
 
 			case 'reports':
-				return (
-					<div className="reports-section">
-						<h2>Reports & Analytics</h2>
-						<p>Reports and analytics features coming soon...</p>
-					</div>
-				);
+				return <ReportsSection />;
 
 			case 'messages':
 				return (
@@ -337,13 +1107,13 @@ const PharmacistDashboard = () => {
 													<p className={`mt-1 ${isRead ? 'text-gray-500' : 'text-gray-700'}`}>
 														{notification.message}
 													</p>
-													{isRead && (
+														{isRead && (
 														<div className="flex items-center gap-2 mt-2">
 															<span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
 																Read
 															</span>
 														</div>
-													)}
+														)}
 												</div>
 											</div>
 										</div>
@@ -503,6 +1273,9 @@ function InventorySection() {
         const res = await fetch(url, { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
         const data = await res.json();
         if (res.ok) {
+            // Show localhost alert for successful product addition
+            alert(`Product ${editing ? 'updated' : 'added'} successfully!\n\nProduct: ${form.name}\nPrice: Rs.${form.price}\nStock: ${form.stock} units\nCategory: ${form.category || 'N/A'}\n\nGenerated at: ${new Date().toLocaleString()}`);
+            
             setShowForm(false);
             setEditing(null);
             setForm(emptyForm);
@@ -513,9 +1286,20 @@ function InventorySection() {
         }
     };
 
-    const remove = async (id) => {
-        const res = await fetch(`http://localhost:5001/api/products/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) setItems(prev => prev.filter(x => x._id !== id));
+    const remove = async (product) => {
+        const productId = typeof product === 'string' ? product : product._id;
+        const productName = typeof product === 'object' ? product.name : 'Unknown Product';
+        const productPrice = typeof product === 'object' ? product.price : 'N/A';
+        const productStock = typeof product === 'object' ? product.stock : 'N/A';
+        const productCategory = typeof product === 'object' ? product.category : 'N/A';
+        
+        const res = await fetch(`http://localhost:5001/api/products/${productId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+            // Show localhost alert for successful product deletion
+            alert(`Product deleted successfully!\n\nProduct: ${productName}\nPrice: Rs.${productPrice}\nStock: ${productStock} units\nCategory: ${productCategory || 'N/A'}\n\nDeleted at: ${new Date().toLocaleString()}`);
+            
+            setItems(prev => prev.filter(x => x._id !== productId));
+        }
     };
 
     return (
@@ -605,7 +1389,7 @@ function InventorySection() {
 											</button>
 											<button 
 												className="btn-danger px-3 py-1.5 text-xs font-medium rounded-md border border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400 transition-all duration-200 hover:shadow-sm" 
-												onClick={() => remove(p._id)}
+												onClick={() => remove(p)}
 											>
 												Delete
 											</button>
