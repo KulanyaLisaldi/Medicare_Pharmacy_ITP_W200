@@ -1016,17 +1016,13 @@ const PharmacistDashboard = () => {
 								) : (
 									lowStockProducts.map(product => {
 										const stock = product.stock || 0
-										const alertLevel = stock <= 5 ? 'high' : stock <= 10 ? 'medium' : 'low'
-										const icon = stock <= 5 ? '🔴' : stock <= 10 ? '🟡' : '🟢'
 										
 										return (
-											<div key={product._id} className={`alert-item ${alertLevel}`}>
-												<div className="alert-icon">{icon}</div>
+											<div key={product._id} className="alert-item">
 												<div className="alert-content">
 													<div className="alert-title">{product.name}</div>
 													<div className="alert-details">Only {stock} units remaining</div>
 												</div>
-												<button className="alert-action">Reorder</button>
 											</div>
 										)
 									})
@@ -1304,37 +1300,95 @@ function InventorySection() {
 
     return (
         <div className="inventory-section">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-                {/*<h2>Inventory Management</h2>*/}
-                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                    <div className="relative flex-1 sm:flex-none sm:w-80">
-                        <input 
-                            value={query} 
-                            onChange={e => setQuery(e.target.value)} 
-                            placeholder="Search products..." 
-                            className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm min-h-[44px]" 
-                        />
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                        {query && (
-                            <button
-                                onClick={() => setQuery('')}
-                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                            >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        )}
+            {/* Enhanced Search Section */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 shadow-sm border border-blue-100">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-1">Inventory Management</h2>
+                        <p className="text-gray-600">Search and manage your pharmacy products</p>
                     </div>
-                    <div className="flex gap-2 sm:flex-nowrap">
-                        <button className="btn-outline flex-1 sm:flex-none px-4 py-3 min-h-[44px]" onClick={load}>Search</button>
-                        <button className="btn-primary flex-1 sm:flex-none px-4 py-3 min-h-[44px]" onClick={openCreate}>Add Product</button>
+                    <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>{items.length} products</span>
                     </div>
                 </div>
+                
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    {/* Enhanced Search Input */}
+                    <div className="relative flex-1">
+                        <div className="relative">
+                            <input 
+                                value={query} 
+                                onChange={e => setQuery(e.target.value)} 
+                                placeholder="Search by name, category, brand, or description..." 
+                                className="w-full px-4 py-4 pl-12 pr-12 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 text-sm transition-all duration-200 bg-white shadow-sm" 
+                            />
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                
+                            </div>
+                            {query && (
+                                <button
+                                    onClick={() => setQuery('')}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                                >
+                                   
+                                </button>
+                            )}
+                        </div>
+                        
+                        {/* Search Suggestions */}
+                        {query && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                                <div className="p-3 text-xs text-gray-500 border-b">
+                                    Search suggestions for "{query}"
+                                </div>
+                                <div className="p-2 text-sm text-gray-600">
+                                    Try searching for: name, category, brand, or description
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                        <button 
+                            className="btn-outline px-6 py-4 rounded-xl font-medium flex items-center gap-2 hover:bg-gray-50  border-2 border-gray-200 hover:border-gray-300" 
+                            onClick={load}
+                        >
+                           
+                            Search
+                        </button>
+                        <button 
+                            className="btn-primary px-6 py-4 rounded-xl font-medium flex items-center gap-2 hover:shadow-lg " 
+                            onClick={openCreate}
+                        >
+                           
+                            Add Product
+                        </button>
+                    </div>
+                </div>
+                
+                {/* Search Stats */}
+                {query && (
+                    <div className="mt-4 flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-blue-600">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span>Searching for: "{query}"</span>
+                        </div>
+                        <div className="text-gray-500">
+                            {items.filter(item => 
+                                item.name.toLowerCase().includes(query.toLowerCase()) ||
+                                item.category.toLowerCase().includes(query.toLowerCase()) ||
+                                item.brand.toLowerCase().includes(query.toLowerCase()) ||
+                                item.description.toLowerCase().includes(query.toLowerCase())
+                            ).length} results found
+                        </div>
+                    </div>
+                )}
             </div>
 
             {error && <div className="mb-3 px-3 py-2 rounded bg-red-50 text-red-700 text-sm">{error}</div>}
