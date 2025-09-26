@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
+import Navbar from '../../components/Navbar/Navbar';
+import Footer from '../../components/Footer/Footer';
 
 const ForgotPassword = () => {
     const { requestPasswordReset } = useAuth();
@@ -17,23 +19,27 @@ const ForgotPassword = () => {
     };
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
-                <div className="auth-header">
-                    <h2>Forgot Password</h2>
-                    <p>Enter your email to receive a reset link</p>
-                </div>
-                <form onSubmit={submit} className="auth-form">
-                    <div className="form-group">
-                        <label>Email</label>
-                        <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+        <>
+            <Navbar />
+            <div className="auth-container">
+                <div className="auth-card">
+                    <div className="auth-header">
+                        <h2>Forgot Password</h2>
+                        <p>Enter your email to receive a reset link</p>
                     </div>
-                    <button type="submit" className="auth-button" disabled={loading}>
-                        {loading ? 'Sending...' : 'Send Reset Link'}
-                    </button>
-                </form>
+                    <form onSubmit={submit} className="auth-form">
+                        <div className="form-group">
+                            <label>Email</label>
+                            <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+                        </div>
+                        <button type="submit" className="auth-button" disabled={loading}>
+                            {loading ? 'Sending...' : 'Send Reset Link'}
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
+            <Footer />
+        </>
     );
 };
 

@@ -552,16 +552,9 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 												{notifications.slice(0, 5).map(notification => (
 													<div 
 														key={notification.id} 
-														className={`notification-item ${
-															notification.priority === 'high' 
-																? 'high-priority' 
-																: notification.priority === 'medium'
-																? 'medium-priority'
-																: 'low-priority'
-														}`}
+														className="notification-item"
 													>
 														<div className="notification-item-header">
-															<span className="notification-icon-small">{notification.icon}</span>
 															<span className="notification-title">{notification.title}</span>
 															<span className="notification-time">
 																{notification.timestamp.toLocaleTimeString()}

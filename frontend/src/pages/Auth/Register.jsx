@@ -438,67 +438,93 @@ const Register = () => {
                         </div>
                     )}
 
-                    <div className="form-group">
-                        <label htmlFor="firstName">First Name</label>
-                        <input
-                            type="text"
-                            id="firstName"
-                            name="firstName"
-                            value={formData.firstName}
-                            onChange={handleChange}
-                            onKeyDown={preventInvalidFirstChar}
-                            onPaste={preventInvalidPasteFirstChar}
-                            required
-                            placeholder="Enter your first name"
-                            className={fieldErrors.firstName ? 'error' : ''}
-                        />
-                        {fieldErrors.firstName && (
-                            <div className="field-error">
-                                {fieldErrors.firstName}
-                            </div>
-                        )}
+                    {/* First Grid Row - Name Fields */}
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label htmlFor="firstName">First Name</label>
+                            <input
+                                type="text"
+                                id="firstName"
+                                name="firstName"
+                                value={formData.firstName}
+                                onChange={handleChange}
+                                onKeyDown={preventInvalidFirstChar}
+                                onPaste={preventInvalidPasteFirstChar}
+                                required
+                                placeholder="Enter your first name"
+                                className={fieldErrors.firstName ? 'error' : ''}
+                            />
+                            {fieldErrors.firstName && (
+                                <div className="field-error">
+                                    {fieldErrors.firstName}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="lastName">Last Name</label>
+                            <input
+                                type="text"
+                                id="lastName"
+                                name="lastName"
+                                value={formData.lastName}
+                                onChange={handleChange}
+                                onKeyDown={preventInvalidFirstChar}
+                                onPaste={preventInvalidPasteFirstChar}
+                                required
+                                placeholder="Enter your last name"
+                                className={fieldErrors.lastName ? 'error' : ''}
+                            />
+                            {fieldErrors.lastName && (
+                                <div className="field-error">
+                                    {fieldErrors.lastName}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="lastName">Last Name</label>
-                        <input
-                            type="text"
-                            id="lastName"
-                            name="lastName"
-                            value={formData.lastName}
-                            onChange={handleChange}
-                            onKeyDown={preventInvalidFirstChar}
-                            onPaste={preventInvalidPasteFirstChar}
-                            required
-                            placeholder="Enter your last name"
-                            className={fieldErrors.lastName ? 'error' : ''}
-                        />
-                        {fieldErrors.lastName && (
-                            <div className="field-error">
-                                {fieldErrors.lastName}
-                            </div>
-                        )}
+                    {/* Second Grid Row - Email and Phone */}
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label htmlFor="email">Email Address</label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
+                                placeholder="Enter your email"
+                                className={fieldErrors.email ? 'error' : ''}
+                            />
+                            {fieldErrors.email && (
+                                <div className="field-error">
+                                    {fieldErrors.email}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="phone">Phone Number</label>
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                required
+                                placeholder="Enter your phone number"
+                                className={fieldErrors.phone ? 'error' : ''}
+                            />
+                            {fieldErrors.phone && (
+                                <div className="field-error">
+                                    {fieldErrors.phone}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="email">Email Address</label>
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                            placeholder="Enter your email"
-                            className={fieldErrors.email ? 'error' : ''}
-                        />
-                        {fieldErrors.email && (
-                            <div className="field-error">
-                                {fieldErrors.email}
-                            </div>
-                        )}
-                    </div>
-
+                    {/* Third Grid Row - Password Fields */}
                     <div className="form-row">
                         <div className="form-group">
                             <label htmlFor="password">Password</label>
@@ -527,6 +553,7 @@ const Register = () => {
                         </div>
                     </div>
 
+                    {/* Full Width - Address */}
                     <div className="form-group">
                         <label htmlFor="address">Address</label>
                         <textarea
@@ -538,25 +565,6 @@ const Register = () => {
                             placeholder="Enter your address"
                             rows="3"
                         />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="phone">Phone Number</label>
-                        <input
-                            type="tel"
-                            id="phone"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            required
-                            placeholder="Enter your phone number"
-                            className={fieldErrors.phone ? 'error' : ''}
-                        />
-                        {fieldErrors.phone && (
-                            <div className="field-error">
-                                {fieldErrors.phone}
-                            </div>
-                        )}
                     </div>
 
                     <button 
