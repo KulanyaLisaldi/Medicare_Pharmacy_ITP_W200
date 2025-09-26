@@ -1709,6 +1709,17 @@ function InventorySection() {
     );
 }
 
+
+
+
+
+
+
+
+
+
+
+
 export default PharmacistDashboard
 
 function OrdersSection() {
