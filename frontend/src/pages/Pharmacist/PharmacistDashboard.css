@@ -816,6 +816,121 @@
     background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
 }
 
+/* Enhanced Inventory Search Section */
+.inventory-section .bg-gradient-to-r {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f4ff 100%);
+    border: 1px solid #bfdbfe;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.inventory-section input {
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.inventory-section input:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.inventory-section .btn-outline {
+    transition: all 0.3s ease;
+    border: 2px solid #e5e7eb;
+    background: #ffffff;
+}
+
+.inventory-section .btn-outline:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+}
+
+.inventory-section .btn-primary {
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.inventory-section .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Search Suggestions Dropdown */
+.inventory-section .absolute.top-full {
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Search Stats Animation */
+.inventory-section .text-blue-600 {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Responsive adjustments for inventory search */
+@media (max-width: 768px) {
+    .inventory-section .bg-gradient-to-r {
+        padding: 1rem;
+    }
+    
+    .inventory-section .flex-col.lg\\:flex-row {
+        flex-direction: column;
+    }
+    
+    .inventory-section .flex.gap-3 {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .inventory-section .btn-outline,
+    .inventory-section .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .inventory-section input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
+@media (max-width: 480px) {
+    .inventory-section .text-2xl {
+        font-size: 1.5rem;
+    }
+    
+    .inventory-section .text-gray-600 {
+        font-size: 0.875rem;
+    }
+    
+    .inventory-section .px-6 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .inventory-section .py-4 {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+}
+
 /* Responsive adjustments for reports */
 @media (max-width: 1024px) {
     .reports-section .grid-cols-4 {
