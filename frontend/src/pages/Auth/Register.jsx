@@ -371,189 +371,138 @@ const Register = () => {
             backgroundRepeat: 'no-repeat'
         }}>
             <div className="auth-card" style={{
-                backgroundColor: 'transparent',
-                display: 'grid',
-                backdropFilter: 'blur(15px)',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '1rem',
-                alignItems: 'center',
-                minHeight: '500px',
-                maxWidth: '800px',
-                width: '80%',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+                maxWidth: '500px',
+                width: '90%',
                 margin: '0 auto'
             }}>
-                {/* Left Side - Text Content */}
-                <div className="auth-text-content" style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    padding: '1.5rem',
-                    color: 'white',
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(15px)',
-                    WebkitBackdropFilter: 'blur(15px)',
-                }}>
-                    <div className="auth-logo" style={{ marginBottom: '1rem' }}>
-                        <div className="logo-icon" style={{
-                            width: '60px',
-                            height: '60px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '24px',
-                            fontWeight: 'bold',
-                            color: 'white',
-                            marginBottom: '1rem'
-                        }}>M</div>
-                        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: '0' }}>MediCare</h1>
-                    </div>
-                    <h2 style={{ fontSize: '2rem', fontWeight: '600', marginBottom: '0.5rem' }}>Join Our Community</h2>
-                    <p style={{ fontSize: '1.1rem', opacity: '0.9', lineHeight: '1.6' }}>
-                        Create your account and start your healthcare journey with us. 
-                        Get access to medical services, book appointments, and manage your health records.
-                    </p>
-                    
-                    </div>
-
-                {/* Right Side - Form */}
                 <div className="auth-form-container" style={{
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    padding: '1.5rem',
-                    backgroundColor: 'white',
-                    borderRadius: '10px'
+                    padding: '2rem'
                 }}>
                     <div className="auth-header" style={{ marginBottom: '1rem', textAlign: 'center' }}>
                         <h2 style={{ color: 'black', fontSize: '1.8rem', fontWeight: '600', marginBottom: '0.5rem', textAlign: 'center' }}>Create Account</h2>
                         <p style={{ color: 'rgba(15, 15, 15, 0.8)', fontSize: '0.9rem', textAlign: 'center' }}>Join MediCare Today!</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="auth-form" style={{ gap: '0.5rem' }}>
+                <form onSubmit={handleSubmit} className="auth-form" style={{ gap: '1rem' }}>
                     {error && (
                         <div className="error-message">
                             {error}
                         </div>
                     )}
 
-                    {/* First Grid Row - Name Fields */}
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label htmlFor="firstName">First Name</label>
-                            <input
-                                type="text"
-                                id="firstName"
-                                name="firstName"
-                                value={formData.firstName}
-                                onChange={handleChange}
-                                onKeyDown={preventInvalidFirstChar}
-                                onPaste={preventInvalidPasteFirstChar}
-                                required
-                                placeholder="Enter your first name"
-                                className={fieldErrors.firstName ? 'error' : ''}
-                            />
-                            {fieldErrors.firstName && (
-                                <div className="field-error">
-                                    {fieldErrors.firstName}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="lastName">Last Name</label>
-                            <input
-                                type="text"
-                                id="lastName"
-                                name="lastName"
-                                value={formData.lastName}
-                                onChange={handleChange}
-                                onKeyDown={preventInvalidFirstChar}
-                                onPaste={preventInvalidPasteFirstChar}
-                                required
-                                placeholder="Enter your last name"
-                                className={fieldErrors.lastName ? 'error' : ''}
-                            />
-                            {fieldErrors.lastName && (
-                                <div className="field-error">
-                                    {fieldErrors.lastName}
-                                </div>
-                            )}
-                        </div>
+                    <div className="form-group">
+                        <label htmlFor="firstName">First Name</label>
+                        <input
+                            type="text"
+                            id="firstName"
+                            name="firstName"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                            onKeyDown={preventInvalidFirstChar}
+                            onPaste={preventInvalidPasteFirstChar}
+                            required
+                            placeholder="Enter your first name"
+                            className={fieldErrors.firstName ? 'error' : ''}
+                        />
+                        {fieldErrors.firstName && (
+                            <div className="field-error">
+                                {fieldErrors.firstName}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Second Grid Row - Email and Phone */}
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label htmlFor="email">Email Address</label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                                placeholder="Enter your email"
-                                className={fieldErrors.email ? 'error' : ''}
-                            />
-                            {fieldErrors.email && (
-                                <div className="field-error">
-                                    {fieldErrors.email}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="phone">Phone Number</label>
-                            <input
-                                type="tel"
-                                id="phone"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleChange}
-                                required
-                                placeholder="Enter your phone number"
-                                className={fieldErrors.phone ? 'error' : ''}
-                            />
-                            {fieldErrors.phone && (
-                                <div className="field-error">
-                                    {fieldErrors.phone}
-                                </div>
-                            )}
-                        </div>
+                    <div className="form-group">
+                        <label htmlFor="lastName">Last Name</label>
+                        <input
+                            type="text"
+                            id="lastName"
+                            name="lastName"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            onKeyDown={preventInvalidFirstChar}
+                            onPaste={preventInvalidPasteFirstChar}
+                            required
+                            placeholder="Enter your last name"
+                            className={fieldErrors.lastName ? 'error' : ''}
+                        />
+                        {fieldErrors.lastName && (
+                            <div className="field-error">
+                                {fieldErrors.lastName}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Third Grid Row - Password Fields */}
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label htmlFor="password">Password</label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                placeholder="Enter password"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="confirmPassword">Confirm Password</label>
-                            <input
-                                type="password"
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                required
-                                placeholder="Confirm password"
-                            />
-                        </div>
+                    <div className="form-group">
+                        <label htmlFor="email">Email Address</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                            placeholder="Enter your email"
+                            className={fieldErrors.email ? 'error' : ''}
+                        />
+                        {fieldErrors.email && (
+                            <div className="field-error">
+                                {fieldErrors.email}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Full Width - Address */}
+                    <div className="form-group">
+                        <label htmlFor="phone">Phone Number</label>
+                        <input
+                            type="tel"
+                            id="phone"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            required
+                            placeholder="Enter your phone number"
+                            className={fieldErrors.phone ? 'error' : ''}
+                        />
+                        {fieldErrors.phone && (
+                            <div className="field-error">
+                                {fieldErrors.phone}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="password">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            placeholder="Enter password"
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="confirmPassword">Confirm Password</label>
+                        <input
+                            type="password"
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            required
+                            placeholder="Confirm password"
+                        />
+                    </div>
+
                     <div className="form-group">
                         <label htmlFor="address">Address</label>
                         <textarea
