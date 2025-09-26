@@ -18,15 +18,42 @@ const DeliveryAssignmentSchema = new mongoose.Schema({
         enum: ['available', 'assigned', 'accepted', 'rejected', 'picked_up', 'delivered', 'failed', 'handed_over'], 
         default: 'available' 
     },
-    assignedAt: { type: Date, default: null },
-    acceptedAt: { type: Date, default: null },
-    pickedUpAt: { type: Date, default: null },
-    deliveredAt: { type: Date, default: null },
-    failedAt: { type: Date, default: null },
-    failureReason: { type: String, default: '' },
-    deliveryNotes: { type: String, default: '' },
-    distance: { type: Number, default: 0 }, // in kilometers
-    estimatedDeliveryTime: { type: Date, default: null },
+    assignedAt: { 
+        type: Date, 
+        default: null },
+
+    acceptedAt: { 
+        type: Date, 
+        default: null },
+
+    pickedUpAt: { 
+        type: Date, 
+        default: null },
+
+    deliveredAt: { 
+        type: Date, 
+        default: null },
+
+    failedAt: { 
+        type: Date, 
+        default: null },
+
+    failureReason: { 
+        type: String, 
+        default: '' },
+
+    deliveryNotes: { 
+        type: String, 
+        default: '' },
+
+    distance: { 
+        type: Number, 
+        default: 0 }, // in kilometers
+
+    estimatedDeliveryTime: { 
+        type: Date, 
+        default: null },
+        
     actualDeliveryTime: { type: Date, default: null },
     // Handover fields
     handoverReason: { type: String, default: '' },

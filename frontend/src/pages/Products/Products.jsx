@@ -4,6 +4,32 @@ import Footer from '../../components/Footer/Footer'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 
+// Local assets for common products
+import ImgParacetamol from '../../assets/paracetamol.jpg'
+import ImgMetformin from '../../assets/metformin.jpg'
+import ImgAmoxicillin from '../../assets/Amoxcillin.jpg'
+import ImgSalbutamol from '../../assets/salbutamol_inhaler.jpg'
+import ImgFolicAcid from '../../assets/FOLIC-ACID.webp'
+import ImgAllermine from '../../assets/Allermine.jpg'
+import ImgOmeprazole from '../../assets/omeprazole.jpg'
+import ImgDefault from '../../assets/illustration.jpg'
+
+// Resolve a sensible image for a product using local assets
+function getProductImage(product) {
+	if (!product) return null
+	const name = `${product.name || ''} ${product.brand || ''}`.toLowerCase()
+
+	if (name.includes('paracetamol') || name.includes('acetaminophen')) return ImgParacetamol
+	if (name.includes('metformin')) return ImgMetformin
+	if (name.includes('amoxicillin') || name.includes('amoxcillin')) return ImgAmoxicillin
+	if (name.includes('salbutamol') || name.includes('inhaler')) return ImgSalbutamol
+	if (name.includes('folic')) return ImgFolicAcid
+	if (name.includes('allermine') || name.includes('cetirizine') || name.includes('antihistamine')) return ImgAllermine
+    if (name.includes('omeprazole') || name.includes('prilosec')) return ImgOmeprazole
+
+	return ImgDefault
+}
+
 const Products = () => {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -237,13 +263,16 @@ function ProductCard({ p, addToCart }) {
   const inStock = (p.stock ?? 0) > 0
   const availableStock = (p.stock ?? 0) - (p.reservedStock ?? 0)
   const isAvailable = availableStock > 0
+  // For omeprazole, always prefer our asset over any provided URL
+  const mapped = getProductImage(p)
+  const imageSrc = mapped || p.imageUrl
   
   return (
     <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden max-w-xs mx-auto w-full">
       <div className="p-4">
         {/* Image placeholder */}
-        {p.imageUrl ? (
-          <img src={p.imageUrl} alt={p.name} className="w-full h-28 object-cover rounded mb-2" />
+        {imageSrc ? (
+          <img src={imageSrc} alt={p.name} className="w-full h-28 object-cover rounded mb-2" />
         ) : (
           <div className="w-full h-28 bg-gray-100 rounded mb-2 flex items-center justify-center text-gray-400 text-sm">
             No Image
