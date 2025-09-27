@@ -49,13 +49,8 @@ router.use(authenticateToken);
 router.post("/change-password", validateRequest(changePasswordSchema), (req, res, next) => next());
 // changePassword must have access to req.userId; append handler
 import { changePassword, requestPasswordReset, resetPassword } from "../controllers/userController.js";
-import { getMyNotifications, markNotificationRead, createNotification } from "../controllers/notificationController.js";
 router.post("/change-password", changePassword);
 
-// Notifications
-router.get("/notifications", getMyNotifications);
-router.patch("/notifications/:id/read", markNotificationRead);
-router.post("/notifications", requireAdmin, createNotification);
 
 // Token management
 router.post("/refresh", refreshToken);
