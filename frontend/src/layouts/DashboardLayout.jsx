@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './DashboardLayout.css'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, Bell } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 
-const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection, notificationCount = 0, notifications = [] }) => {
+const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection, notificationCount = 0, notifications = [], onNotificationUpdate, showNotificationPopup = false, setShowNotificationPopup }) => {
 	const location = useLocation()
 	const navigate = useNavigate()
 	const { user, logout, updateProfile } = useAuth()
 	const [showAccountManagement, setShowAccountManagement] = useState(false)
 	const [showPasswordChange, setShowPasswordChange] = useState(false)
-	const [showNotificationPopup, setShowNotificationPopup] = useState(false)
+	const [selectedNotification, setSelectedNotification] = useState(null)
 	const [accountForm, setAccountForm] = useState({
 		firstName: user?.firstName || '',
 		lastName: user?.lastName || '',
@@ -549,12 +549,14 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 							<button 
 								className="notification-icon" 
 								title="Notifications"
-								onClick={() => setShowNotificationPopup(!showNotificationPopup)}
+								onClick={() => setShowNotificationPopup && setShowNotificationPopup(!showNotificationPopup)}
 								style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}
 							>
-								<Bell size={20} />
+								<span style={{ fontSize: '20px' }}>🔔</span>
 								{notificationCount > 0 && (
-									<span className="notification-badge">{notificationCount}</span>
+									<span className="notification-badge">
+										{notificationCount > 99 ? '99+' : notificationCount}
+									</span>
 								)}
 							</button>
 							
@@ -564,7 +566,7 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 									<div className="notification-popup-header">
 										<h3>Notifications</h3>
 										<button 
-											onClick={() => setShowNotificationPopup(false)}
+											onClick={() => setShowNotificationPopup && setShowNotificationPopup(false)}
 											className="close-popup-btn"
 										>
 											×
@@ -580,13 +582,21 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 											<div className="notification-list">
 												{notifications.slice(0, 5).map(notification => (
 													<div 
-														key={notification.id} 
-														className="notification-item"
+														key={notification._id || notification.id} 
+														className={`notification-item ${notification.read ? 'read' : 'unread'}`}
+														onClick={() => {
+															setSelectedNotification(notification)
+															if (!notification.read && onNotificationUpdate) {
+																onNotificationUpdate(notification._id || notification.id)
+															}
+														}}
+														style={{ cursor: 'pointer' }}
 													>
 														<div className="notification-item-header">
 															<span className="notification-title">{notification.title}</span>
 															<span className="notification-time">
-																{notification.timestamp.toLocaleTimeString()}
+																{notification.createdAt ? new Date(notification.createdAt).toLocaleTimeString() : 
+																 notification.timestamp ? notification.timestamp.toLocaleTimeString() : 'N/A'}
 															</span>
 														</div>
 														<p className="notification-message">{notification.message}</p>
@@ -596,8 +606,8 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 													<div className="view-all-notifications">
 														<button 
 															onClick={() => {
-																setShowNotificationPopup(false)
-																onSectionChange && onSectionChange('messages')
+																setShowNotificationPopup && setShowNotificationPopup(false)
+																navigate('/doctor/notifications')
 															}}
 															className="view-all-btn"
 														>
@@ -813,6 +823,88 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 					</div>
 				</div>
 			)}
+
+			{/* Notification Details Modal */}
+			{selectedNotification && (
+				<div className="modal-overlay" onClick={() => setSelectedNotification(null)}>
+					<div className="modal notification-details-modal" onClick={e => e.stopPropagation()}>
+						<div className="modal-header">
+							<h2>Notification Details</h2>
+							<button 
+								className="close-btn" 
+								onClick={() => setSelectedNotification(null)}
+							>
+								×
+							</button>
+						</div>
+						<div className="notification-details-content">
+							{selectedNotification.type === 'booking' && selectedNotification.data && (
+								<div>
+									<p className="notification-main-message"><strong>You have a new appointment booking.</strong></p>
+									<div className="appointment-details-modal">
+										<p>📅 <strong>Date:</strong> {selectedNotification.data.date ? new Date(selectedNotification.data.date).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>Time:</strong> {selectedNotification.data.startTime || 'N/A'}</p>
+										<p>👤 <strong>Patient:</strong> {selectedNotification.data.patientName || 'N/A'}</p>
+										<p>🏥 <strong>Location:</strong> {selectedNotification.data.location || 'MediCare Clinic'}</p>
+										{selectedNotification.data.notes && (
+											<p>📝 <strong>Notes:</strong> {selectedNotification.data.notes}</p>
+										)}
+									</div>
+								</div>
+							)}
+							{selectedNotification.type === 'reschedule' && selectedNotification.data && (
+								<div>
+									<p className="notification-main-message"><strong>An appointment has been rescheduled.</strong></p>
+									<div className="appointment-details-modal">
+										<p>👤 <strong>Patient:</strong> {selectedNotification.data.patientName || 'N/A'}</p>
+										<p>📅 <strong>New Date:</strong> {selectedNotification.data.newDate ? new Date(selectedNotification.data.newDate).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>New Time:</strong> {selectedNotification.data.newTime || 'N/A'}</p>
+										<p>📅 <strong>Previous Date:</strong> {selectedNotification.data.oldDate ? new Date(selectedNotification.data.oldDate).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>Previous Time:</strong> {selectedNotification.data.oldTime || 'N/A'}</p>
+										{selectedNotification.data.reason && (
+											<p>📝 <strong>Reason:</strong> {selectedNotification.data.reason}</p>
+										)}
+									</div>
+								</div>
+							)}
+							{selectedNotification.type === 'slot_creation' && selectedNotification.data && (
+								<div>
+									<p className="notification-main-message"><strong>Admin has created new appointment slots for you.</strong></p>
+									<div className="appointment-details-modal">
+										<p>📅 <strong>Date:</strong> {selectedNotification.data.date ? new Date(selectedNotification.data.date).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>Start Time:</strong> {selectedNotification.data.startTime || 'N/A'}</p>
+										<p>⏰ <strong>End Time:</strong> {selectedNotification.data.endTime || 'N/A'}</p>
+										<p>🔢 <strong>Slot Count:</strong> {selectedNotification.data.slotCount || 'N/A'}</p>
+										<p>🏥 <strong>Location:</strong> {selectedNotification.data.location || 'MediCare Clinic'}</p>
+										<p>🩺 <strong>Specialization:</strong> {selectedNotification.data.specialization || 'N/A'}</p>
+										{selectedNotification.data.title && (
+											<p>📋 <strong>Title:</strong> {selectedNotification.data.title}</p>
+										)}
+									</div>
+								</div>
+							)}
+							{(!selectedNotification.data || !['booking', 'reschedule', 'slot_creation'].includes(selectedNotification.type)) && (
+								<div>
+									<p className="notification-main-message"><strong>{selectedNotification.title || 'Notification'}</strong></p>
+									<div className="appointment-details-modal">
+										<p>📝 <strong>Message:</strong> {selectedNotification.message || 'No additional details available'}</p>
+										<p>🕒 <strong>Time:</strong> {selectedNotification.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : 'N/A'}</p>
+										{selectedNotification.data && (
+											<div>
+												<p><strong>Additional Data:</strong></p>
+												<pre style={{fontSize: '12px', background: '#f5f5f5', padding: '8px', borderRadius: '4px', overflow: 'auto'}}>
+													{JSON.stringify(selectedNotification.data, null, 2)}
+												</pre>
+											</div>
+										)}
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
+
 		</div>
 	)
 }

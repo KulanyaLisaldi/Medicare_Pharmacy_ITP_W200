@@ -1,6 +1,7 @@
 import Appointment from "../models/Appointment.js";
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 
 // Public: create a booking for an appointment session
 export async function createBooking(req, res) {
@@ -81,6 +82,22 @@ export async function createBooking(req, res) {
         // Update the slot with booking reference
         bookedSlot.patientId = booking._id;
         await session.save();
+
+        // Create notification for doctor
+        await Notification.create({
+            userId: session.doctorId,
+            type: 'booking',
+            title: 'New Appointment Booking',
+            message: `New appointment booking from ${patientName}`,
+            data: {
+                bookingId: booking._id,
+                patientName: patientName,
+                date: session.date,
+                startTime: bookedSlot.time,
+                location: session.location || 'MediCare Clinic',
+                notes: notes
+            }
+        });
 
         return res.status(201).json({ 
             message: 'Booked successfully', 
@@ -400,6 +417,46 @@ export async function deleteBooking(req, res) {
     } catch (error) {
         console.error('Error in deleteBooking', error);
         return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+// Get notifications for doctor
+export async function getDoctorNotifications(req, res) {
+    try {
+        const doctorId = req.userId;
+        
+        // Get all notifications for this doctor
+        const notifications = await Notification.find({
+            userId: doctorId
+        }).sort({ createdAt: -1 });
+
+        res.json(notifications);
+    } catch (error) {
+        console.error('Error fetching doctor notifications:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+// Mark notification as read
+export async function markNotificationRead(req, res) {
+    try {
+        const { notificationId } = req.params;
+        const doctorId = req.userId;
+
+        const notification = await Notification.findOneAndUpdate(
+            { _id: notificationId, userId: doctorId },
+            { read: true },
+            { new: true }
+        );
+
+        if (!notification) {
+            return res.status(404).json({ message: 'Notification not found' });
+        }
+
+        res.json({ message: 'Notification marked as read', notification });
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 }
 
