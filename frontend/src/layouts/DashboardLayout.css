@@ -168,14 +168,20 @@
 
 .notification-badge {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: -2px;
+    right: -2px;
     background: #dc2626;
     color: white;
     font-size: 9px;
+    font-weight: bold;
     padding: 1px 5px;
     border-radius: 8px;
-    font-weight: bold;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
 }
 
 /* Profile Section */
@@ -612,6 +618,7 @@
     padding: 12px 16px;
     border-bottom: 1px solid #f3f4f6;
     transition: background-color 0.2s;
+    cursor: pointer;
 }
 
 .notification-item:hover {
@@ -622,15 +629,73 @@
     border-bottom: none;
 }
 
-.notification-item {
+.notification-item.unread {
     border-left: 3px solid #3b82f6;
+    background-color: #f0f9ff;
+}
+
+.notification-item.read {
+    border-left: 3px solid #e5e7eb;
+    background-color: #f9fafb;
+    opacity: 0.8;
 }
 
 .notification-item-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
     margin-bottom: 4px;
+}
+
+.notification-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Notification Details Modal */
+.notification-details-modal {
+    max-width: 500px;
+    width: 90%;
+}
+
+.notification-details-content {
+    padding: 20px;
+}
+
+.notification-main-message {
+    font-size: 16px;
+    color: #1e40af;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    text-align: center;
+    padding: 12px;
+    background-color: #f0f9ff;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+}
+
+.appointment-details-modal {
+    background-color: #f8fafc;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.appointment-details-modal p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #374151;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.appointment-details-modal strong {
+    color: #1f2937;
+    font-weight: 600;
+    min-width: 80px;
 }
 
 .notification-icon-small {
@@ -655,6 +720,7 @@
     margin: 0;
     line-height: 1.4;
 }
+
 
 .view-all-notifications {
     padding: 12px 16px;

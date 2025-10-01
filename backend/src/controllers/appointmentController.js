@@ -1,5 +1,6 @@
 import Appointment from "../models/Appointment.js";
 import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 
 // Admin: create channel (appointment session)
 export async function createChannel(req, res) {
@@ -28,6 +29,24 @@ export async function createChannel(req, res) {
         // Generate time slots automatically
         session.generateTimeSlots();
         await session.save();
+
+        // Create notification for doctor about new appointment slots
+        await Notification.create({
+            userId: doctorId,
+            type: 'slot_creation',
+            title: 'New Appointment Slots Created',
+            message: `Admin has created new appointment slots for you`,
+            data: {
+                appointmentId: session._id,
+                title: session.title,
+                date: session.date,
+                startTime: session.startTime,
+                endTime: session.endTime,
+                slotCount: session.capacity,
+                location: session.location || 'MediCare Clinic',
+                specialization: session.specialization
+            }
+        });
 
         return res.status(201).json({ 
             message: 'Channel created successfully', 
