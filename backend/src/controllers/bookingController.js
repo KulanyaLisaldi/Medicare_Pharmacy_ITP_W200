@@ -271,6 +271,7 @@ export async function getUserBookings(req, res) {
             ]
         })
         .populate('appointmentId', 'title specialization location mode notes rescheduleReason rescheduledAt')
+        .populate('doctorId', 'firstName lastName specialization')
         .sort({ date: -1, startTime: -1 });
         
         return res.status(200).json(bookings);

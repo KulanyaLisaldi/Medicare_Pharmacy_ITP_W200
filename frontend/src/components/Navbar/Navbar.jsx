@@ -113,6 +113,7 @@ const Navbar = () => {
                       {user.role === 'customer' && (
                         <>
                           <Link to="/my-appointments" className="dropdown-item">My Appointments</Link>
+                          <Link to="/my-messages" className="dropdown-item">My Messages</Link>
                           <Link to="/orders" className="dropdown-item">Orders</Link>
                           <Link to="/upload-prescription" className="dropdown-item">Upload Prescription</Link>
                         </>

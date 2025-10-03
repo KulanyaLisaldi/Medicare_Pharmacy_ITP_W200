@@ -185,6 +185,7 @@ const DoctorDashboard = () => {
 			
 			if (response.ok) {
 				const data = await response.json()
+				console.log('Doctor conversations data:', data)
 				setMessages(data.data || [])
 			} else {
 				console.error('Failed to fetch messages')

@@ -40,6 +40,11 @@ const messageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Appointment',
         required: false
+    },
+    // Optional: Document attachment path
+    documentPath: {
+        type: String,
+        required: false
     }
 }, {
     timestamps: true

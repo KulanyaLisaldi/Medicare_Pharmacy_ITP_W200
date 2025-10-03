@@ -32,13 +32,20 @@ export const sendMessage = async (req, res) => {
         // Generate conversation ID
         const conversationId = generateConversationId(senderId, receiverId);
 
+        // Handle file upload if present
+        let documentPath = null;
+        if (req.file) {
+            documentPath = `/uploads/messages/${req.file.filename}`;
+        }
+
         // Create message
         const newMessage = await Message.create({
             senderId,
             receiverId,
             message: message.trim(),
             conversationId,
-            appointmentId: appointmentId || null
+            appointmentId: appointmentId || null,
+            documentPath: documentPath
         });
 
         // Populate sender information
@@ -101,7 +108,7 @@ export const getDoctorMessages = async (req, res) => {
                 $addFields: {
                     otherUser: {
                         $cond: {
-                            if: { $eq: ['$senderId', doctorId] },
+                            if: { $eq: [{ $toString: '$senderId' }, { $toString: doctorId }] },
                             then: '$receiver',
                             else: '$sender'
                         }
@@ -117,7 +124,7 @@ export const getDoctorMessages = async (req, res) => {
                             $cond: [
                                 { 
                                     $and: [
-                                        { $eq: ['$receiverId', doctorId] },
+                                        { $eq: [{ $toString: '$receiverId' }, { $toString: doctorId }] },
                                         { $eq: ['$seen', false] }
                                     ]
                                 },
@@ -318,6 +325,90 @@ export const getUnreadCount = async (req, res) => {
 
     } catch (error) {
         console.error('Error getting unread count:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+};
+
+// Get customer conversations (for patient side)
+export const getCustomerConversations = async (req, res) => {
+    try {
+        const customerId = req.userId;
+
+        const conversations = await Message.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { senderId: customerId },
+                        { receiverId: customerId }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'senderId',
+                    foreignField: '_id',
+                    as: 'sender'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'receiverId',
+                    foreignField: '_id',
+                    as: 'receiver'
+                }
+            },
+            {
+                $unwind: '$sender'
+            },
+            {
+                $unwind: '$receiver'
+            },
+            {
+                $addFields: {
+                    otherUser: {
+                        $cond: {
+                            if: { $eq: [{ $toString: '$senderId' }, { $toString: customerId }] },
+                            then: '$receiver',
+                            else: '$sender'
+                        }
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: '$conversationId',
+                    lastMessage: { $last: '$$ROOT' },
+                    unreadCount: {
+                        $sum: {
+                            $cond: [
+                                { 
+                                    $and: [
+                                        { $eq: [{ $toString: '$receiverId' }, { $toString: customerId }] },
+                                        { $eq: ['$seen', false] }
+                                    ]
+                                },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    totalMessages: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { 'lastMessage.sentAt': -1 }
+            }
+        ]);
+
+        res.json(conversations);
+
+    } catch (error) {
+        console.error('Error fetching customer conversations:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 

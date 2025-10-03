@@ -99,4 +99,27 @@ export const uploadProductImage = multer({
   fileFilter: imageFilter
 });
 
+// Configure multer for message file uploads
+const messageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/messages';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `message-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+export const uploadMessageFile = multer({
+  storage: messageStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: fileFilter
+});
+
 export default uploadBookingFiles;
