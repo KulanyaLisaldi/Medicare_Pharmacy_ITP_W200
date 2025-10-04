@@ -15,6 +15,7 @@ const MyMessages = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState('');
   const [replyTo, setReplyTo] = useState(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
 
   useEffect(() => {
     if (user && token) {
@@ -119,22 +120,33 @@ const MyMessages = () => {
       const composed = replyTo 
         ? `> ${replyTo.message}\n${messageText.trim()}` 
         : messageText.trim();
+
+      // Create FormData for message with optional file
+      const formData = new FormData();
+      formData.append('receiverId', selectedConversation.otherUser._id);
+      formData.append('message', composed);
+      formData.append('appointmentId', selectedConversation.lastMessage?.appointmentId || null);
+
+      // Add uploaded file if exists
+      if (uploadedFile) {
+        formData.append('document', uploadedFile);
+      }
+
       const response = await fetch('http://localhost:5001/api/messages/send', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          receiverId: selectedConversation.otherUser._id,
-          message: composed,
-          appointmentId: selectedConversation.lastMessage?.appointmentId || null
-        })
+        body: formData
       });
 
       if (response.ok) {
         setMessageText('');
         setReplyTo(null);
+        setUploadedFile(null);
+        // Clear file input
+        const fileInput = document.getElementById('message-file-upload');
+        if (fileInput) fileInput.value = '';
         // Refresh conversation messages
         fetchConversationMessages(selectedConversation._id);
         // Refresh conversations list to update last message
@@ -312,6 +324,24 @@ const MyMessages = () => {
                           >
                               <div className="message-content">
                                 <div className="message-text">{message.message}</div>
+                                {message.documentPath && (
+                                  <div className="message-document">
+                                    <div className="document-item">
+                                      <div className="document-icon">📄</div>
+                                      <div className="document-info">
+                                        <span className="document-name">
+                                          {message.documentPath.split('/').pop()}
+                                        </span>
+                                        <button 
+                                          className="view-document-btn"
+                                          onClick={() => window.open(`http://localhost:5001${message.documentPath}`, '_blank')}
+                                        >
+                                          View Document
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="message-meta">
                                   <span className="message-time">{formatTime(message.sentAt)}</span>
                                   <div className="message-actions">
@@ -350,6 +380,25 @@ const MyMessages = () => {
                         >Cancel</button>
                       </div>
                     )}
+                    
+                    {/* File Upload Section */}
+                    {uploadedFile && (
+                      <div className="file-preview">
+                        <div className="file-info">
+                          <span className="file-icon">📄</span>
+                          <span className="file-name">{uploadedFile.name}</span>
+                          <button 
+                            className="remove-file-btn"
+                            onClick={() => {
+                              setUploadedFile(null);
+                              const fileInput = document.getElementById('message-file-upload');
+                              if (fileInput) fileInput.value = '';
+                            }}
+                          >×</button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="message-input">
                       <input
                         type="text"
@@ -363,13 +412,30 @@ const MyMessages = () => {
                         }}
                         disabled={sendingMessage}
                       />
-                      <button 
-                        onClick={sendMessage}
-                        disabled={!messageText.trim() || sendingMessage}
-                        className="send-btn"
-                      >
-                        {sendingMessage ? 'Sending...' : 'Send'}
-                      </button>
+                      <div className="message-input-actions">
+                        <input
+                          type="file"
+                          id="message-file-upload"
+                          className="file-upload-input"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setUploadedFile(file);
+                            }
+                          }}
+                        />
+                        <label htmlFor="message-file-upload" className="file-upload-btn" title="Attach file">
+                          📎
+                        </label>
+                        <button 
+                          onClick={sendMessage}
+                          disabled={!messageText.trim() || sendingMessage}
+                          className="send-btn"
+                        >
+                          {sendingMessage ? 'Sending...' : 'Send'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

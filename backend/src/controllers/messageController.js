@@ -10,28 +10,54 @@ const generateConversationId = (userId1, userId2) => {
 // Send a message
 export const sendMessage = async (req, res) => {
     try {
-        const { receiverId, message, appointmentId } = req.body;
+        const { receiverId, message, appointmentId, conversationId } = req.body;
         const senderId = req.userId;
 
         // Validate required fields
-        if (!receiverId || !message) {
+        if (!message) {
             return res.status(400).json({ 
                 success: false, 
-                message: 'Receiver ID and message are required' 
+                message: 'Message is required' 
+            });
+        }
+
+        let finalReceiverId = receiverId;
+        let finalConversationId = conversationId;
+
+        // If conversationId is provided, find the other participant
+        if (conversationId && !receiverId) {
+            const lastMessage = await Message.findOne({ conversationId })
+                .sort({ sentAt: -1 });
+
+            if (!lastMessage) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Conversation not found' 
+                });
+            }
+
+            // Determine the receiver (the other participant)
+            finalReceiverId = lastMessage.senderId.toString() === senderId 
+                ? lastMessage.receiverId 
+                : lastMessage.senderId;
+        } else if (receiverId && !conversationId) {
+            // Generate conversation ID if not provided
+            finalConversationId = generateConversationId(senderId, receiverId);
+        } else if (!receiverId && !conversationId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Either receiverId or conversationId is required' 
             });
         }
 
         // Check if receiver exists
-        const receiver = await User.findById(receiverId);
+        const receiver = await User.findById(finalReceiverId);
         if (!receiver) {
             return res.status(404).json({ 
                 success: false, 
                 message: 'Receiver not found' 
             });
         }
-
-        // Generate conversation ID
-        const conversationId = generateConversationId(senderId, receiverId);
 
         // Handle file upload if present
         let documentPath = null;
@@ -42,9 +68,9 @@ export const sendMessage = async (req, res) => {
         // Create message
         const newMessage = await Message.create({
             senderId,
-            receiverId,
+            receiverId: finalReceiverId,
             message: message.trim(),
-            conversationId,
+            conversationId: finalConversationId,
             appointmentId: appointmentId || null,
             documentPath: documentPath
         });
