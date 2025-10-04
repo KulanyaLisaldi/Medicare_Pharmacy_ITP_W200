@@ -39,7 +39,7 @@ const DoctorDashboard = () => {
 	const [notifications, setNotifications] = useState([])
 	const [unreadCount, setUnreadCount] = useState(0)
 	const [showNotificationPopup, setShowNotificationPopup] = useState(false)
-	const { token } = useAuth()
+	const { user, token } = useAuth()
 
 	useEffect(() => {
 		const fetchStats = async () => {
@@ -243,6 +243,34 @@ const DoctorDashboard = () => {
 			}
 		} catch (error) {
 			console.error('Error sending reply:', error)
+		}
+	}
+
+	// Delete a message
+	const deleteMessage = async (messageId) => {
+		if (!window.confirm('Are you sure you want to delete this message?')) {
+			return
+		}
+
+		try {
+			const response = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+				method: 'DELETE',
+				headers: {
+					'Authorization': `Bearer ${token}`,
+					'Content-Type': 'application/json'
+				}
+			})
+
+			if (response.ok) {
+				// Refresh conversation messages
+				await fetchConversationMessages(selectedConversation._id)
+				// Refresh messages list
+				await fetchMessages()
+			} else {
+				console.error('Failed to delete message')
+			}
+		} catch (error) {
+			console.error('Error deleting message:', error)
 		}
 	}
 
@@ -708,8 +736,17 @@ const DoctorDashboard = () => {
 													>
 														<div className="message-content">
 															<div className="message-text">{message.message}</div>
-															<div className="message-time">
-																{new Date(message.sentAt).toLocaleTimeString()}
+															<div className="message-meta">
+																<div className="message-time">
+																	{new Date(message.sentAt).toLocaleTimeString()}
+																</div>
+																{message.senderId._id === user?._id && (
+																	<button 
+																		className="delete-btn"
+																		onClick={() => deleteMessage(message._id)}
+																		title="Delete message"
+																	>🗑️</button>
+																)}
 															</div>
 														</div>
 													</div>

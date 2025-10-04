@@ -6,7 +6,8 @@ import {
     replyToMessage,
     markMessagesAsSeen,
     getUnreadCount,
-    getCustomerConversations
+    getCustomerConversations,
+    deleteMessage
 } from '../controllers/messageController.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { uploadMessageFile } from '../middleware/uploadMiddleware.js';
@@ -33,5 +34,8 @@ router.get('/unread-count', authenticateToken, getUnreadCount);
 
 // Get customer conversations (for patient side)
 router.get('/customer/conversations', authenticateToken, getCustomerConversations);
+
+// Delete a message
+router.delete('/:messageId', authenticateToken, deleteMessage);
 
 export default router;

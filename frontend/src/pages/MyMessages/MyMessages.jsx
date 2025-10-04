@@ -14,6 +14,7 @@ const MyMessages = () => {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
 
   useEffect(() => {
     if (user && token) {
@@ -82,7 +83,7 @@ const MyMessages = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setConversationMessages(data);
+        setConversationMessages(Array.isArray(data) ? data : data.data || []);
         
         // Mark messages as seen
         await fetch(`http://localhost:5001/api/messages/conversation/${conversationId}/seen`, {
@@ -114,6 +115,10 @@ const MyMessages = () => {
 
     try {
       setSendingMessage(true);
+      // If replying, prepend a lightweight quote marker (client-side only)
+      const composed = replyTo 
+        ? `> ${replyTo.message}\n${messageText.trim()}` 
+        : messageText.trim();
       const response = await fetch('http://localhost:5001/api/messages/send', {
         method: 'POST',
         headers: {
@@ -122,13 +127,14 @@ const MyMessages = () => {
         },
         body: JSON.stringify({
           receiverId: selectedConversation.otherUser._id,
-          message: messageText.trim(),
+          message: composed,
           appointmentId: selectedConversation.lastMessage?.appointmentId || null
         })
       });
 
       if (response.ok) {
         setMessageText('');
+        setReplyTo(null);
         // Refresh conversation messages
         fetchConversationMessages(selectedConversation._id);
         // Refresh conversations list to update last message
@@ -142,6 +148,35 @@ const MyMessages = () => {
       console.error('Error sending message:', err);
     } finally {
       setSendingMessage(false);
+    }
+  };
+
+  const deleteMessage = async (messageId) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        // Refresh conversation messages
+        fetchConversationMessages(selectedConversation._id);
+        // Refresh conversations list to update last message
+        fetchConversations();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to delete message');
+      }
+    } catch (err) {
+      setError('Network error occurred');
+      console.error('Error deleting message:', err);
     }
   };
 
@@ -230,17 +265,11 @@ const MyMessages = () => {
                         <div className="conversation-name">
                           Dr. {conversation.otherUser?.firstName} {conversation.otherUser?.lastName}
                         </div>
-                        <div className="conversation-specialization">
-                          {conversation.otherUser?.specialization}
-                        </div>
                         <div className="conversation-preview">
                           {conversation.lastMessage?.message?.substring(0, 50)}
                           {conversation.lastMessage?.message?.length > 50 ? '...' : ''}
                         </div>
                         <div className="conversation-meta">
-                          <span className="conversation-time">
-                            {formatTime(conversation.lastMessage?.sentAt)}
-                          </span>
                           {conversation.unreadCount > 0 && (
                             <span className="unread-badge">{conversation.unreadCount}</span>
                           )}
@@ -281,12 +310,29 @@ const MyMessages = () => {
                             key={message._id} 
                             className={`message-item ${message.senderId._id === user._id ? 'sent' : 'received'}`}
                           >
-                            <div className="message-content">
-                              <div className="message-text">{message.message}</div>
-                              <div className="message-time">
-                                {formatTime(message.sentAt)}
+                              <div className="message-content">
+                                <div className="message-text">{message.message}</div>
+                                <div className="message-meta">
+                                  <span className="message-time">{formatTime(message.sentAt)}</span>
+                                  <div className="message-actions">
+                                    <button 
+                                      className="reply-btn"
+                                      onClick={() => {
+                                        setReplyTo(message);
+                                        const input = document.querySelector('.message-input input');
+                                        if (input) input.focus();
+                                      }}
+                                    >Reply</button>
+                                    {message.senderId._id === user._id && (
+                                      <button 
+                                        className="delete-btn"
+                                        onClick={() => deleteMessage(message._id)}
+                                        title="Delete message"
+                                      >🗑️</button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
                           </div>
                         ))}
                       </div>
@@ -294,6 +340,16 @@ const MyMessages = () => {
                   </div>
 
                   <div className="message-input-container">
+                    {replyTo && (
+                      <div className="reply-preview">
+                        <div className="reply-title">Replying to</div>
+                        <div className="reply-text">{replyTo.message}</div>
+                        <button 
+                          className="reply-cancel"
+                          onClick={() => setReplyTo(null)}
+                        >Cancel</button>
+                      </div>
+                    )}
                     <div className="message-input">
                       <input
                         type="text"
