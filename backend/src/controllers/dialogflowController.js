@@ -1,12 +1,12 @@
-import { SessionsClient } from '@google-cloud/dialogflow';
+// Dialogflow is optional; load lazily inside the handler to avoid startup crashes
+let SessionsClient = null;
+import fs from 'fs';
 import User from '../models/User.js';
 import Appointment from '../models/Appointment.js';
 import Order from '../models/Order.js';
 
-// Initialize Dialogflow client
-const dialogflowClient = new SessionsClient({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || './google-credentials.json'
-});
+// Initialize Dialogflow client lazily and tolerate missing credentials
+let dialogflowClient = null;
 
 const projectId = process.env.DIALOGFLOW_PROJECT_ID || 'your-project-id';
 const sessionId = 'medicare-chatbot-session';
@@ -22,6 +22,31 @@ export const processMessage = async (req, res) => {
         success: false,
         message: 'Message is required'
       });
+    }
+
+    // Lazy-load Dialogflow only when first used
+    if (!dialogflowClient) {
+      try {
+        if (!SessionsClient) {
+          const mod = await import('@google-cloud/dialogflow');
+          SessionsClient = mod.SessionsClient;
+        }
+        const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || './google-credentials.json';
+        const hasCreds = keyPath && fs.existsSync(keyPath);
+        if (!hasCreds) {
+          dialogflowClient = null;
+        } else {
+          dialogflowClient = new SessionsClient({ keyFilename: keyPath });
+        }
+      } catch (e) {
+        dialogflowClient = null;
+      }
+    }
+
+    // If still unavailable, return a safe default local response
+    if (!dialogflowClient) {
+      const fallback = await handleIntent('DefaultWelcomeIntent', {}, req.userId || null, message);
+      return res.status(200).json({ success: true, intent: 'Fallback', response: fallback, parameters: {} });
     }
 
     // Create session path

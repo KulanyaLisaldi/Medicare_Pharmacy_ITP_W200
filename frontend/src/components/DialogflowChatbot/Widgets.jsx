@@ -128,11 +128,20 @@ export const HelpOptions = (props) => {
 // Doctor Finder Widget
 export const DoctorFinder = (props) => {
   const handleFindSpecialist = (specialty) => {
-    props.actionProvider.handleButtonClick(`Find ${specialty} specialist`);
+    // directly call API via action and render list
+    if (props?.actionProvider?.findSpecialist) {
+      props.actionProvider.findSpecialist(specialty);
+    } else {
+      props.actionProvider.handleButtonClick(`Find ${specialty} specialist`);
+    }
   };
 
   const handleDescribeSymptoms = () => {
-    props.actionProvider.handleButtonClick('Describe symptoms for doctor recommendation');
+    if (props?.actionProvider?.handleDescribeSymptoms) {
+      props.actionProvider.handleDescribeSymptoms({});
+    } else {
+      props.actionProvider.handleButtonClick('Describe symptoms for doctor recommendation');
+    }
   };
 
   const handleViewAllDoctors = () => {
@@ -228,6 +237,35 @@ export const DeliveryTracking = (props) => {
           📋 Order History
         </button>
       </div>
+    </div>
+  );
+};
+
+// Doctor List Widget
+export const DoctorList = (props) => {
+  const results = props?.payload || props?.state?.doctorResults;
+  const doctors = results?.doctors || [];
+  const message = results?.message;
+  const specialty = results?.specialty;
+
+  return (
+    <div className="doctor-list-widget">
+      {specialty && !message && <div className="notice" style={{fontWeight:600, marginBottom:6}}>{`Here are available ${specialty} doctors:`}</div>}
+      {message && <div className="notice">{message}</div>}
+      {doctors.length > 0 ? (
+        <ul className="doctor-list">
+          {doctors.map((d) => (
+            <li key={d.id} className="doctor-item">
+              <div className="doctor-name">{d.name}</div>
+              <div className="doctor-spec">{d.specialization}</div>
+              <div className="doctor-contact">
+                {d.email && <span>{d.email}</span>}
+                {d.phone && <span>{d.phone}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (!message && <div>No doctors to display.</div>)}
     </div>
   );
 };

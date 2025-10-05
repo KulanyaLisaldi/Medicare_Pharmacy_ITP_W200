@@ -3,8 +3,17 @@ import { createChatBotMessage } from 'react-chatbot-kit';
 class ActionProvider {
   constructor(createChatBotMessage, setStateFunc, createClientMessage) {
     this.createChatBotMessage = createChatBotMessage;
-    this.setState = setStateFunc;
+    // Keep a live reference of state so we can compare previous results reliably
+    this.stateRef = { current: undefined };
+    this.setState = (updater) => {
+      setStateFunc((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        this.stateRef.current = next;
+        return next;
+      });
+    };
     this.createClientMessage = createClientMessage;
+    this.awaitingSymptoms = false;
   }
 
   // Handle Dialogflow responses
@@ -12,23 +21,25 @@ class ActionProvider {
     try {
       const token = localStorage.getItem('token');
       
-      // If no token, use local responses
-      if (!token) {
-        this.handleLocalResponse(userMessage);
-        return;
-      }
+      // Always allow core flows even if not signed in
 
       const response = await fetch('http://localhost:5001/api/dialogflow/message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ message: userMessage })
       });
 
       if (response.status === 401) {
         // Token expired, use local responses
+        this.handleLocalResponse(userMessage);
+        return;
+      }
+
+      // If Dialogflow backend errors, fall back to local responses gracefully
+      if (!response.ok) {
         this.handleLocalResponse(userMessage);
         return;
       }
@@ -57,11 +68,111 @@ class ActionProvider {
             this.handleDefaultResponse(data);
         }
       } else {
-        this.handleErrorResponse(data.message);
+        // If Dialogflow returns an application error, prefer local fallback
+        this.handleLocalResponse(userMessage);
       }
     } catch (error) {
       console.error('Dialogflow error:', error);
       this.handleLocalResponse(userMessage);
+    }
+  };
+
+  // Handle free-text symptoms: call backend analyzer then search doctors
+  handleSymptomsInput = async (symptomsText) => {
+    try {
+      // reflect state
+      this.setState(prev => {
+        const next = { ...prev, awaitingSymptoms: false };
+        this.stateRef.current = next;
+        return next;
+      });
+      this.awaitingSymptoms = false;
+
+      const response = await fetch('http://localhost:5001/api/doctor-recommendations/analyze-symptoms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symptoms: symptomsText })
+      });
+      const data = await response.json();
+
+      const specialty = data?.data?.specialty || 'General Medicine';
+
+      const analysisMsg = this.createChatBotMessage(
+        `Based on your symptoms, the most suitable specialization is ${specialty}. I'll find available doctors for you.`,
+      );
+      this.setState(prev => ({ ...prev, messages: [...prev.messages, analysisMsg] }));
+
+      // Reuse existing finder to fetch doctors by specialization
+      await this.findSpecialist(specialty);
+    } catch (e) {
+      console.error('Symptom analyze error', e);
+      const message = this.createChatBotMessage('Sorry, I could not analyze those symptoms right now.');
+      this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
+    }
+  };
+
+  // Fetch doctors by specialization and show list
+  findSpecialist = async (specialty) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5001/api/doctor-recommendations/recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ specialty })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data?.data?.doctors) {
+        // Deduplicate by id/email to avoid repeats
+        const seen = new Set();
+        const uniqueDoctors = (data.data.doctors || []).filter(d => {
+          const key = d.id || d.email || `${d.name}-${d.specialization}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        // If results are identical to the last render for the same specialty, avoid adding another message
+        const prevState = this.stateRef?.current;
+        const prevResults = prevState?.doctorResults;
+        let isSameAsBefore = false;
+        if (prevResults && prevResults.specialty === specialty) {
+          const prevKeys = new Set((prevResults.doctors || []).map(d => d.id || d.email || `${d.name}-${d.specialization}`));
+          const newKeys = new Set(uniqueDoctors.map(d => d.id || d.email || `${d.name}-${d.specialization}`));
+          if (prevKeys.size === newKeys.size) {
+            isSameAsBefore = [...newKeys].every(k => prevKeys.has(k));
+          }
+        }
+
+        if (isSameAsBefore) {
+          // Do not duplicate the same list again
+          return;
+        }
+
+        const payload = { specialty, doctors: uniqueDoctors };
+        this.setState(prev => ({ ...prev, doctorResults: payload }));
+        const message = this.createChatBotMessage('', { widget: 'doctorList', payload });
+        this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
+      } else {
+        const notAvailable = data?.message || `No ${specialty} doctors found.`;
+        // Avoid pushing the same not-available message twice in a row
+        const prev = this.stateRef?.current;
+        const lastMsg = prev?.messages?.[prev.messages.length - 1]?.props?.message || prev?.messages?.[prev.messages.length - 1]?.message;
+        if (lastMsg !== notAvailable) {
+          const payload = { specialty, doctors: [], message: notAvailable };
+          this.setState(prev => ({ ...prev, doctorResults: payload }));
+          const message = this.createChatBotMessage('', { widget: 'doctorList', payload });
+          this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
+        }
+      }
+    } catch (error) {
+      console.error('Doctor recommendation error:', error);
+      const message = this.createChatBotMessage('Sorry, something went wrong fetching doctors.');
+      this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
     }
   };
 
@@ -153,8 +264,7 @@ class ActionProvider {
   // Handle conversation end
   handleConversationEnd = () => {
     const endMessage = this.createChatBotMessage(
-      "Do you need any more help?",
-      { widget: 'helpOptions' }
+      "Do you need any more help? You can ask me another question anytime."
     );
     this.setState(prev => ({ ...prev, messages: [...prev.messages, endMessage] }));
   };
@@ -188,8 +298,7 @@ class ActionProvider {
       "• Appointment data security\n" +
       "• Avoids double-booking\n" +
       "• Proper coordination with medical staff\n\n" +
-      "Is there anything else I can help you with?",
-      { widget: 'helpOptions' }
+      "Is there anything else I can help you with?"
     );
     this.setState(prev => ({ ...prev, messages: [...prev.messages, restrictionMessage] }));
   };
@@ -233,8 +342,7 @@ class ActionProvider {
       "4️⃣ Need Changes?\n" +
       "For rescheduling or cancellations, please contact the hospital or doctor's office directly through the main website or support.\n\n" +
       "This ensures appointment data security and avoids double-booking.\n\n" +
-      "Do you need any help?",
-      { widget: 'viewAppointments' }
+      "If you need more help, just type your question here."
     );
     this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
   };
@@ -257,10 +365,9 @@ class ActionProvider {
 
   handleDescribeSymptoms = (data) => {
     const message = this.createChatBotMessage(
-      data.response || "Please describe your symptoms or health concerns, and I'll recommend the best specialist for you.",
-      { widget: 'symptomAnalyzer' }
+      data.response || "Please describe your symptoms. For example: 'chest pain and shortness of breath' or 'skin rash and itching'."
     );
-    this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
+    this.setState(prev => ({ ...prev, awaitingSymptoms: true, messages: [...prev.messages, message] }));
   };
 
   handleMedicineRecommendation = (data) => {
@@ -308,7 +415,37 @@ class ActionProvider {
     const userMessage = this.createClientMessage(action);
     this.setState(prev => ({ ...prev, messages: [...prev.messages, userMessage] }));
     
-    // Send to Dialogflow
+    const lower = action.toLowerCase();
+    if (lower.includes('book') && lower.includes('appointment')) {
+      this.handleBookAppointment({});
+      return;
+    }
+    if (lower.includes('view') && (lower.includes('booking') || lower.includes('appointments'))) {
+      this.handleViewBookings({});
+      return;
+    }
+    if (lower.includes('describe symptoms')) {
+      this.handleDescribeSymptoms({});
+      return;
+    }
+    if (lower.includes('show all available doctors')) {
+      this.handleShowAllDoctors({});
+      return;
+    }
+    if (lower.includes('find') && lower.includes('doctor')) {
+      this.handleFindDoctor({});
+      return;
+    }
+    if (lower.includes('medicine')) {
+      this.handleMedicineRecommendation({});
+      return;
+    }
+    if (lower.includes('track') && lower.includes('delivery')) {
+      this.handleTrackDelivery({});
+      return;
+    }
+
+    // Fallback to Dialogflow for anything else
     this.handleDialogflowResponse(action);
   };
 }
