@@ -25,6 +25,7 @@ import Cart from "./pages/Cart/Cart"
 import Checkout from "./pages/Checkout/Checkout"
 import Orders from "./pages/Orders/Orders"
 import UploadPrescription from "./pages/UploadPrescription/UploadPrescription"
+import DialogflowChatbot from "./components/DialogflowChatbot/DialogflowChatbot"
 
 const App = () => {
   return (
@@ -69,6 +70,9 @@ const App = () => {
         {/* Catch-all route for authenticated users */}
         <Route path="*" element={<CatchAllRoute />} />
       </Routes>
+      
+      {/* Dialogflow Chatbot Widget */}
+      <DialogflowChatbot />
     </AuthProvider>
   )
 }
