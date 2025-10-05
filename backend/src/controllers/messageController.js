@@ -1,5 +1,6 @@
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import mongoose from 'mongoose';
 
 // Generate conversation ID between two users
 const generateConversationId = (userId1, userId2) => {
@@ -9,19 +10,48 @@ const generateConversationId = (userId1, userId2) => {
 // Send a message
 export const sendMessage = async (req, res) => {
     try {
-        const { receiverId, message, appointmentId } = req.body;
+        const { receiverId, message, appointmentId, conversationId } = req.body;
         const senderId = req.userId;
 
         // Validate required fields
-        if (!receiverId || !message) {
+        if (!message) {
             return res.status(400).json({ 
                 success: false, 
-                message: 'Receiver ID and message are required' 
+                message: 'Message is required' 
+            });
+        }
+
+        let finalReceiverId = receiverId;
+        let finalConversationId = conversationId;
+
+        // If conversationId is provided, find the other participant
+        if (conversationId && !receiverId) {
+            const lastMessage = await Message.findOne({ conversationId })
+                .sort({ sentAt: -1 });
+
+            if (!lastMessage) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Conversation not found' 
+                });
+            }
+
+            // Determine the receiver (the other participant)
+            finalReceiverId = lastMessage.senderId.toString() === senderId 
+                ? lastMessage.receiverId 
+                : lastMessage.senderId;
+        } else if (receiverId && !conversationId) {
+            // Generate conversation ID if not provided
+            finalConversationId = generateConversationId(senderId, receiverId);
+        } else if (!receiverId && !conversationId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Either receiverId or conversationId is required' 
             });
         }
 
         // Check if receiver exists
-        const receiver = await User.findById(receiverId);
+        const receiver = await User.findById(finalReceiverId);
         if (!receiver) {
             return res.status(404).json({ 
                 success: false, 
@@ -29,16 +59,20 @@ export const sendMessage = async (req, res) => {
             });
         }
 
-        // Generate conversation ID
-        const conversationId = generateConversationId(senderId, receiverId);
+        // Handle file upload if present
+        let documentPath = null;
+        if (req.file) {
+            documentPath = `/uploads/messages/${req.file.filename}`;
+        }
 
         // Create message
         const newMessage = await Message.create({
             senderId,
-            receiverId,
+            receiverId: finalReceiverId,
             message: message.trim(),
-            conversationId,
-            appointmentId: appointmentId || null
+            conversationId: finalConversationId,
+            appointmentId: appointmentId || null,
+            documentPath: documentPath
         });
 
         // Populate sender information
@@ -63,6 +97,7 @@ export const sendMessage = async (req, res) => {
 export const getDoctorMessages = async (req, res) => {
     try {
         const doctorId = req.userId;
+        const doctorObjectId = new mongoose.Types.ObjectId(doctorId);
         const { page = 1, limit = 20 } = req.query;
 
         // Get all conversations where doctor is either sender or receiver
@@ -70,8 +105,8 @@ export const getDoctorMessages = async (req, res) => {
             {
                 $match: {
                     $or: [
-                        { senderId: doctorId },
-                        { receiverId: doctorId }
+                        { senderId: doctorObjectId },
+                        { receiverId: doctorObjectId }
                     ]
                 }
             },
@@ -101,7 +136,7 @@ export const getDoctorMessages = async (req, res) => {
                 $addFields: {
                     otherUser: {
                         $cond: {
-                            if: { $eq: ['$senderId', doctorId] },
+                            if: { $eq: ['$senderId', doctorObjectId] },
                             then: '$receiver',
                             else: '$sender'
                         }
@@ -117,7 +152,7 @@ export const getDoctorMessages = async (req, res) => {
                             $cond: [
                                 { 
                                     $and: [
-                                        { $eq: ['$receiverId', doctorId] },
+                                        { $eq: ['$receiverId', doctorObjectId] },
                                         { $eq: ['$seen', false] }
                                     ]
                                 },
@@ -131,6 +166,15 @@ export const getDoctorMessages = async (req, res) => {
             },
             {
                 $sort: { 'lastMessage.sentAt': -1 }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    lastMessage: 1,
+                    unreadCount: 1,
+                    totalMessages: 1,
+                    otherUser: '$lastMessage.otherUser'
+                }
             },
             {
                 $skip: (page - 1) * limit
@@ -318,6 +362,140 @@ export const getUnreadCount = async (req, res) => {
 
     } catch (error) {
         console.error('Error getting unread count:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+};
+
+// Get customer conversations (for patient side)
+export const getCustomerConversations = async (req, res) => {
+    try {
+        const customerId = req.userId;
+        const customerObjectId = new mongoose.Types.ObjectId(customerId);
+
+        const conversations = await Message.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { senderId: customerObjectId },
+                        { receiverId: customerObjectId }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'senderId',
+                    foreignField: '_id',
+                    as: 'sender'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'receiverId',
+                    foreignField: '_id',
+                    as: 'receiver'
+                }
+            },
+            {
+                $unwind: '$sender'
+            },
+            {
+                $unwind: '$receiver'
+            },
+            {
+                $addFields: {
+                    otherUser: {
+                        $cond: {
+                            if: { $eq: ['$senderId', customerObjectId] },
+                            then: '$receiver',
+                            else: '$sender'
+                        }
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: '$conversationId',
+                    lastMessage: { $last: '$$ROOT' },
+                    unreadCount: {
+                        $sum: {
+                            $cond: [
+                                { 
+                                    $and: [
+                                        { $eq: ['$receiverId', customerObjectId] },
+                                        { $eq: ['$seen', false] }
+                                    ]
+                                },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    totalMessages: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { 'lastMessage.sentAt': -1 }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    lastMessage: 1,
+                    unreadCount: 1,
+                    totalMessages: 1,
+                    otherUser: '$lastMessage.otherUser'
+                }
+            }
+        ]);
+
+        res.json(conversations);
+
+    } catch (error) {
+        console.error('Error fetching customer conversations:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+};
+
+// Delete a message
+export const deleteMessage = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const userId = req.userId;
+
+        // Find the message and verify ownership
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Message not found' 
+            });
+        }
+
+        // Check if the user is the sender of the message
+        if (message.senderId.toString() !== userId) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'You can only delete your own messages' 
+            });
+        }
+
+        // Delete the message
+        await Message.findByIdAndDelete(messageId);
+
+        res.json({
+            success: true,
+            message: 'Message deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Error deleting message:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 

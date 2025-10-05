@@ -9,6 +9,13 @@ const UserAppointments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all'); // all, upcoming, past, cancelled
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [messageText, setMessageText] = useState('');
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageError, setMessageError] = useState('');
+  const [messageSuccess, setMessageSuccess] = useState('');
 
   useEffect(() => {
     if (user && token) {
@@ -65,6 +72,78 @@ const UserAppointments = () => {
       minute: '2-digit',
       hour12: true
     });
+  };
+
+  // Handle message modal opening
+  const handleMessageClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowMessageModal(true);
+    setMessageText('');
+    setUploadedFile(null);
+    setMessageError('');
+    setMessageSuccess('');
+  };
+
+  // Handle sending message
+  const handleSendMessage = async () => {
+    if (!messageText.trim()) {
+      setMessageError('Please enter a message');
+      return;
+    }
+
+    if (!selectedAppointment) {
+      setMessageError('No appointment selected');
+      return;
+    }
+
+    setSendingMessage(true);
+    setMessageError('');
+    setMessageSuccess('');
+
+    try {
+      // Create FormData for message with optional file
+      const formData = new FormData();
+      formData.append('receiverId', selectedAppointment.doctorId._id || selectedAppointment.doctorId);
+      formData.append('message', messageText.trim());
+      formData.append('appointmentId', selectedAppointment._id);
+
+      // Add uploaded file if exists
+      if (uploadedFile) {
+        formData.append('document', uploadedFile);
+      }
+
+      const response = await fetch('http://localhost:5001/api/messages/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        setMessageSuccess('Message sent successfully!');
+        setMessageText('');
+        setUploadedFile(null);
+        
+        // Close modal after 2 seconds
+        setTimeout(() => {
+          setShowMessageModal(false);
+          setMessageSuccess('');
+        }, 2000);
+        
+        // Show success message with link to messages
+        setTimeout(() => {
+          alert('Message sent successfully! You can view your conversations in the "My Messages" section.');
+        }, 2500);
+      } else {
+        const errorData = await response.json();
+        setMessageError(errorData.message || 'Failed to send message');
+      }
+    } catch (err) {
+      setMessageError('Network error. Please try again.');
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const downloadAppointmentDetails = (appointment) => {
@@ -426,7 +505,12 @@ const UserAppointments = () => {
                       >
                         📄 Download PDF
                       </button>
-                      
+                      <button
+                        onClick={() => handleMessageClick(appointment)}
+                        className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        💬 Message Doctor
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -437,6 +521,137 @@ const UserAppointments = () => {
         )}
       </div>
 
+      {/* Message Modal */}
+      {showMessageModal && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">Message Doctor</h2>
+              <button 
+                onClick={() => setShowMessageModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {/* Doctor Information */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">Sending message to:</h3>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-xl">
+                    👨‍⚕️
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">
+                      Dr. {selectedAppointment.doctorId?.firstName || selectedAppointment.doctorName} {selectedAppointment.doctorId?.lastName || ''}
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      {selectedAppointment.doctorId?.specialization || selectedAppointment.specialization}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Message Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Message *
+                  </label>
+                  <textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Type your message to the doctor..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                {/* File Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Attach Document (Optional)
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="file"
+                      id="message-file-upload"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setUploadedFile(file);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="message-file-upload"
+                      className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      {uploadedFile ? uploadedFile.name : 'Choose file to upload'}
+                    </label>
+                    {uploadedFile && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-sm text-green-600">✓ {uploadedFile.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedFile(null);
+                            document.getElementById('message-file-upload').value = '';
+                          }}
+                          className="text-sm text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB)
+                  </p>
+                </div>
+
+                {/* Error/Success Messages */}
+                {messageError && (
+                  <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
+                    {messageError}
+                  </div>
+                )}
+                {messageSuccess && (
+                  <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg p-3 text-sm">
+                    {messageSuccess}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <button 
+                    onClick={() => setShowMessageModal(false)}
+                    className="px-6 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 font-medium"
+                    disabled={sendingMessage}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleSendMessage}
+                    disabled={sendingMessage || !messageText.trim()}
+                    className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 font-medium"
+                  >
+                    {sendingMessage ? 'Sending...' : 'Send Message'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
