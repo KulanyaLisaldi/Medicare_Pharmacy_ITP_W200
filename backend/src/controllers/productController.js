@@ -58,4 +58,22 @@ export async function deleteProduct(req, res) {
     }
 }
 
+export async function uploadProductImage(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No image file provided' });
+        }
+        
+        const imageUrl = `http://localhost:5001/uploads/products/${req.file.filename}`;
+        
+        return res.status(200).json({ 
+            message: 'Image uploaded successfully', 
+            imageUrl 
+        });
+    } catch (error) {
+        console.error('Error in uploadProductImage', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
 

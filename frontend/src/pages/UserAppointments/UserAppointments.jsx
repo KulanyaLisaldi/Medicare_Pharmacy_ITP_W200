@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
-import { toast } from 'react-hot-toast';
 
 const UserAppointments = () => {
   const { user, token } = useAuth();
@@ -10,8 +9,6 @@ const UserAppointments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all'); // all, upcoming, past, cancelled
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   useEffect(() => {
     if (user && token) {
@@ -50,52 +47,7 @@ const UserAppointments = () => {
     }
   };
 
-  const cancelAppointment = async (appointmentId) => {
-    try {
-      const response = await fetch(`http://localhost:5001/api/bookings/${appointmentId}/cancel`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
 
-      if (response.ok) {
-        toast.success('Appointment cancelled successfully');
-        fetchUserAppointments(); // Refresh the list
-        setShowCancelModal(false);
-        setSelectedAppointment(null);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to cancel appointment');
-      }
-    } catch (err) {
-      toast.error('Network error occurred');
-      console.error('Error cancelling appointment:', err);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'no_show': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending': return '⏳';
-      case 'confirmed': return '✅';
-      case 'completed': return '🏥';
-      case 'cancelled': return '❌';
-      case 'no_show': return '👻';
-      default: return '❓';
-    }
-  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -115,23 +67,178 @@ const UserAppointments = () => {
     });
   };
 
+  const downloadAppointmentDetails = (appointment) => {
+    // Create HTML content for PDF
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Appointment Details - ${appointment.referenceNo}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            line-height: 1.8;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .header h1 {
+            color: #2563eb;
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            color: #666;
+            margin: 5px 0 0 0;
+            font-size: 14px;
+          }
+          .info-item {
+            margin-bottom: 15px;
+            font-size: 16px;
+          }
+          .info-item strong {
+            color: #2563eb;
+            font-weight: bold;
+            margin-right: 10px;
+          }
+          .notes {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-left: 4px solid #2563eb;
+            border-radius: 4px;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 12px;
+          }
+          @media print {
+            body { margin: 20px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MediCare</h1>
+          <p>Appointment Details</p>
+        </div>
+
+        <div class="info-item">
+          <strong>Appointment Reference Number:</strong> ${appointment.referenceNo}
+        </div>
+        
+        <div class="info-item">
+          <strong>Slot Number:</strong> ${appointment.slotNumber || 'N/A'}
+        </div>
+        
+        <div class="info-item">
+          <strong>Date:</strong> ${formatDate(appointment.date)}
+        </div>
+        
+        <div class="info-item">
+          <strong>Time:</strong> ${appointment.slotTime ? formatTime(appointment.slotTime) : formatTime(appointment.startTime)}
+        </div>
+        
+        <div class="info-item">
+          <strong>Doctor Name:</strong> Dr. ${appointment.doctorName}
+        </div>
+        
+        <div class="info-item">
+          <strong>Specialization:</strong> ${appointment.specialization}
+        </div>
+        
+        <div class="info-item">
+          <strong>Patient Name:</strong> ${appointment.patientName}
+        </div>
+        
+        <div class="info-item">
+          <strong>Email:</strong> ${appointment.patientEmail}
+        </div>
+        
+        <div class="info-item">
+          <strong>Phone:</strong> ${appointment.patientPhone}
+        </div>
+        
+        <div class="info-item">
+          <strong>Gender:</strong> ${appointment.patientGender}
+        </div>
+        
+        <div class="info-item">
+          <strong>Age:</strong> ${appointment.patientAge}
+        </div>
+        
+        <div class="info-item">
+          <strong>Ongoing Condition:</strong> ${appointment.ongoingCondition}
+        </div>
+
+        ${appointment.notes ? `
+        <div class="notes">
+          <strong>Notes:</strong> ${appointment.notes}
+        </div>
+        ` : ''}
+
+        <div class="footer">
+          <p>Generated on ${new Date().toLocaleString()}</p>
+          <p>MediCare - Your Health, Our Priority</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Wait for content to load, then trigger print
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      
+      // Close the window after a delay
+      setTimeout(() => {
+        printWindow.close();
+      }, 1000);
+    };
+  };
+
   const isUpcoming = (appointment) => {
     const appointmentDate = new Date(appointment.date);
-    const now = new Date();
-    return appointmentDate > now && appointment.status !== 'cancelled' && appointment.status !== 'completed';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of today
+    
+    // Debug logging
+    console.log('Appointment:', appointment.referenceNo, 'Date:', appointmentDate, 'Today:', today, 'Is Upcoming:', appointmentDate >= today);
+    
+    return appointmentDate >= today;
   };
 
   const isPast = (appointment) => {
     const appointmentDate = new Date(appointment.date);
-    const now = new Date();
-    return appointmentDate <= now || appointment.status === 'completed';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of today
+    
+    // Debug logging
+    console.log('Appointment:', appointment.referenceNo, 'Date:', appointmentDate, 'Today:', today, 'Is Past:', appointmentDate < today);
+    
+    return appointmentDate < today;
   };
 
   const filteredAppointments = appointments.filter(appointment => {
     switch (filter) {
       case 'upcoming': return isUpcoming(appointment);
       case 'past': return isPast(appointment);
-      case 'cancelled': return appointment.status === 'cancelled';
+      case 'cancelled': return false; // No cancelled appointments since status field was removed
       default: return true;
     }
   });
@@ -191,8 +298,7 @@ const UserAppointments = () => {
               {[
                 { key: 'all', label: 'All Appointments', count: appointments.length },
                 { key: 'upcoming', label: 'Upcoming', count: appointments.filter(isUpcoming).length },
-                { key: 'past', label: 'Past', count: appointments.filter(isPast).length },
-                { key: 'cancelled', label: 'Cancelled', count: appointments.filter(a => a.status === 'cancelled').length }
+                { key: 'past', label: 'Past', count: appointments.filter(isPast).length }
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -239,26 +345,21 @@ const UserAppointments = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {filteredAppointments.map((appointment) => (
+            {filteredAppointments.map((appointment) => {
+              // Debug: Log appointment data to check for reschedule fields
+              console.log('Appointment data:', {
+                id: appointment._id,
+                rescheduleReason: appointment.rescheduleReason,
+                rescheduledAt: appointment.rescheduledAt,
+                doctorName: appointment.doctorName
+              });
+              
+              return (
               <div key={appointment._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      {/* Appointment Header */}
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appointment.status)}`}>
-                          <span className="mr-1">{getStatusIcon(appointment.status)}</span>
-                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1).replace('_', ' ')}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Ref: {appointment.referenceNo}
-                        </div>
-                        {appointment.slotNumber && (
-                          <div className="text-sm text-blue-600 font-medium">
-                            Slot #{appointment.slotNumber}
-                          </div>
-                        )}
-                      </div>
+                      
 
                       {/* Doctor Info */}
                       <div className="mb-4">
@@ -269,113 +370,73 @@ const UserAppointments = () => {
                       </div>
 
                       {/* Appointment Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-900 mb-2">Appointment Details</h4>
-                          <div className="space-y-1 text-sm text-gray-600">
-                            <div className="flex items-center gap-2">
-                              <span>📅</span>
-                              <span>{formatDate(appointment.date)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span>🕐</span>
-                              <span>{formatTime(appointment.startTime)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span>🏥</span>
-                              <span>{appointment.channel === 'online' ? 'Online Consultation' : 'In-Person'}</span>
-                            </div>
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-900 mb-2">Appointment Details</h4>
+                        <div className="space-y-1 text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <span>📅</span>
+                            <span>{formatDate(appointment.date)}</span>
                           </div>
-                        </div>
-
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-900 mb-2">Payment Info</h4>
-                          <div className="space-y-1 text-sm text-gray-600">
-                            <div className="flex items-center gap-2">
-                              <span>💰</span>
-                              <span>LKR {appointment.paymentStatus === 'paid' ? 'Paid' : 'Pending'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span>💳</span>
-                              <span className="capitalize">{appointment.paymentStatus}</span>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <span>🕐</span>
+                            <span>{appointment.slotTime ? formatTime(appointment.slotTime) : formatTime(appointment.startTime)}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Notes */}
-                      {appointment.notes && (
+                      {/* Reschedule Alert */}
+                      {appointment.rescheduleReason && (
                         <div className="mb-4">
-                          <h4 className="text-sm font-medium text-gray-900 mb-1">Notes</h4>
-                          <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                            {appointment.notes}
-                          </p>
+                          <div className="bg-red-100 border-2 border-red-300 rounded-lg p-4 shadow-sm">
+                            <div className="flex items-start gap-3">
+                              <div className="text-red-600 text-xl">🚨</div>
+                              <div className="flex-1">
+                                <h4 className="text-base font-bold text-red-900 mb-2">⚠️ APPOINTMENT RESCHEDULED</h4>
+                                <div className="bg-white rounded p-3 border border-red-200">
+                                  <p className="text-sm font-semibold text-red-800 mb-1">Reschedule Reason:</p>
+                                  <p className="text-sm text-red-700 font-medium">
+                                    {appointment.rescheduleReason}
+                                  </p>
+                                  {appointment.rescheduledAt && (
+                                    <p className="text-xs text-red-600 mt-2 pt-2 border-t border-red-200">
+                                      <strong>Rescheduled on:</strong> {new Date(appointment.rescheduledAt).toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
+
                     </div>
 
                     {/* Actions */}
                     <div className="flex flex-col gap-2 ml-4">
-                      {isUpcoming(appointment) && appointment.status !== 'cancelled' && (
-                        <button
-                          onClick={() => {
-                            setSelectedAppointment(appointment);
-                            setShowCancelModal(true);
-                          }}
-                          className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      )}
+                      <button
+                        onClick={() => downloadAppointmentDetails(appointment)}
+                        className="px-4 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                      >
+                        📄 Download PDF
+                      </button>
                       
-                      {appointment.status === 'completed' && (
-                        <button className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                          View Prescription
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Cancel Confirmation Modal */}
-      {showCancelModal && selectedAppointment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="text-red-500 text-2xl">⚠️</div>
-              <h3 className="text-lg font-semibold text-gray-900">Cancel Appointment</h3>
-            </div>
-            
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to cancel your appointment with Dr. {selectedAppointment.doctorName} 
-              on {formatDate(selectedAppointment.date)} at {formatTime(selectedAppointment.startTime)}?
-            </p>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowCancelModal(false);
-                  setSelectedAppointment(null);
-                }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Keep Appointment
-              </button>
-              <button
-                onClick={() => cancelAppointment(selectedAppointment._id)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Yes, Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <Footer />
     </div>

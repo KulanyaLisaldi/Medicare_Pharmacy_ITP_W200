@@ -114,7 +114,7 @@ const Navbar = () => {
                         <>
                           <Link to="/my-appointments" className="dropdown-item">My Appointments</Link>
                           <Link to="/orders" className="dropdown-item">Orders</Link>
-                          <Link to="/prescriptions" className="dropdown-item">Prescriptions</Link>
+                          <Link to="/upload-prescription" className="dropdown-item">Upload Prescription</Link>
                         </>
                       )}
                       {isAdmin() && (

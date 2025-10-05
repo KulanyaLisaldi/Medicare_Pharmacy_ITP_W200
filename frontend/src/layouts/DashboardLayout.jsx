@@ -4,13 +4,13 @@ import './DashboardLayout.css'
 import { useAuth } from '../context/AuthContext'
 import { LogOut } from 'lucide-react'
 
-const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection }) => {
+const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection, notificationCount = 0, notifications = [], onNotificationUpdate, showNotificationPopup = false, setShowNotificationPopup }) => {
 	const location = useLocation()
 	const navigate = useNavigate()
 	const { user, logout, updateProfile } = useAuth()
-	const [showProfileDropdown, setShowProfileDropdown] = useState(false)
 	const [showAccountManagement, setShowAccountManagement] = useState(false)
 	const [showPasswordChange, setShowPasswordChange] = useState(false)
+	const [selectedNotification, setSelectedNotification] = useState(null)
 	const [accountForm, setAccountForm] = useState({
 		firstName: user?.firstName || '',
 		lastName: user?.lastName || '',
@@ -23,11 +23,272 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 		newPassword: '',
 		confirmPassword: ''
 	})
+	const [fieldErrors, setFieldErrors] = useState({
+		firstName: '',
+		lastName: '',
+		email: '',
+		phone: '',
+		newPassword: '',
+		confirmPassword: ''
+	})
+	const [isChangingPassword, setIsChangingPassword] = useState(false)
 
 	const handleLogout = () => {
 		logout()
 		navigate('/login')
 	}
+
+	// Validation functions for account form
+	const preventInvalidNameChar = (e) => {
+		const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+		if (!isNameField) return;
+		const key = e.key || '';
+		if (e.type === 'keydown') {
+			const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+			if (controlKeys.includes(key)) return;
+			// Block any non-letter characters (including numbers, symbols, etc.)
+			if (!/^[A-Za-z ]$/.test(key)) {
+				e.preventDefault();
+				if (/^[0-9]$/.test(key)) {
+					setFieldErrors(prev => ({
+						...prev,
+						[e.target.name]: 'Numbers are not allowed in name fields'
+					}));
+				} else {
+					setFieldErrors(prev => ({
+						...prev,
+						[e.target.name]: 'Only letters and spaces are allowed'
+					}));
+				}
+			}
+		}
+	};
+
+	const preventInvalidNamePaste = (e) => {
+		const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+		if (!isNameField) return;
+		const pasted = (e.clipboardData || window.clipboardData).getData('text');
+		if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+			e.preventDefault();
+			if (/[0-9]/.test(pasted)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[e.target.name]: 'Numbers are not allowed in name fields'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[e.target.name]: 'Only letters and spaces are allowed'
+				}));
+			}
+		}
+	};
+
+	const handlePhoneKeyDown = (e) => {
+		const { name } = e.target;
+		if (name === 'phone') {
+			const current = e.target.value || '';
+			const key = e.key || '';
+			
+			// Allow control keys
+			const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+			if (controlKeys.includes(key)) return;
+			
+			// Block any non-digit characters (letters, symbols, etc.)
+			if (!/^[0-9]$/.test(key)) {
+				e.preventDefault();
+				if (/^[A-Za-z]$/.test(key)) {
+					setFieldErrors(prev => ({
+						...prev,
+						[name]: 'Letters are not allowed in phone number'
+					}));
+				} else if (key === '-') {
+					setFieldErrors(prev => ({
+						...prev,
+						[name]: 'Minus (-) values are not allowed'
+					}));
+				} else {
+					setFieldErrors(prev => ({
+						...prev,
+						[name]: 'Only numbers are allowed in phone number'
+					}));
+				}
+				return;
+			}
+			
+			// Check length limit - exactly 10 digits
+			if (/^[0-9]$/.test(key) && current.length >= 10) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Phone number must be exactly 10 digits'
+				}));
+			}
+		}
+	};
+
+	const handlePhonePaste = (e) => {
+		const { name } = e.target;
+		if (name === 'phone') {
+			const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+			const digitsOnly = pastedText.replace(/\D/g, '');
+			
+			// Block if contains letters
+			if (/[A-Za-z]/.test(pastedText)) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Letters are not allowed in phone number'
+				}));
+			} else if (pastedText.includes('-')) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Minus (-) values are not allowed'
+				}));
+			} else if (digitsOnly.length > 10) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Phone number must be exactly 10 digits'
+				}));
+			} else if (!/^[0-9]+$/.test(pastedText)) {
+				e.preventDefault();
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Only numbers are allowed in phone number'
+				}));
+			}
+		}
+	};
+
+	const handleAccountFormChange = (e) => {
+		const { name, value } = e.target;
+		
+		// Special handling for phone field - clean and limit input
+		if (name === 'phone') {
+			// Remove all non-digit characters and limit to 10 digits
+			const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+			
+			// Update the form with cleaned value
+			setAccountForm(prev => ({ ...prev, [name]: digitsOnly }));
+			
+			// Check for letters in original input
+			if (/[A-Za-z]/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Letters are not allowed in phone number'
+				}));
+			} else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+			return; // Exit early to prevent double setting
+		}
+		
+		setAccountForm(prev => ({ ...prev, [name]: value }));
+		
+		// Clear field-specific error when user types
+		if (fieldErrors[name]) {
+			setFieldErrors(prev => ({
+				...prev,
+				[name]: ''
+			}));
+		}
+		
+		// Real-time validation for name fields
+		if (name === 'firstName' || name === 'lastName') {
+			if (/[0-9]/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Numbers are not allowed in name fields'
+				}));
+			} else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Only letters and spaces are allowed'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+		
+		// Real-time validation for email field
+		if (name === 'email') {
+			if (value.trim() && !value.includes('@')) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Email must contain @ symbol'
+				}));
+			} else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Please enter a valid email address'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+	};
+
+	const handlePasswordFormChange = (e) => {
+		const { name, value } = e.target;
+		
+		setPasswordForm(prev => ({ ...prev, [name]: value }));
+		
+		// Clear field-specific error when user types
+		if (fieldErrors[name]) {
+			setFieldErrors(prev => ({
+				...prev,
+				[name]: ''
+			}));
+		}
+		
+		// Real-time validation for new password field
+		if (name === 'newPassword') {
+			const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+			
+			if (value.trim() && !pwRegex.test(value)) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+		
+		// Real-time validation for confirm password field
+		if (name === 'confirmPassword') {
+			if (value.trim() && value !== passwordForm.newPassword) {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: 'Passwords do not match'
+				}));
+			} else {
+				setFieldErrors(prev => ({
+					...prev,
+					[name]: ''
+				}));
+			}
+		}
+	};
 
 	const handleSidebarItemClick = (item) => {
 		if (item.path) {
@@ -50,16 +311,96 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 
     const handleAccountUpdate = async (e) => {
         e.preventDefault()
-        // Client-side validation: names letters/spaces, address required, SL phone
-        const nameRegex = /^[A-Za-z ]+$/
-        if (!nameRegex.test(accountForm.firstName)) { alert('First name should contain only letters and spaces'); return }
-        if (!nameRegex.test(accountForm.lastName)) { alert('Last name should contain only letters and spaces'); return }
-        if (!accountForm.address.trim()) { alert('Address is required'); return }
-        const phoneRegex = /^07\d{8}$/
-        if (accountForm.phone && !phoneRegex.test(accountForm.phone)) { alert('Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'); return }
+        
+        // Comprehensive validation
+        let hasErrors = false;
+        const newFieldErrors = {};
+        
+        // First name validation
+        if (!accountForm.firstName.trim()) {
+            newFieldErrors.firstName = 'First name is required';
+            hasErrors = true;
+        } else if (/[0-9]/.test(accountForm.firstName)) {
+            newFieldErrors.firstName = 'Numbers are not allowed in name fields';
+            hasErrors = true;
+        } else if (!/^[A-Za-z ]+$/.test(accountForm.firstName)) {
+            newFieldErrors.firstName = 'Only letters and spaces are allowed';
+            hasErrors = true;
+        } else {
+            newFieldErrors.firstName = '';
+        }
+        
+        // Last name validation
+        if (!accountForm.lastName.trim()) {
+            newFieldErrors.lastName = 'Last name is required';
+            hasErrors = true;
+        } else if (/[0-9]/.test(accountForm.lastName)) {
+            newFieldErrors.lastName = 'Numbers are not allowed in name fields';
+            hasErrors = true;
+        } else if (!/^[A-Za-z ]+$/.test(accountForm.lastName)) {
+            newFieldErrors.lastName = 'Only letters and spaces are allowed';
+            hasErrors = true;
+        } else {
+            newFieldErrors.lastName = '';
+        }
+        
+        // Email validation
+        if (!accountForm.email.trim()) {
+            newFieldErrors.email = 'Email is required';
+            hasErrors = true;
+        } else if (!accountForm.email.includes('@')) {
+            newFieldErrors.email = 'Email must contain @ symbol';
+            hasErrors = true;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountForm.email)) {
+            newFieldErrors.email = 'Please enter a valid email address';
+            hasErrors = true;
+        } else {
+            newFieldErrors.email = '';
+        }
+        
+        // Phone validation
+        if (accountForm.phone.trim()) {
+            const digitsOnly = accountForm.phone.replace(/\D/g, '');
+            if (/[A-Za-z]/.test(accountForm.phone)) {
+                newFieldErrors.phone = 'Letters are not allowed in phone number';
+                hasErrors = true;
+            } else if (digitsOnly.length !== 10) {
+                newFieldErrors.phone = 'Phone number must be exactly 10 digits';
+                hasErrors = true;
+            } else if (!/^07\d{8}$/.test(digitsOnly)) {
+                newFieldErrors.phone = 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)';
+                hasErrors = true;
+            } else {
+                newFieldErrors.phone = '';
+            }
+        } else {
+            newFieldErrors.phone = '';
+        }
+        
+        // Address validation
+        if (!accountForm.address.trim()) {
+            alert('Address is required');
+            return;
+        }
+        
+        // Set field errors
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            return;
+        }
+        
         try {
             await updateProfile(accountForm)
             setShowAccountManagement(false)
+            setFieldErrors({
+                firstName: '',
+                lastName: '',
+                email: '',
+                phone: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
         } catch (error) {
             console.error('Error updating profile:', error)
         }
@@ -67,18 +408,91 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 
 	const handleChangePassword = async (e) => {
 		e.preventDefault()
-		if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-			alert('New passwords do not match')
-			return
+		
+		// Comprehensive password validation
+		let hasErrors = false;
+		const newFieldErrors = {};
+		
+		// Current password validation
+		if (!passwordForm.currentPassword.trim()) {
+			alert('Current password is required');
+			return;
 		}
+		
+		// New password validation
+		const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+		if (!passwordForm.newPassword.trim()) {
+			newFieldErrors.newPassword = 'New password is required';
+			hasErrors = true;
+		} else if (!pwRegex.test(passwordForm.newPassword)) {
+			newFieldErrors.newPassword = 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)';
+			hasErrors = true;
+		} else {
+			newFieldErrors.newPassword = '';
+		}
+		
+		// Confirm password validation
+		if (!passwordForm.confirmPassword.trim()) {
+			newFieldErrors.confirmPassword = 'Please confirm your new password';
+			hasErrors = true;
+		} else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+			newFieldErrors.confirmPassword = 'Passwords do not match';
+			hasErrors = true;
+		} else {
+			newFieldErrors.confirmPassword = '';
+		}
+		
+		// Set field errors
+		setFieldErrors(prev => ({
+			...prev,
+			...newFieldErrors
+		}));
+		
+		if (hasErrors) {
+			return;
+		}
+		
 		try {
-			// Implement password change logic here
-			setShowPasswordChange(false)
-			setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-			// You can add a success toast here
+			setIsChangingPassword(true);
+			const token = localStorage.getItem('token');
+			if (!token) {
+				alert('Please log in again');
+				return;
+			}
+
+			const response = await fetch('http://localhost:5001/api/users/change-password', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${token}`
+				},
+				body: JSON.stringify({
+					currentPassword: passwordForm.currentPassword,
+					newPassword: passwordForm.newPassword
+				})
+			});
+
+			const data = await response.json();
+
+			if (response.ok) {
+				// Success
+				alert('Password changed successfully!');
+				setShowPasswordChange(false);
+				setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+				setFieldErrors(prev => ({
+					...prev,
+					newPassword: '',
+					confirmPassword: ''
+				}));
+			} else {
+				// Error
+				alert(data.message || 'Failed to change password');
+			}
 		} catch (error) {
-			console.error('Error changing password:', error)
-			// You can add an error toast here
+			console.error('Error changing password:', error);
+			alert('Network error. Please try again.');
+		} finally {
+			setIsChangingPassword(false);
 		}
 	}
 
@@ -131,46 +545,94 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 					</div>
 					<div className="dash-header-actions">
 						{/* Notification Icon */}
-						<div className="notification-icon" title="Notifications">
-							🔔
-							<span className="notification-badge">3</span>
+						<div className="notification-container" style={{ position: 'relative' }}>
+							<button 
+								className="notification-icon" 
+								title="Notifications"
+								onClick={() => setShowNotificationPopup && setShowNotificationPopup(!showNotificationPopup)}
+								style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}
+							>
+								<span style={{ fontSize: '20px' }}>🔔</span>
+								{notificationCount > 0 && (
+									<span className="notification-badge">
+										{notificationCount > 99 ? '99+' : notificationCount}
+									</span>
+								)}
+							</button>
+							
+							{/* Notification Popup */}
+							{showNotificationPopup && (
+								<div className="notification-popup">
+									<div className="notification-popup-header">
+										<h3>Notifications</h3>
+										<button 
+											onClick={() => setShowNotificationPopup && setShowNotificationPopup(false)}
+											className="close-popup-btn"
+										>
+											×
+										</button>
+									</div>
+									<div className="notification-popup-content">
+										{notifications.length === 0 ? (
+											<div className="no-notifications">
+												<div className="text-gray-400 text-2xl mb-2">🔔</div>
+												<p className="text-gray-500 text-sm">No notifications</p>
+											</div>
+										) : (
+											<div className="notification-list">
+												{notifications.slice(0, 5).map(notification => (
+													<div 
+														key={notification._id || notification.id} 
+														className={`notification-item ${notification.read ? 'read' : 'unread'}`}
+														onClick={() => {
+															setSelectedNotification(notification)
+															if (!notification.read && onNotificationUpdate) {
+																onNotificationUpdate(notification._id || notification.id)
+															}
+														}}
+														style={{ cursor: 'pointer' }}
+													>
+														<div className="notification-item-header">
+															<span className="notification-title">{notification.title}</span>
+															<span className="notification-time">
+																{notification.createdAt ? new Date(notification.createdAt).toLocaleTimeString() : 
+																 notification.timestamp ? notification.timestamp.toLocaleTimeString() : 'N/A'}
+															</span>
+														</div>
+														<p className="notification-message">{notification.message}</p>
+													</div>
+												))}
+												{notifications.length > 5 && (
+													<div className="view-all-notifications">
+														<button 
+															onClick={() => {
+																setShowNotificationPopup && setShowNotificationPopup(false)
+																navigate('/doctor/notifications')
+															}}
+															className="view-all-btn"
+														>
+															View All Notifications ({notifications.length})
+														</button>
+													</div>
+												)}
+											</div>
+										)}
+									</div>
+								</div>
+							)}
 						</div>
 						
-						{/* Profile Dropdown */}
-						<div className="profile-dropdown">
+						{/* Profile Section */}
+						<div className="profile-section">
 							<button 
 								className="profile-trigger"
-								onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+								onClick={() => setShowAccountManagement(true)}
 							>
 								<div className="profile-avatar">
 									{user?.firstName?.charAt(0)?.toUpperCase()}
 								</div>
 								<span className="profile-name">{`${user?.firstName} ${user?.lastName}`}</span>
-								<span className="dropdown-arrow">▼</span>
 							</button>
-							
-							{showProfileDropdown && (
-								<div className="profile-dropdown-menu">
-									<button 
-										className="dropdown-item"
-										onClick={() => {
-											setShowAccountManagement(true)
-											setShowProfileDropdown(false)
-										}}
-									>
-										<span className="dropdown-icon">👤</span>
-										View My Profile
-									</button>
-									{/* Show logout in dropdown on mobile */}
-									<div className="mobile-logout">
-										<div className="dropdown-divider"></div>
-										<button className="dropdown-item logout-item" onClick={handleLogout}>
-											<LogOut size={16} />
-											Logout
-										</button>
-									</div>
-								</div>
-							)}
 						</div>
 					</div>
 				</header>
@@ -209,73 +671,92 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 						{!showPasswordChange ? (
 							<div className="account-form-section">
 								<form onSubmit={handleAccountUpdate}>
-									<div className="profile-info-grid">
-										<div className="form-group">
-											<label>First Name</label>
-                                            <input
-												type="text"
-												value={accountForm.firstName}
-                                                onChange={(e) => setAccountForm({...accountForm, firstName: e.target.value})}
-                                                onKeyDown={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete']
-                                                        if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault()
-                                                    }
-                                                }}
-                                                onPaste={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const pasted = (e.clipboardData || window.clipboardData).getData('text')
-                                                        if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault()
-                                                    }
-                                                }}
-												required
-											/>
+									<div className="profile-layout-grid">
+										{/* Left Side - Profile Section */}
+										<div className="profile-section">
+											<div className="profile-avatar-large">
+												{user?.firstName?.charAt(0)?.toUpperCase()}
+											</div>
+											<div className="profile-name-large">
+												{`${user?.firstName} ${user?.lastName}`}
+											</div>
+											<div className="profile-email">
+												{user?.email}
+											</div>
 										</div>
-										<div className="form-group">
-											<label>Last Name</label>
-                                            <input
-												type="text"
-												value={accountForm.lastName}
-                                                onChange={(e) => setAccountForm({...accountForm, lastName: e.target.value})}
-                                                onKeyDown={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete']
-                                                        if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault()
-                                                    }
-                                                }}
-                                                onPaste={(e) => {
-                                                    if ((e.target.value || '').length === 0) {
-                                                        const pasted = (e.clipboardData || window.clipboardData).getData('text')
-                                                        if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault()
-                                                    }
-                                                }}
-												required
-											/>
-										</div>
-										<div className="form-group">
-											<label>Email</label>
-											<input
-												type="email"
-												value={accountForm.email}
-												onChange={(e) => setAccountForm({...accountForm, email: e.target.value})}
-												required
-											/>
-										</div>
-										<div className="form-group">
-											<label>Phone</label>
-                                            <input
-												type="tel"
-												value={accountForm.phone}
-												onChange={(e) => setAccountForm({...accountForm, phone: e.target.value})}
-											/>
-										</div>
-										<div className="form-group">
-											<label>Address</label>
-											<input
-												type="text"
-												value={accountForm.address}
-												onChange={(e) => setAccountForm({...accountForm, address: e.target.value})}
-											/>
+										
+										{/* Right Side - Form Fields */}
+										<div className="form-section">
+											<div className="form-group">
+												<label>First Name</label>
+												<input
+													type="text"
+													name="firstName"
+													value={accountForm.firstName}
+													onChange={handleAccountFormChange}
+													onKeyDown={preventInvalidNameChar}
+													onPaste={preventInvalidNamePaste}
+													required
+													className={fieldErrors.firstName ? 'error' : ''}
+												/>
+												{fieldErrors.firstName && (
+													<p className="field-error">{fieldErrors.firstName}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Last Name</label>
+												<input
+													type="text"
+													name="lastName"
+													value={accountForm.lastName}
+													onChange={handleAccountFormChange}
+													onKeyDown={preventInvalidNameChar}
+													onPaste={preventInvalidNamePaste}
+													required
+													className={fieldErrors.lastName ? 'error' : ''}
+												/>
+												{fieldErrors.lastName && (
+													<p className="field-error">{fieldErrors.lastName}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Email</label>
+												<input
+													type="email"
+													name="email"
+													value={accountForm.email}
+													onChange={handleAccountFormChange}
+													required
+													className={fieldErrors.email ? 'error' : ''}
+												/>
+												{fieldErrors.email && (
+													<p className="field-error">{fieldErrors.email}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Phone</label>
+												<input
+													type="tel"
+													name="phone"
+													value={accountForm.phone}
+													onChange={handleAccountFormChange}
+													onKeyDown={handlePhoneKeyDown}
+													onPaste={handlePhonePaste}
+													className={fieldErrors.phone ? 'error' : ''}
+													placeholder="07XXXXXXXX"
+												/>
+												{fieldErrors.phone && (
+													<p className="field-error">{fieldErrors.phone}</p>
+												)}
+											</div>
+											<div className="form-group">
+												<label>Address</label>
+												<input
+													type="text"
+													value={accountForm.address}
+													onChange={(e) => setAccountForm({...accountForm, address: e.target.value})}
+												/>
+											</div>
 										</div>
 									</div>
 									<div className="modal-actions">
@@ -304,26 +785,36 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 										<label>New Password</label>
 										<input
 											type="password"
+											name="newPassword"
 											value={passwordForm.newPassword}
-											onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+											onChange={handlePasswordFormChange}
 											required
+											className={fieldErrors.newPassword ? 'error' : ''}
 										/>
+										{fieldErrors.newPassword && (
+											<p className="field-error">{fieldErrors.newPassword}</p>
+										)}
 									</div>
 									<div className="form-group">
 										<label>Confirm New Password</label>
 										<input
 											type="password"
+											name="confirmPassword"
 											value={passwordForm.confirmPassword}
-											onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+											onChange={handlePasswordFormChange}
 											required
+											className={fieldErrors.confirmPassword ? 'error' : ''}
 										/>
+										{fieldErrors.confirmPassword && (
+											<p className="field-error">{fieldErrors.confirmPassword}</p>
+										)}
 									</div>
 									<div className="modal-actions">
-										<button type="button" className="cancel-btn" onClick={() => setShowPasswordChange(false)}>
+										<button type="button" className="cancel-btn" onClick={() => setShowPasswordChange(false)} disabled={isChangingPassword}>
 											Cancel
 										</button>
-										<button type="submit" className="submit-btn">
-											Change Password
+										<button type="submit" className="submit-btn" disabled={isChangingPassword}>
+											{isChangingPassword ? 'Changing...' : 'Change Password'}
 										</button>
 									</div>
 								</form>
@@ -332,6 +823,88 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 					</div>
 				</div>
 			)}
+
+			{/* Notification Details Modal */}
+			{selectedNotification && (
+				<div className="modal-overlay" onClick={() => setSelectedNotification(null)}>
+					<div className="modal notification-details-modal" onClick={e => e.stopPropagation()}>
+						<div className="modal-header">
+							<h2>Notification Details</h2>
+							<button 
+								className="close-btn" 
+								onClick={() => setSelectedNotification(null)}
+							>
+								×
+							</button>
+						</div>
+						<div className="notification-details-content">
+							{selectedNotification.type === 'booking' && selectedNotification.data && (
+								<div>
+									<p className="notification-main-message"><strong>You have a new appointment booking.</strong></p>
+									<div className="appointment-details-modal">
+										<p>📅 <strong>Date:</strong> {selectedNotification.data.date ? new Date(selectedNotification.data.date).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>Time:</strong> {selectedNotification.data.startTime || 'N/A'}</p>
+										<p>👤 <strong>Patient:</strong> {selectedNotification.data.patientName || 'N/A'}</p>
+										<p>🏥 <strong>Location:</strong> {selectedNotification.data.location || 'MediCare Clinic'}</p>
+										{selectedNotification.data.notes && (
+											<p>📝 <strong>Notes:</strong> {selectedNotification.data.notes}</p>
+										)}
+									</div>
+								</div>
+							)}
+							{selectedNotification.type === 'reschedule' && selectedNotification.data && (
+								<div>
+									<p className="notification-main-message"><strong>An appointment has been rescheduled.</strong></p>
+									<div className="appointment-details-modal">
+										<p>👤 <strong>Patient:</strong> {selectedNotification.data.patientName || 'N/A'}</p>
+										<p>📅 <strong>New Date:</strong> {selectedNotification.data.newDate ? new Date(selectedNotification.data.newDate).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>New Time:</strong> {selectedNotification.data.newTime || 'N/A'}</p>
+										<p>📅 <strong>Previous Date:</strong> {selectedNotification.data.oldDate ? new Date(selectedNotification.data.oldDate).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>Previous Time:</strong> {selectedNotification.data.oldTime || 'N/A'}</p>
+										{selectedNotification.data.reason && (
+											<p>📝 <strong>Reason:</strong> {selectedNotification.data.reason}</p>
+										)}
+									</div>
+								</div>
+							)}
+							{selectedNotification.type === 'slot_creation' && selectedNotification.data && (
+								<div>
+									<p className="notification-main-message"><strong>Admin has created new appointment slots for you.</strong></p>
+									<div className="appointment-details-modal">
+										<p>📅 <strong>Date:</strong> {selectedNotification.data.date ? new Date(selectedNotification.data.date).toLocaleDateString() : 'N/A'}</p>
+										<p>⏰ <strong>Start Time:</strong> {selectedNotification.data.startTime || 'N/A'}</p>
+										<p>⏰ <strong>End Time:</strong> {selectedNotification.data.endTime || 'N/A'}</p>
+										<p>🔢 <strong>Slot Count:</strong> {selectedNotification.data.slotCount || 'N/A'}</p>
+										<p>🏥 <strong>Location:</strong> {selectedNotification.data.location || 'MediCare Clinic'}</p>
+										<p>🩺 <strong>Specialization:</strong> {selectedNotification.data.specialization || 'N/A'}</p>
+										{selectedNotification.data.title && (
+											<p>📋 <strong>Title:</strong> {selectedNotification.data.title}</p>
+										)}
+									</div>
+								</div>
+							)}
+							{(!selectedNotification.data || !['booking', 'reschedule', 'slot_creation'].includes(selectedNotification.type)) && (
+								<div>
+									<p className="notification-main-message"><strong>{selectedNotification.title || 'Notification'}</strong></p>
+									<div className="appointment-details-modal">
+										<p>📝 <strong>Message:</strong> {selectedNotification.message || 'No additional details available'}</p>
+										<p>🕒 <strong>Time:</strong> {selectedNotification.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : 'N/A'}</p>
+										{selectedNotification.data && (
+											<div>
+												<p><strong>Additional Data:</strong></p>
+												<pre style={{fontSize: '12px', background: '#f5f5f5', padding: '8px', borderRadius: '4px', overflow: 'auto'}}>
+													{JSON.stringify(selectedNotification.data, null, 2)}
+												</pre>
+											</div>
+										)}
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
+
 		</div>
 	)
 }

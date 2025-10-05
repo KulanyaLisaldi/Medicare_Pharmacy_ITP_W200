@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import './AdminDashboard.css';
 import DashboardLayout from '../../layouts/DashboardLayout';
+import { BarChart3, Users, Package, ShoppingCart, Calendar, Truck, FileText, Bell } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -76,20 +77,29 @@ const AdminDashboard = () => {
         experience: '',
         vehicleNumber: ''
     });
+    const [createFormErrors, setCreateFormErrors] = useState({
+        firstName: '',
+        lastName: '',
+        phone: '',
+        password: '',
+        email: '',
+        experienceYears: '',
+        experience: ''
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [activeSection, setActiveSection] = useState('overview');
     const [recentUsers, setRecentUsers] = useState([]);
     const [productsCount, setProductsCount] = useState(0);
 
     const sidebarItems = [
-        { id: 'overview', label: 'Overview', icon: '📊' },
-        { id: 'users', label: 'Users', icon: '👥' },
-        { id: 'inventory', label: 'Inventory', icon: '📦' },
-        { id: 'orders', label: 'Orders', icon: '🛒' },
-        { id: 'appointments', label: 'Appointments', icon: '📅' },
-        { id: 'delivery', label: 'Delivery', icon: '🚚' },
-        { id: 'sales', label: 'Sales', icon: '💰' },
-        { id: 'messages', label: 'Messages', icon: '💬' },
+        { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
+        { id: 'users', label: 'Users', icon: <Users size={18} /> },
+        { id: 'inventory', label: 'Inventory', icon: <Package size={18} /> },
+        { id: 'orders', label: 'Orders', icon: <ShoppingCart size={18} /> },
+        { id: 'appointments', label: 'Appointments', icon: <Calendar size={18} /> },
+        { id: 'delivery', label: 'Delivery', icon: <Truck size={18} /> },
+        { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
+        { id: 'messages', label: 'Notifications', icon: <Bell size={18} /> },
     ];
 
     useEffect(() => {
@@ -142,6 +152,60 @@ const AdminDashboard = () => {
 
     const handleCreateStaff = async (e) => {
         e.preventDefault();
+        
+        // Validate email before submission
+        if (!createForm.email.trim()) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                email: 'Email is required'
+            }));
+            toast.error('Please enter an email address');
+            return;
+        } else if (!createForm.email.includes('@')) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                email: 'Email must contain @ symbol'
+            }));
+            toast.error('Please enter a valid email address');
+            return;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createForm.email)) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                email: 'Please enter a valid email address'
+            }));
+            toast.error('Please enter a valid email address');
+            return;
+        }
+        
+        // Validate password before submission
+        const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+        if (!pwRegex.test(createForm.password)) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                password: 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)'
+            }));
+            toast.error('Please fix the password requirements');
+            return;
+        }
+        
+        // Validate experience fields for negative values
+        if (createForm.experienceYears && parseFloat(createForm.experienceYears) < 0) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                experienceYears: 'Cannot enter negative values'
+            }));
+            toast.error('Experience years cannot be negative');
+            return;
+        }
+        
+        if (createForm.experience && parseFloat(createForm.experience) < 0) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                experience: 'Cannot enter negative values'
+            }));
+            toast.error('Experience cannot be negative');
+            return;
+        }
         
         try {
             const formData = {
@@ -227,6 +291,297 @@ const AdminDashboard = () => {
             } catch (error) {
                 console.error('Error deleting user:', error);
                 toast.error('Failed to delete user');
+            }
+        }
+    };
+
+    // Validation functions for create form
+    const preventInvalidNameChar = (e, formType = 'create') => {
+        const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+        if (!isNameField) return;
+        const key = e.key || '';
+        if (e.type === 'keydown') {
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            // Block any non-letter characters (including numbers, symbols, etc.)
+            if (!/^[A-Za-z ]$/.test(key)) {
+                e.preventDefault();
+                if (/^[0-9]$/.test(key)) {
+                    const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                    errorSetter(prev => ({
+                        ...prev,
+                        [e.target.name]: 'Numbers are not allowed in name fields'
+                    }));
+                } else {
+                    const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                    errorSetter(prev => ({
+                        ...prev,
+                        [e.target.name]: 'Only letters and spaces are allowed'
+                    }));
+                }
+            }
+        }
+    };
+
+    const preventInvalidNamePaste = (e, formType = 'create') => {
+        const isNameField = e.target.name === 'firstName' || e.target.name === 'lastName';
+        if (!isNameField) return;
+        const pasted = (e.clipboardData || window.clipboardData).getData('text');
+        if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+            e.preventDefault();
+            if (/[0-9]/.test(pasted)) {
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                errorSetter(prev => ({
+                    ...prev,
+                    [e.target.name]: 'Numbers are not allowed in name fields'
+                }));
+            } else {
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                errorSetter(prev => ({
+                    ...prev,
+                    [e.target.name]: 'Only letters and spaces are allowed'
+                }));
+            }
+        }
+    };
+
+    const handlePhoneKeyDown = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'phone') {
+            const current = e.target.value || '';
+            const key = e.key || '';
+            
+            // Allow control keys
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            
+            // Block any non-digit characters (letters, symbols, etc.)
+            if (!/^[0-9]$/.test(key)) {
+                e.preventDefault();
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                if (/^[A-Za-z]$/.test(key)) {
+                    errorSetter(prev => ({
+                        ...prev,
+                        [name]: 'Letters are not allowed in phone number'
+                    }));
+                } else if (key === '-') {
+                    errorSetter(prev => ({
+                        ...prev,
+                        [name]: 'Minus (-) values are not allowed'
+                    }));
+                } else {
+                    errorSetter(prev => ({
+                        ...prev,
+                        [name]: 'Only numbers are allowed in phone number'
+                    }));
+                }
+                return;
+            }
+            
+            // Check length limit - exactly 10 digits
+            if (/^[0-9]$/.test(key) && current.length >= 10) {
+                e.preventDefault();
+                const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Phone number must be exactly 10 digits'
+                }));
+            }
+        }
+    };
+
+    const handlePhonePaste = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'phone') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const digitsOnly = pastedText.replace(/\D/g, '');
+            const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+            
+            // Block if contains letters
+            if (/[A-Za-z]/.test(pastedText)) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Letters are not allowed in phone number'
+                }));
+            } else if (pastedText.includes('-')) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Minus (-) values are not allowed'
+                }));
+            } else if (digitsOnly.length > 10) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Phone number must be exactly 10 digits'
+                }));
+            } else if (!/^[0-9]+$/.test(pastedText)) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Only numbers are allowed in phone number'
+                }));
+            }
+        }
+    };
+
+    const handleExperienceKeyDown = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'experienceYears' || name === 'experience') {
+            const key = e.key || '';
+            const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+            
+            // Allow control keys
+            const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+            if (controlKeys.includes(key)) return;
+            
+            // Block minus (-) character
+            if (key === '-') {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            }
+        }
+    };
+
+    const handleExperiencePaste = (e, formType = 'create') => {
+        const { name } = e.target;
+        if (name === 'experienceYears' || name === 'experience') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const errorSetter = formType === 'create' ? setCreateFormErrors : setEditFormErrors;
+            
+            // Block if contains minus
+            if (pastedText.includes('-')) {
+                e.preventDefault();
+                errorSetter(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            }
+        }
+    };
+
+    const handleCreateFormChange = (e) => {
+        const { name, value } = e.target;
+        
+        setCreateForm(prev => ({ ...prev, [name]: value }));
+        
+        // Clear field-specific error when user types
+        if (createFormErrors[name]) {
+            setCreateFormErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Real-time validation for name fields
+        if (name === 'firstName' || name === 'lastName') {
+            if (/[0-9]/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Numbers are not allowed in name fields'
+                }));
+            } else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Only letters and spaces are allowed'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for phone field
+        if (name === 'phone') {
+            // Remove all non-digit characters and limit to 10 digits
+            const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+            
+            // Update the form with cleaned value
+            setCreateForm(prev => ({ ...prev, [name]: digitsOnly }));
+            
+            // Check for letters in original input
+            if (/[A-Za-z]/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Letters are not allowed in phone number'
+                }));
+            } else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+            return; // Exit early to prevent double setting
+        }
+        
+        // Real-time validation for email field
+        if (name === 'email') {
+            if (value.trim() && !value.includes('@')) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Email must contain @ symbol'
+                }));
+            } else if (value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Please enter a valid email address'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for password field
+        if (name === 'password') {
+            // Password complexity validation
+            const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
+            
+            if (value.trim() && !pwRegex.test(value)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Password must be 8+ chars with uppercase, lowercase, number and special (@,#,$,%,!)'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
+        // Real-time validation for experience fields
+        if (name === 'experienceYears' || name === 'experience') {
+            const numericValue = parseFloat(value);
+            
+            if (value.trim() && (isNaN(numericValue) || numericValue < 0)) {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            } else if (value.trim() && numericValue === 0 && value !== '0') {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: 'Experience must be a valid number'
+                }));
+            } else {
+                setCreateFormErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
             }
         }
     };
@@ -813,11 +1168,11 @@ const AdminDashboard = () => {
                     </div>
                 );
 
-            case 'sales':
+            case 'reports':
                 return (
-                    <div className="sales-section">
-                        <h2>Sales Analytics</h2>
-                        <p>Sales analytics features coming soon...</p>
+                    <div className="reports-section">
+                        <h2>Reports & Analytics</h2>
+                        <p>Generate comprehensive reports and analytics...</p>
                     </div>
                 );
 
@@ -882,43 +1237,33 @@ const AdminDashboard = () => {
                                         <label>First Name</label>
                                         <input
                                             type="text"
+                                            name="firstName"
                                             value={createForm.firstName}
-                                            onChange={(e) => setCreateForm({...createForm, firstName: e.target.value})}
-                                            onKeyDown={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
-                                                    if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault();
-                                                }
-                                            }}
-                                            onPaste={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
-                                                    if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault();
-                                                }
-                                            }}
+                                            onChange={handleCreateFormChange}
+                                            onKeyDown={(e) => preventInvalidNameChar(e, 'create')}
+                                            onPaste={(e) => preventInvalidNamePaste(e, 'create')}
                                             required
+                                            className={createFormErrors.firstName ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.firstName && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.firstName}</p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Last Name</label>
                                         <input
                                             type="text"
+                                            name="lastName"
                                             value={createForm.lastName}
-                                            onChange={(e) => setCreateForm({...createForm, lastName: e.target.value})}
-                                            onKeyDown={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
-                                                    if (!controlKeys.includes(e.key) && !/^[A-Za-z]$/.test(e.key)) e.preventDefault();
-                                                }
-                                            }}
-                                            onPaste={(e) => {
-                                                if ((e.target.value || '').length === 0) {
-                                                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
-                                                    if (pasted && !/^[A-Za-z]/.test(pasted.trimStart())) e.preventDefault();
-                                                }
-                                            }}
+                                            onChange={handleCreateFormChange}
+                                            onKeyDown={(e) => preventInvalidNameChar(e, 'create')}
+                                            onPaste={(e) => preventInvalidNamePaste(e, 'create')}
                                             required
+                                            className={createFormErrors.lastName ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.lastName && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.lastName}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -927,19 +1272,29 @@ const AdminDashboard = () => {
                                         <label>Email</label>
                                         <input
                                             type="email"
+                                            name="email"
                                             value={createForm.email}
-                                            onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                                            onChange={handleCreateFormChange}
                                             required
+                                            className={createFormErrors.email ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.email && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.email}</p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Password</label>
                                         <input
                                             type="password"
+                                            name="password"
                                             value={createForm.password}
-                                            onChange={(e) => setCreateForm({...createForm, password: e.target.value})}
+                                            onChange={handleCreateFormChange}
                                             required
+                                            className={createFormErrors.password ? 'border-red-500 bg-red-50' : ''}
                                         />
+                                        {createFormErrors.password && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.password}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -948,10 +1303,18 @@ const AdminDashboard = () => {
                                         <label>Phone</label>
                                         <input
                                             type="tel"
+                                            name="phone"
                                             value={createForm.phone}
-                                            onChange={(e) => setCreateForm({...createForm, phone: e.target.value})}
+                                            onChange={handleCreateFormChange}
+                                            onKeyDown={(e) => handlePhoneKeyDown(e, 'create')}
+                                            onPaste={(e) => handlePhonePaste(e, 'create')}
                                             required
+                                            className={createFormErrors.phone ? 'border-red-500 bg-red-50' : ''}
+                                            placeholder="07XXXXXXXX"
                                         />
+                                        {createFormErrors.phone && (
+                                            <p className="text-xs text-red-600 mt-1">{createFormErrors.phone}</p>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Registration Number</label>
@@ -1002,10 +1365,17 @@ const AdminDashboard = () => {
                                                 <label>Experience (Years)</label>
                                                 <input
                                                     type="number"
+                                                    name="experienceYears"
                                                     value={createForm.experienceYears}
-                                                    onChange={(e) => setCreateForm({...createForm, experienceYears: e.target.value})}
+                                                    onChange={handleCreateFormChange}
+                                                    onKeyDown={(e) => handleExperienceKeyDown(e, 'create')}
+                                                    onPaste={(e) => handleExperiencePaste(e, 'create')}
                                                     required
+                                                    className={createFormErrors.experienceYears ? 'border-red-500 bg-red-50' : ''}
                                                 />
+                                                {createFormErrors.experienceYears && (
+                                                    <p className="text-xs text-red-600 mt-1">{createFormErrors.experienceYears}</p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1076,10 +1446,17 @@ const AdminDashboard = () => {
                                                 <label>Experience (years)</label>
                                                 <input
                                                     type="number"
+                                                    name="experience"
                                                     value={createForm.experience}
-                                                    onChange={(e) => setCreateForm({...createForm, experience: e.target.value})}
+                                                    onChange={handleCreateFormChange}
+                                                    onKeyDown={(e) => handleExperienceKeyDown(e, 'create')}
+                                                    onPaste={(e) => handleExperiencePaste(e, 'create')}
                                                     required
+                                                    className={createFormErrors.experience ? 'border-red-500 bg-red-50' : ''}
                                                 />
+                                                {createFormErrors.experience && (
+                                                    <p className="text-xs text-red-600 mt-1">{createFormErrors.experience}</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1407,6 +1784,11 @@ function ChannelCreator() {
     });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({
+        capacity: '',
+        price: '',
+        slotDuration: ''
+    });
 
     useEffect(() => {
         const loadDoctors = async () => {
@@ -1424,8 +1806,81 @@ function ChannelCreator() {
         loadDoctors();
     }, [token]);
 
+    const handleKeyDown = (e) => {
+        const { name } = e.target;
+        
+        // Prevent minus (-) character in numeric fields
+        if ((name === 'capacity' || name === 'price' || name === 'slotDuration') && e.key === '-') {
+            e.preventDefault();
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: 'Minus (-) values are not allowed'
+            }));
+        }
+    };
+
+    const handlePaste = (e) => {
+        const { name } = e.target;
+        
+        // Prevent pasting content with minus (-) in numeric fields
+        if (name === 'capacity' || name === 'price' || name === 'slotDuration') {
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            if (pastedText.includes('-')) {
+                e.preventDefault();
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Minus (-) values are not allowed'
+                }));
+            }
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
+        
+        // Auto-populate specialization when doctor is selected
+        if (name === 'doctorId' && value) {
+            const selectedDoctor = doctors.find(d => d._id === value);
+            if (selectedDoctor && selectedDoctor.specialization) {
+                setForm(prev => ({ 
+                    ...prev, 
+                    [name]: value, 
+                    specialization: selectedDoctor.specialization 
+                }));
+                return;
+            }
+        }
+        
+        // Clear field-specific error when user types
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+        
+        // Real-time validation for numeric fields
+        if (name === 'capacity' || name === 'price' || name === 'slotDuration') {
+            const numericValue = parseFloat(value);
+            
+            if (value.trim() && (isNaN(numericValue) || numericValue < 0)) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Cannot enter negative values'
+                }));
+            } else if (value.trim() && numericValue === 0 && (name === 'capacity' || name === 'slotDuration')) {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: 'Value must be greater than 0'
+                }));
+            } else {
+                setFieldErrors(prev => ({
+                    ...prev,
+                    [name]: ''
+                }));
+            }
+        }
+        
         setForm(prev => ({ ...prev, [name]: value }));
     };
 
@@ -1457,16 +1912,63 @@ function ChannelCreator() {
             if (!res.ok) throw new Error(data.message || 'Failed to create channel');
             setMessage('Channel created');
             setForm({ doctorId: '', title: 'Consultation', specialization: '', location: '', date: '', startTime: '', endTime: '', capacity: 10, price: 0, paymentType: 'online', mode: 'physical', notes: '', slotDuration: 10 });
+            // Auto-refresh page after successful appointment creation
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } catch (e) {
             setError(e.message);
         }
     };
 
     const validate = () => {
+        let hasErrors = false;
+        const newFieldErrors = { ...fieldErrors };
+        
         if (!form.doctorId) { setError('Please select a doctor'); return false; }
         if (!form.date || !form.startTime || !form.endTime) { setError('Please provide date and time'); return false; }
         if (form.startTime >= form.endTime) { setError('End time must be after start time'); return false; }
-        if (Number(form.capacity) < 1) { setError('Capacity must be at least 1'); return false; }
+        
+        // Validate capacity
+        const capacity = Number(form.capacity);
+        if (isNaN(capacity) || capacity < 0) {
+            newFieldErrors.capacity = 'Cannot enter negative values';
+            hasErrors = true;
+        } else if (capacity < 1) {
+            newFieldErrors.capacity = 'Capacity must be at least 1';
+            hasErrors = true;
+        } else {
+            newFieldErrors.capacity = '';
+        }
+        
+        // Validate price
+        const price = Number(form.price);
+        if (isNaN(price) || price < 0) {
+            newFieldErrors.price = 'Cannot enter negative values';
+            hasErrors = true;
+        } else {
+            newFieldErrors.price = '';
+        }
+        
+        // Validate slot duration
+        const slotDuration = Number(form.slotDuration);
+        if (isNaN(slotDuration) || slotDuration < 0) {
+            newFieldErrors.slotDuration = 'Cannot enter negative values';
+            hasErrors = true;
+        } else if (slotDuration < 1) {
+            newFieldErrors.slotDuration = 'Slot duration must be at least 1 minute';
+            hasErrors = true;
+        } else {
+            newFieldErrors.slotDuration = '';
+        }
+        
+        setFieldErrors(newFieldErrors);
+        
+        if (hasErrors) {
+            setError('Please fix the errors in the form');
+            return false;
+        }
+        
         return true;
     };
 
@@ -1503,7 +2005,17 @@ function ChannelCreator() {
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Specialization</label>
-                                <input name="specialization" value={form.specialization} onChange={handleChange} placeholder="Defaults to doctor's" className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    name="specialization" 
+                                    value={form.specialization} 
+                                    onChange={handleChange} 
+                                    placeholder="Auto-filled from selected doctor" 
+                                    className="mt-1 w-full border rounded-lg px-3 py-2 bg-gray-50" 
+                                    readOnly={form.doctorId ? true : false}
+                                />
+                                {form.doctorId && (
+                                    <p className="text-xs text-gray-500 mt-1">✓ Auto-filled from doctor's specialization</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1521,7 +2033,7 @@ function ChannelCreator() {
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Date</label>
-                                <input type="date" name="date" value={form.date} onChange={handleChange} required className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input type="date" name="date" value={form.date} onChange={handleChange} required min={new Date().toISOString().split('T')[0]} className="mt-1 w-full border rounded-lg px-3 py-2" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1541,17 +2053,55 @@ function ChannelCreator() {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label className="block text-sm text-gray-600">Max Patients</label>
-                                <input type="number" min="1" name="capacity" value={form.capacity} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    name="capacity" 
+                                    value={form.capacity} 
+                                    onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.capacity ? 'border-red-500 bg-red-50' : ''}`} 
+                                />
+                                {fieldErrors.capacity && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.capacity}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-1">Total slots available</p>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Slot Duration (min)</label>
-                                <input type="number" min="5" max="60" name="slotDuration" value={form.slotDuration} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    type="number" 
+                                    min="5" 
+                                    max="60" 
+                                    name="slotDuration" 
+                                    value={form.slotDuration} 
+                                    onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.slotDuration ? 'border-red-500 bg-red-50' : ''}`} 
+                                />
+                                {fieldErrors.slotDuration && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.slotDuration}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-1">Time per appointment</p>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-600">Consultation Fee</label>
-                                <input type="number" min="0" step="0.01" name="price" value={form.price} onChange={handleChange} className="mt-1 w-full border rounded-lg px-3 py-2" />
+                                <input 
+                                    type="number" 
+                                    min="0" 
+                                    step="0.01" 
+                                    name="price" 
+                                    value={form.price} 
+                                    onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    className={`mt-1 w-full border rounded-lg px-3 py-2 ${fieldErrors.price ? 'border-red-500 bg-red-50' : ''}`} 
+                                />
+                                {fieldErrors.price && (
+                                    <p className="text-xs text-red-600 mt-1">{fieldErrors.price}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-1">LKR per appointment</p>
                             </div>
                             <div>
@@ -1650,10 +2200,8 @@ function AdminAppointments() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showReschedule, setShowReschedule] = useState(false);
-    const [showCancelModal, setShowCancelModal] = useState(false);
     const [selected, setSelected] = useState(null);
-    const [filters, setFilters] = useState({ status: '', from: '', to: '' });
-    const [resForm, setResForm] = useState({ doctorId: '', date: '', startTime: '', endTime: '', status: '' });
+    const [resForm, setResForm] = useState({ date: '', startTime: '', endTime: '', reason: '' });
 
     useEffect(() => {
         const load = async () => {
@@ -1688,72 +2236,115 @@ function AdminAppointments() {
     }, [token]);
 
     const deleteChannel = async (id) => {
-        const res = await fetch(`http://localhost:5001/api/appointments/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) setChannels(prev => prev.filter(c => c._id !== id));
-    };
-
-    const applyFilters = async () => {
-        const params = new URLSearchParams();
-        if (filters.status) params.append('status', filters.status);
-        if (filters.from) params.append('from', filters.from);
-        if (filters.to) params.append('to', filters.to);
-        const res = await fetch(`http://localhost:5001/api/bookings?${params.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        const data = await res.json();
-        if (res.ok) setBookings(data);
-    };
-
-    const openReschedule = (b) => { setSelected(b); setResForm({ doctorId: b.doctorId || '', date: b.date?.slice(0,10) || '', startTime: b.startTime || '', endTime: b.endTime || '', status: b.status }); setShowReschedule(true); };
-
-    const submitReschedule = async (e) => {
-        e.preventDefault();
-        const res = await fetch(`http://localhost:5001/api/bookings/${selected._id}`, {
-            method: 'PATCH', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(resForm)
-        });
-        const data = await res.json();
-        if (res.ok) {
-            setBookings(prev => prev.map(x => x._id === selected._id ? data.booking : x));
-            setShowReschedule(false);
-        }
-    };
-
-    const openCancelModal = (booking) => {
-        setSelected(booking);
-        setShowCancelModal(true);
-    };
-
-    const cancelAppointment = async () => {
+        // Find the channel to get its details
+        const channel = channels.find(c => c._id === id);
+        if (!channel) return;
+        
+        // Show confirmation dialog
+        const confirmed = window.confirm(
+            `Are you sure you want to delete this channel?\n\n` +
+            `Channel: ${channel.title || 'Consultation'}\n` +
+            `Date: ${new Date(channel.date).toLocaleDateString()}\n` +
+            `Time: ${channel.startTime} - ${channel.endTime}\n\n` +
+            `This will also delete ALL appointments under this channel!\n` +
+            `This action cannot be undone.`
+        );
+        
+        if (!confirmed) return;
+        
         try {
-            const res = await fetch(`http://localhost:5001/api/bookings/${selected._id}`, {
-                method: 'PATCH',
-                headers: { 
-                    'Authorization': `Bearer ${token}`, 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({ status: 'cancelled' })
+            const res = await fetch(`http://localhost:5001/api/appointments/${id}`, { 
+                method: 'DELETE', 
+                headers: { 'Authorization': `Bearer ${token}` } 
             });
             
             if (res.ok) {
-                setBookings(prev => prev.map(x => 
-                    x._id === selected._id ? { ...x, status: 'cancelled' } : x
-                ));
-                setShowCancelModal(false);
-                setSelected(null);
-                // Refresh stats
-                const statsRes = await fetch('http://localhost:5001/api/bookings/stats', { 
-                    headers: { 'Authorization': `Bearer ${token}` } 
-                });
-                if (statsRes.ok) {
-                    const statsData = await statsRes.json();
-                    setStats(statsData);
-                }
+                const data = await res.json();
+                alert(`Channel deleted successfully!\n\nDeleted ${data.deletedBookingsCount || 0} associated appointments.`);
+                setChannels(prev => prev.filter(c => c._id !== id));
             } else {
                 const errorData = await res.json();
-                console.error('Error cancelling appointment:', errorData.message);
+                alert(`Error: ${errorData.message || 'Failed to delete channel'}`);
             }
         } catch (error) {
-            console.error('Error cancelling appointment:', error);
+            alert(`Error: ${error.message}`);
         }
     };
+
+    const cancelChannel = async (id) => {
+        // Find the channel to get its details
+        const channel = channels.find(c => c._id === id);
+        if (!channel) return;
+        
+        // Show confirmation dialog
+        const confirmed = window.confirm(
+            `Are you sure you want to cancel this channel?\n\n` +
+            `Channel: ${channel.title || 'Consultation'}\n` +
+            `Date: ${new Date(channel.date).toLocaleDateString()}\n` +
+            `Time: ${channel.startTime} - ${channel.endTime}\n\n` +
+            `This will make the channel inactive and prevent new bookings.\n` +
+            `Existing bookings will remain but patients should be notified.`
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch(`http://localhost:5001/api/appointments/${id}/cancel`, { 
+                method: 'PATCH', 
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } 
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Channel canceled successfully!\n\n${data.affectedBookings || 0} existing bookings are affected.\nPatients should be notified about the cancellation.`);
+                setChannels(prev => prev.map(c => c._id === id ? { ...c, isActive: false, status: 'cancelled' } : c));
+            } else {
+                const errorData = await res.json();
+                alert(`Error: ${errorData.message || 'Failed to cancel channel'}`);
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    };
+
+
+
+    const openReschedule = (b) => { setSelected(b); setResForm({ date: b.date?.slice(0,10) || '', startTime: b.startTime || '', endTime: b.endTime || '', reason: '' }); setShowReschedule(true); };
+
+    const submitReschedule = async (e) => {
+        e.preventDefault();
+        
+        // Validate required fields
+        if (!resForm.reason.trim()) {
+            alert('Please provide a reschedule reason');
+            return;
+        }
+        
+        try {
+            const res = await fetch(`http://localhost:5001/api/appointments/${selected._id}`, {
+                method: 'PATCH', 
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({
+                    date: resForm.date,
+                    startTime: resForm.startTime,
+                    endTime: resForm.endTime,
+                    rescheduleReason: resForm.reason // Backend expects 'rescheduleReason' field
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setShowReschedule(false);
+                // Auto-refresh page after successful reschedule to show updated date/time
+                window.location.reload();
+            } else {
+                alert(`Error: ${data.message || 'Failed to reschedule appointment'}`);
+            }
+        } catch (error) {
+            console.error('Reschedule error:', error);
+            alert('Network error occurred. Please try again.');
+        }
+    };
+
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div className="text-red-600">{error}</div>;
@@ -1775,43 +2366,11 @@ function AdminAppointments() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                {['pending','confirmed','completed','cancelled','no_show'].map(k => (
-                    <div key={k} className="bg-white rounded-xl shadow p-4">
-                        <div className="text-gray-500 text-sm capitalize">{k.replace('_',' ')}</div>
-                        <div className="text-xl font-semibold">{stats.statusCounts?.[k] || 0}</div>
-                    </div>
-                ))}
-            </div>
 
-            <div className="bg-white rounded-xl shadow p-4 mb-8">
-                <div className="text-gray-800 font-semibold mb-3">Upcoming Appointments</div>
-                <div className="space-y-2">
-                    {stats.upcoming?.length ? stats.upcoming.map(u => (
-                        <div key={u._id} className="flex items-center justify-between text-sm">
-                            <div>{new Date(u.date).toLocaleDateString()} • {u.startTime}-{u.endTime}</div>
-                            <div className="text-gray-600">{u.patientName || '-'} with Dr. {u.doctorName || ''}</div>
-                        </div>
-                    )) : <div className="text-gray-500 text-sm">No upcoming bookings</div>}
-                </div>
-            </div>
 
             <div className="bg-white rounded-xl shadow p-4">
-                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-3">
+                <div className="mb-3">
                     <div className="font-semibold text-gray-800">Appointments</div>
-                    <div className="flex flex-wrap gap-2">
-                        <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}>
-                            <option value="">All Statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Canceled</option>
-                            <option value="no_show">No-Show</option>
-                        </select>
-                        <input type="date" value={filters.from} onChange={e => setFilters({ ...filters, from: e.target.value })} />
-                        <input type="date" value={filters.to} onChange={e => setFilters({ ...filters, to: e.target.value })} />
-                        <button onClick={applyFilters} className="btn-primary">Apply</button>
-                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1822,10 +2381,8 @@ function AdminAppointments() {
                                 <th className="p-2">Patient</th>
                                 <th className="p-2">Doctor</th>
                                 <th className="p-2">Date & Time</th>
-                                <th className="p-2">Status</th>
                                 <th className="p-2">Payment</th>
                                 <th className="p-2">Channel</th>
-                                <th className="p-2">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1840,30 +2397,9 @@ function AdminAppointments() {
                                         <div className="text-gray-800">Dr. {b.doctorName}</div>
                                         <div className="text-gray-500 text-xs">{b.specialization}</div>
                                     </td>
-                                    <td className="p-2 text-gray-700">{new Date(b.date).toLocaleDateString()} • {b.startTime}-{b.endTime}</td>
-                                    <td className="p-2"><span className="px-2 py-1 rounded bg-gray-100 capitalize">{b.status.replace('_',' ')}</span></td>
+                                    <td className="p-2 text-gray-700">{new Date(b.date).toLocaleDateString()} • {b.startTime}</td>
                                     <td className="p-2 capitalize">{b.paymentStatus}</td>
                                     <td className="p-2 capitalize">{b.channel}</td>
-                                    <td className="p-2">
-                                        <div className="flex gap-2">
-                                            <button 
-                                                className="btn-outline text-xs px-3 py-1" 
-                                                onClick={() => openReschedule(b)}
-                                                title="Reschedule Appointment"
-                                            >
-                                                Reschedule
-                                            </button>
-                                            {b.status !== 'cancelled' && b.status !== 'completed' && (
-                                                <button 
-                                                    className="bg-red-100 text-red-700 border border-red-200 text-xs px-3 py-1 rounded hover:bg-red-200 transition-colors" 
-                                                    onClick={() => openCancelModal(b)}
-                                                    title="Cancel Appointment"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -1940,11 +2476,25 @@ function AdminAppointments() {
                                     <td className="p-2">
                                         <div className="flex gap-1">
                                             <button 
+                                                className="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700" 
+                                                onClick={() => openReschedule(c)}
+                                                title="Reschedule Channel"
+                                            >
+                                                📅 Reschedule
+                                            </button>
+                                            <button 
                                                 className="btn-outline text-xs px-2 py-1" 
                                                 onClick={() => deleteChannel(c._id)}
                                                 title="Delete Channel"
                                             >
                                                 🗑️
+                                            </button>
+                                            <button 
+                                                className="bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700" 
+                                                onClick={() => cancelChannel(c._id)}
+                                                title="Cancel Channel"
+                                            >
+                                                Cancel
                                             </button>
                                         </div>
                                     </td>
@@ -1959,13 +2509,55 @@ function AdminAppointments() {
                 <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
                     <div className="bg-white w-full max-w-lg rounded-xl shadow-lg p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold">Reschedule</h2>
+                            <h2 className="text-xl font-semibold">Reschedule Channel</h2>
                             <button onClick={() => setShowReschedule(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                        </div>
+                        
+                        {/* Fixed Channel Details */}
+                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-3">Channel Details (Fixed)</h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <span className="text-gray-600">Channel ID:</span>
+                                    <span className="ml-2 font-medium">{selected.appointmentNo}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Doctor:</span>
+                                    <span className="ml-2 font-medium">Dr. {selected.doctorId?.firstName} {selected.doctorId?.lastName}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Specialty:</span>
+                                    <span className="ml-2 font-medium">{selected.specialization || 'General'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Slots:</span>
+                                    <span className="ml-2 font-medium">{selected.bookedCount}/{selected.capacity}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Fee:</span>
+                                    <span className="ml-2 font-medium">LKR {selected.price}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">Mode:</span>
+                                    <span className="ml-2 font-medium capitalize">{selected.mode}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Changeable Fields */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-3">Reschedule Details (Changeable)</h3>
                         </div>
                         <form onSubmit={submitReschedule} className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-sm text-gray-700">Date</label>
-                                <input type="date" value={resForm.date} onChange={e => setResForm({ ...resForm, date: e.target.value })} />
+                                <input 
+                                    type="date" 
+                                    value={resForm.date} 
+                                    onChange={e => setResForm({ ...resForm, date: e.target.value })} 
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-700">Start</label>
@@ -1975,71 +2567,26 @@ function AdminAppointments() {
                                 <label className="block text-sm text-gray-700">End</label>
                                 <input type="time" value={resForm.endTime} onChange={e => setResForm({ ...resForm, endTime: e.target.value })} />
                             </div>
-                            <div>
-                                <label className="block text-sm text-gray-700">Status</label>
-                                <select value={resForm.status} onChange={e => setResForm({ ...resForm, status: e.target.value })}>
-                                    <option value="pending">Pending</option>
-                                    <option value="confirmed">Confirmed</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Canceled</option>
-                                    <option value="no_show">No-Show</option>
-                                </select>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm text-gray-700">Reschedule Reason *</label>
+                                <textarea 
+                                    value={resForm.reason} 
+                                    onChange={e => setResForm({ ...resForm, reason: e.target.value })} 
+                                    placeholder="Please provide a reason for rescheduling this appointment..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    rows="3"
+                                    required
+                                />
                             </div>
                             <div className="md:col-span-2 flex justify-end gap-3 mt-2">
                                 <button type="button" className="btn-outline" onClick={() => setShowReschedule(false)}>Close</button>
-                                <button className="btn-primary">Save</button>
+                                <button type="submit" className="btn-primary">Save</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* Cancel Appointment Confirmation Modal */}
-            {showCancelModal && selected && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="text-red-500 text-2xl">⚠️</div>
-                            <h3 className="text-lg font-semibold text-gray-900">Cancel Appointment</h3>
-                        </div>
-                        
-                        <div className="mb-6">
-                            <p className="text-gray-600 mb-3">
-                                Are you sure you want to cancel this appointment?
-                            </p>
-                            <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                                <div className="font-medium text-gray-900 mb-1">
-                                    {selected.patientName} - Dr. {selected.doctorName}
-                                </div>
-                                <div className="text-gray-600">
-                                    {new Date(selected.date).toLocaleDateString()} at {selected.startTime}
-                                </div>
-                                <div className="text-gray-500 text-xs mt-1">
-                                    Ref: {selected.referenceNo}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowCancelModal(false);
-                                    setSelected(null);
-                                }}
-                                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                Keep Appointment
-                            </button>
-                            <button
-                                onClick={cancelAppointment}
-                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                                Yes, Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

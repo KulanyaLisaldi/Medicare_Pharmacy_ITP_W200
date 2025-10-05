@@ -6,7 +6,16 @@ import {
   acceptOrder, 
   rejectOrder, 
   updateDeliveryStatus, 
-  getOrderDetails 
+  getOrderDetails,
+  getDeliveryStats,
+  getRecentDeliveries,
+  handoverOrder,
+  acceptHandoverOrder,
+  getAvailableDeliveryAgents,
+  getDeliveryNotifications,
+  markNotificationAsRead,
+  deleteAssignment,
+  getCompletedDeliveries
 } from '../controllers/deliveryController.js';
 
 const router = express.Router();
@@ -32,5 +41,32 @@ router.patch('/assignments/:assignmentId/status', updateDeliveryStatus);
 
 // Get order details
 router.get('/orders/:orderId/details', getOrderDetails);
+
+// Get delivery statistics for dashboard
+router.get('/stats', getDeliveryStats);
+
+// Get recent deliveries for dashboard
+router.get('/recent', getRecentDeliveries);
+
+// Handover an order to another delivery agent
+router.post('/assignments/:assignmentId/handover', handoverOrder);
+
+// Accept a handover order
+router.post('/orders/:orderId/accept-handover', acceptHandoverOrder);
+
+// Get available delivery agents for handover
+router.get('/agents/available', getAvailableDeliveryAgents);
+
+// Get notifications for delivery agent
+router.get('/notifications', getDeliveryNotifications);
+
+// Mark notification as read
+router.patch('/notifications/:notificationId/read', markNotificationAsRead);
+
+// Delete assignment (before picked up)
+router.delete('/assignments/:assignmentId', deleteAssignment);
+
+// Get completed delivery history
+router.get('/completed', getCompletedDeliveries);
 
 export default router;

@@ -1,4 +1,8 @@
 import User from "../models/User.js";
+import Booking from "../models/Booking.js";
+import Order from "../models/Order.js";
+import Notification from "../models/Notification.js";
+import DeliveryAssignment from "../models/DeliveryAssignment.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendVerificationEmail, sendWelcomeEmail, sendStaffWelcomeEmail } from "../utils/mailer.js";
@@ -46,7 +50,7 @@ export async function registerCustomer(req, res) {
             return res.status(400).json({ message: `User with this ${conflictField} already exists` });
         }
 
-        // Additional password policy enforcement (defense-in-depth)
+        // Additional password policy enforcement
         const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%!]).{8,}$/;
         if (!strongPassword.test(password)) {
             return res.status(400).json({ message: 'Password must be at least 8 characters and include uppercase, lowercase, number and special (@,#,$,%,!)' });
@@ -205,7 +209,7 @@ export async function createStaffMember(req, res) {
         }
 
     } catch (error) {
-        console.error("❌ Error in createStaffMember controller:", error);
+        console.error(" Error in createStaffMember controller:", error);
         res.status(500).json({ message: "Internal server error while creating staff member" });
     }
 };
@@ -439,6 +443,71 @@ export async function getCurrentUserProfile(req, res) {
     }
 };
 
+// Delete own account (customers only)
+export async function deleteOwnAccount(req, res) {
+    try {
+        console.log('Delete account request received');
+        const userId = req.userId;
+        console.log('User ID:', userId);
+        
+        // Find the user
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('User not found');
+            return res.status(404).json({ 
+                success: false,
+                message: "User not found" 
+            });
+        }
+
+        console.log('User found:', user.email, 'Role:', user.role);
+
+        // Only allow customers to delete their own accounts
+        if (user.role !== 'customer') {
+            console.log('Access denied - not a customer');
+            return res.status(403).json({ 
+                success: false,
+                message: "Only customers can delete their own accounts. Staff accounts must be managed by administrators." 
+            });
+        }
+
+        // Delete related data first
+        try {
+            // Delete user's bookings
+            await Booking.deleteMany({ userId: userId });
+            
+            // Delete user's orders
+            await Order.deleteMany({ userId: userId });
+            
+            // Delete user's notifications
+            await Notification.deleteMany({ userId: userId });
+            
+            // Delete user's delivery assignments
+            await DeliveryAssignment.deleteMany({ userId: userId });
+            
+        } catch (relatedDataError) {
+            console.error("Error deleting related data:", relatedDataError);
+            // Continue with user deletion even if related data deletion fails
+        }
+
+        // Delete the user account
+        console.log('Deleting user account...');
+        await User.findByIdAndDelete(userId);
+        console.log('User account deleted successfully');
+
+        res.json({ 
+            success: true,
+            message: "Account deleted successfully" 
+        });
+    } catch (error) {
+        console.error("Error in deleteOwnAccount", error);
+        res.status(500).json({ 
+            success: false,
+            message: "Internal server error" 
+        });
+    }
+};
+
 // Verify Email
 export async function verifyEmail(req, res) {
     try {
@@ -633,7 +702,7 @@ export async function adminResendVerificationEmail(req, res) {
         user.verificationExpires = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
         await user.save();
 
-        console.log(`🔄 Admin resending verification email to: ${user.email}`);
+        console.log(` Admin resending verification email to: ${user.email}`);
 
         // Send verification email
         try {
@@ -652,14 +721,14 @@ export async function adminResendVerificationEmail(req, res) {
                 }
             });
 
-            console.log(`✅ Verification email resent successfully to: ${user.email}`);
+            console.log(` Verification email resent successfully to: ${user.email}`);
             
             res.status(200).json({ 
                 message: `Verification email has been resent to ${user.email}`,
                 emailSent: true
             });
         } catch (emailError) {
-            console.error('❌ Error sending verification email:', emailError);
+            console.error(' Error sending verification email:', emailError);
             
             res.status(500).json({ 
                 message: 'Failed to send verification email',
@@ -669,7 +738,7 @@ export async function adminResendVerificationEmail(req, res) {
         }
 
     } catch (error) {
-        console.error('❌ Error in adminResendVerificationEmail:', error);
+        console.error(' Error in adminResendVerificationEmail:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };

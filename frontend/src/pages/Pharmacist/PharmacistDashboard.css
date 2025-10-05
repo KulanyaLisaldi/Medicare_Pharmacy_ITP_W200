@@ -3,6 +3,65 @@
     animation: fadeIn 0.5s ease-in;
 }
 
+/* Inventory Section Responsive Search */
+.inventory-section .flex {
+    transition: all 0.3s ease;
+}
+
+.inventory-section input {
+    transition: all 0.3s ease;
+}
+
+.inventory-section input:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+/* Responsive adjustments for inventory search */
+@media (max-width: 1024px) {
+    .inventory-section .flex {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .inventory-section input {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .inventory-section .flex {
+        gap: 12px;
+    }
+    
+    .inventory-section input {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px 16px 12px 40px;
+        min-height: 48px;
+    }
+    
+    .inventory-section button {
+        min-height: 48px;
+        font-size: 14px;
+        padding: 12px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .inventory-section input {
+        padding: 14px 16px 14px 40px;
+        min-height: 50px;
+        font-size: 16px;
+    }
+    
+    .inventory-section button {
+        min-height: 50px;
+        font-size: 13px;
+        padding: 14px 12px;
+    }
+}
+
 /* Stats Grid */
 .pharmacist-stats {
     display: grid;
@@ -495,5 +554,440 @@
     .performance-metrics {
         grid-template-columns: 1fr;
         gap: 12px;
+    }
+}
+
+/* Custom Select Dropdown Arrow */
+.orders-section select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+/* Enhanced Action Buttons for Inventory Table */
+.inventory-section .flex button {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.inventory-section .flex button:active {
+    transform: translateY(0.5px);
+}
+
+.inventory-section .flex button:focus {
+    outline: 2px solid rgba(59, 130, 246, 0.5);
+    outline-offset: 2px;
+}
+
+/* Edit Button Enhanced Styling */
+.inventory-section .flex button.btn-outline {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #3b82f6;
+    color: #1e40af;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.inventory-section .flex button.btn-outline:hover {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-color: #2563eb;
+    color: #1d4ed8;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Delete Button Enhanced Styling */
+.inventory-section .flex button.btn-danger {
+    background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+    border: 1px solid #ef4444;
+    color: #dc2626;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.inventory-section .flex button.btn-danger:hover {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border-color: #dc2626;
+    color: #b91c1c;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Responsive adjustments for action buttons */
+@media (max-width: 768px) {
+    .inventory-section .flex {
+        gap: 2px;
+    }
+    
+    .inventory-section .flex button {
+        padding: 6px 8px;
+        font-size: 11px;
+        min-height: 26px;
+    }
+}
+
+@media (max-width: 480px) {
+    .inventory-section .flex {
+        gap: 1px;
+    }
+    
+    .inventory-section .flex button {
+        padding: 4px 6px;
+        font-size: 10px;
+        min-height: 24px;
+    }
+}
+
+/* Reports Section Styling */
+.reports-section {
+    padding: 0;
+}
+
+/* Report Filters Styling */
+.reports-section .bg-white {
+    transition: all 0.3s ease;
+}
+
+/* PDF Download Button Styling */
+.reports-section .btn-outline {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    transition: all 0.3s ease;
+}
+
+.reports-section .btn-outline:hover:not(:disabled) {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.reports-section .btn-outline:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.reports-section .btn-outline svg {
+    transition: transform 0.2s ease;
+}
+
+.reports-section .btn-outline:hover:not(:disabled) svg {
+    transform: translateY(-1px);
+}
+
+/* Success Notification Styling */
+.reports-section .fixed {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.reports-section .bg-white:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.reports-section select,
+.reports-section input[type="date"] {
+    transition: all 0.3s ease;
+    border: 1px solid #d1d5db;
+}
+
+.reports-section select:focus,
+.reports-section input[type="date"]:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+.reports-section .quick-range button {
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.reports-section .quick-range button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Active Filters Display */
+.reports-section .bg-blue-50 {
+    border: 1px solid #dbeafe;
+    border-radius: 0.5rem;
+}
+
+.reports-section .bg-blue-50 .bg-blue-100 {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 1px solid #93c5fd;
+}
+
+/* Responsive Filter Layout */
+@media (max-width: 768px) {
+    .reports-section .grid-cols-4 {
+        grid-template-columns: 1fr;
+    }
+    
+    .reports-section .grid-cols-2 {
+        grid-template-columns: 1fr;
+    }
+    
+    .reports-section .quick-range {
+        flex-direction: row;
+        gap: 0.5rem;
+    }
+    
+    .reports-section .quick-range button {
+        flex: 1;
+        text-align: center;
+    }
+}
+
+.reports-section .grid {
+    gap: 1.5rem;
+}
+
+.reports-section .bg-white {
+    transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
+}
+
+.reports-section .bg-white:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.reports-section .space-y-3 > * + * {
+    margin-top: 0.75rem;
+}
+
+.reports-section .space-y-2 > * + * {
+    margin-top: 0.5rem;
+}
+
+.reports-section .space-y-4 > * + * {
+    margin-top: 1rem;
+}
+
+/* Summary Cards Styling */
+.reports-section .grid .bg-white {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e5e7eb;
+}
+
+.reports-section .grid .bg-white:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+    border-color: #d1d5db;
+}
+
+/* Progress Bar Styling */
+.reports-section .bg-gray-200 {
+    background-color: #f3f4f6;
+    border-radius: 0.75rem;
+}
+
+.reports-section .bg-green-500 {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.reports-section .bg-yellow-500 {
+    background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.reports-section .bg-red-500 {
+    background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Enhanced Inventory Search Section */
+.inventory-section .bg-gradient-to-r {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f4ff 100%);
+    border: 1px solid #bfdbfe;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.inventory-section input {
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.inventory-section input:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.inventory-section .btn-outline {
+    transition: all 0.3s ease;
+    border: 2px solid #e5e7eb;
+    background: #ffffff;
+}
+
+.inventory-section .btn-outline:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+}
+
+.inventory-section .btn-primary {
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.inventory-section .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Search Suggestions Dropdown */
+.inventory-section .absolute.top-full {
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Search Stats Animation */
+.inventory-section .text-blue-600 {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Responsive adjustments for inventory search */
+@media (max-width: 768px) {
+    .inventory-section .bg-gradient-to-r {
+        padding: 1rem;
+    }
+    
+    .inventory-section .flex-col.lg\\:flex-row {
+        flex-direction: column;
+    }
+    
+    .inventory-section .flex.gap-3 {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .inventory-section .btn-outline,
+    .inventory-section .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .inventory-section input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
+@media (max-width: 480px) {
+    .inventory-section .text-2xl {
+        font-size: 1.5rem;
+    }
+    
+    .inventory-section .text-gray-600 {
+        font-size: 0.875rem;
+    }
+    
+    .inventory-section .px-6 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .inventory-section .py-4 {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+}
+
+/* Responsive adjustments for reports */
+@media (max-width: 1024px) {
+    .reports-section .grid-cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .reports-section .lg\\:col-span-2 {
+        grid-column: span 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .reports-section .grid-cols-4 {
+        grid-template-columns: 1fr;
+    }
+    
+    .reports-section .md\\:grid-cols-3 {
+        grid-template-columns: 1fr;
+    }
+    
+    .reports-section .md\\:grid-cols-2 {
+        grid-template-columns: 1fr;
+    }
+    
+    .reports-section .space-y-3 {
+        gap: 0.5rem;
+    }
+    
+    .reports-section .max-h-96 {
+        max-height: 200px;
+    }
+    
+    .reports-section .max-h-40 {
+        max-height: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .reports-section .p-6 {
+        padding: 1rem;
+    }
+    
+    .reports-section .text-2xl {
+        font-size: 1.5rem;
+    }
+    
+    .reports-section .text-lg {
+        font-size: 1rem;
+    }
+    
+    .reports-section .w-16 {
+        width: 3rem;
+        height: 3rem;
+    }
+    
+    .reports-section .w-8 {
+        width: 1.5rem;
+        height: 1.5rem;
     }
 }

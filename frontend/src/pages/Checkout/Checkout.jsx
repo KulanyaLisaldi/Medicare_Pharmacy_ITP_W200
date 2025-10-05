@@ -21,6 +21,10 @@ const Checkout = () => {
     notes: ''
   })
   const [subtotal, setSubtotal] = useState(0)
+  const [fieldErrors, setFieldErrors] = useState({
+    name: '',
+    phone: ''
+  })
 
   useEffect(() => {
     if (!user) {
@@ -38,13 +42,197 @@ const Checkout = () => {
     setSubtotal(cartData.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0))
     
     // Pre-fill user data if available
-    if (user.name) setFormData(prev => ({ ...prev, name: user.name }))
+    if (user.firstName || user.lastName) {
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim()
+      setFormData(prev => ({ ...prev, name: fullName }))
+    }
     if (user.phone) setFormData(prev => ({ ...prev, phone: user.phone }))
   }, [user, navigate])
 
+  // Validation functions
+  const preventInvalidNameChar = (e) => {
+    const isNameField = e.target.name === 'name';
+    if (!isNameField) return;
+    const key = e.key || '';
+    if (e.type === 'keydown') {
+      const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+      if (controlKeys.includes(key)) return;
+      // Block any non-letter characters (including numbers, symbols, etc.)
+      if (!/^[A-Za-z ]$/.test(key)) {
+        e.preventDefault();
+        if (/^[0-9]$/.test(key)) {
+          setFieldErrors(prev => ({
+            ...prev,
+            [e.target.name]: 'Numbers are not allowed in name fields'
+          }));
+        } else {
+          setFieldErrors(prev => ({
+            ...prev,
+            [e.target.name]: 'Only letters and spaces are allowed'
+          }));
+        }
+      }
+    }
+  };
+
+  const preventInvalidNamePaste = (e) => {
+    const isNameField = e.target.name === 'name';
+    if (!isNameField) return;
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    if (pasted && !/^[A-Za-z ]+$/.test(pasted)) {
+      e.preventDefault();
+      if (/[0-9]/.test(pasted)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [e.target.name]: 'Numbers are not allowed in name fields'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [e.target.name]: 'Only letters and spaces are allowed'
+        }));
+      }
+    }
+  };
+
+  const handlePhoneKeyDown = (e) => {
+    const { name } = e.target;
+    if (name === 'phone') {
+      const current = e.target.value || '';
+      const key = e.key || '';
+      
+      // Allow control keys
+      const controlKeys = ['Backspace','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete'];
+      if (controlKeys.includes(key)) return;
+      
+      // Block any non-digit characters (letters, symbols, etc.)
+      if (!/^[0-9]$/.test(key)) {
+        e.preventDefault();
+        if (/^[A-Za-z]$/.test(key)) {
+          setFieldErrors(prev => ({
+            ...prev,
+            [name]: 'Letters are not allowed in phone number'
+          }));
+        } else if (key === '-') {
+          setFieldErrors(prev => ({
+            ...prev,
+            [name]: 'Minus (-) values are not allowed'
+          }));
+        } else {
+          setFieldErrors(prev => ({
+            ...prev,
+            [name]: 'Only numbers are allowed in phone number'
+          }));
+        }
+        return;
+      }
+      
+      // Check length limit - exactly 10 digits
+      if (/^[0-9]$/.test(key) && current.length >= 10) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Phone number must be exactly 10 digits'
+        }));
+      }
+    }
+  };
+
+  const handlePhonePaste = (e) => {
+    const { name } = e.target;
+    if (name === 'phone') {
+      const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      const digitsOnly = pastedText.replace(/\D/g, '');
+      
+      // Block if contains letters
+      if (/[A-Za-z]/.test(pastedText)) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Letters are not allowed in phone number'
+        }));
+      } else if (pastedText.includes('-')) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Minus (-) values are not allowed'
+        }));
+      } else if (digitsOnly.length > 10) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Phone number must be exactly 10 digits'
+        }));
+      } else if (!/^[0-9]+$/.test(pastedText)) {
+        e.preventDefault();
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Only numbers are allowed in phone number'
+        }));
+      }
+    }
+  };
+
   const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const { name, value } = e.target;
+    
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear field-specific error when user types
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+    
+    // Real-time validation for name field
+    if (name === 'name') {
+      if (/[0-9]/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Numbers are not allowed in name fields'
+        }));
+      } else if (value.trim() && !/^[A-Za-z ]+$/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Only letters and spaces are allowed'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    }
+    
+    // Real-time validation for phone field
+    if (name === 'phone') {
+      // Remove all non-digit characters and limit to 10 digits
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+      
+      // Update the form with cleaned value
+      setFormData(prev => ({ ...prev, [name]: digitsOnly }));
+      
+      // Check for letters in original input
+      if (/[A-Za-z]/.test(value)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Letters are not allowed in phone number'
+        }));
+      } else if (value.trim() && digitsOnly.length === 10 && !/^07\d{8}$/.test(digitsOnly)) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: 'Phone must be 10 digits (Sri Lanka format: 07XXXXXXXX)'
+        }));
+      } else {
+        setFieldErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+      return; // Exit early to prevent double setting
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -126,6 +314,7 @@ const Checkout = () => {
       alert('Order placed successfully!')
       localStorage.removeItem('cart')
       window.dispatchEvent(new Event('cart:update'))
+      window.dispatchEvent(new Event('order:placed'))
       navigate('/orders')
     } catch (err) {
       alert(err.message)
@@ -189,10 +378,15 @@ const Checkout = () => {
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
+                      onKeyDown={preventInvalidNameChar}
+                      onPaste={preventInvalidNamePaste}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                       placeholder="Enter your full name"
                     />
+                    {fieldErrors.name && (
+                      <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -204,10 +398,15 @@ const Checkout = () => {
                       name="phone"
                       value={formData.phone}
                       onChange={handleInputChange}
+                      onKeyDown={handlePhoneKeyDown}
+                      onPaste={handlePhonePaste}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter your phone number"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fieldErrors.phone ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                      placeholder="07XXXXXXXX"
                     />
+                    {fieldErrors.phone && (
+                      <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>
+                    )}
                   </div>
                   
                   <div>

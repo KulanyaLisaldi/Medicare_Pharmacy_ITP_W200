@@ -4,6 +4,40 @@ import Footer from '../../components/Footer/Footer'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 
+// Local assets for common products
+import ImgParacetamol from '../../assets/paracetamol.jpg'
+import ImgMetformin from '../../assets/metformin.jpg'
+import ImgAmoxicillin from '../../assets/Amoxcillin.jpg'
+import ImgSalbutamol from '../../assets/salbutamol_inhaler.jpg'
+import ImgFolicAcid from '../../assets/FOLIC-ACID.webp'
+import ImgAllermine from '../../assets/Allermine.jpg'
+import ImgOmeprazole from '../../assets/omeprazole.jpg'
+import ImgDefault from '../../assets/illustration.jpg'
+
+// Resolve a sensible image for a product using uploaded images first, then local assets
+function getProductImage(product) {
+	if (!product) return ImgDefault
+	
+	// First priority: Use uploaded product image if available
+	if (product.image && product.image.trim() !== '') {
+		return product.image
+	}
+	
+	// Second priority: Use local assets based on product name/brand
+	const name = `${product.name || ''} ${product.brand || ''}`.toLowerCase()
+
+	if (name.includes('paracetamol') || name.includes('acetaminophen')) return ImgParacetamol
+	if (name.includes('metformin')) return ImgMetformin
+	if (name.includes('amoxicillin') || name.includes('amoxcillin')) return ImgAmoxicillin
+	if (name.includes('salbutamol') || name.includes('inhaler')) return ImgSalbutamol
+	if (name.includes('folic')) return ImgFolicAcid
+	if (name.includes('allermine') || name.includes('cetirizine') || name.includes('antihistamine')) return ImgAllermine
+    if (name.includes('omeprazole') || name.includes('prilosec')) return ImgOmeprazole
+
+	// Fallback to default image
+	return ImgDefault
+}
+
 const Products = () => {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,10 +60,27 @@ const Products = () => {
 
   useEffect(() => { load() }, [])
 
+  // Refresh products when cart is updated (to show updated stock)
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      // Show a brief loading state to indicate stock is being updated
+      setLoading(true)
+      load()
+    }
+    
+    window.addEventListener('cart:update', handleCartUpdate)
+    window.addEventListener('order:placed', handleCartUpdate)
+    
+    return () => {
+      window.removeEventListener('cart:update', handleCartUpdate)
+      window.removeEventListener('order:placed', handleCartUpdate)
+    }
+  }, [])
+
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const addToCart = (p) => {
+  const addToCart = async (p) => {
     if (!user) {
       navigate('/login')
       return
@@ -46,6 +97,7 @@ const Products = () => {
     const cart = raw ? JSON.parse(raw) : []
     const idx = cart.findIndex(i => i._id === p._id)
     
+    let quantityToReserve = 1
     if (idx >= 0) {
       // Check if adding one more would exceed available stock
       const currentQuantity = cart[idx].quantity || 1
@@ -54,14 +106,45 @@ const Products = () => {
         alert(`Cannot add more items. Only ${availableStock} units available in stock.`)
         return
       }
-      cart[idx].quantity = newQuantity
-    } else {
-      cart.push({ _id: p._id, name: p.name, price: p.price, quantity: 1 })
+      quantityToReserve = 1 // Only reserve the additional quantity
     }
     
-    localStorage.setItem('cart', JSON.stringify(cart))
-    // notify navbar to update badge
-    window.dispatchEvent(new Event('cart:update'))
+    try {
+      // Reserve stock immediately when adding to cart
+      const response = await fetch('http://localhost:5001/api/orders/reserve-stock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          productId: p._id,
+          quantity: quantityToReserve
+        })
+      })
+      
+      const data = await response.json()
+      if (!response.ok) {
+        alert(data.message || 'Failed to reserve stock')
+        return
+      }
+      
+      // Update cart after successful stock reservation
+      if (idx >= 0) {
+        cart[idx].quantity = cart[idx].quantity + 1
+      } else {
+        cart.push({ _id: p._id, name: p.name, price: p.price, quantity: 1 })
+      }
+      
+      localStorage.setItem('cart', JSON.stringify(cart))
+      // notify navbar to update badge and refresh products
+      window.dispatchEvent(new Event('cart:update'))
+      window.dispatchEvent(new Event('order:placed'))
+      
+    } catch (error) {
+      alert('Failed to add item to cart. Please try again.')
+      console.error('Add to cart error:', error)
+    }
   }
 
   const activeCategory = searchParams.get('category') || ''
@@ -93,7 +176,7 @@ const Products = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6 text-center">
             {activeCategory && (
-              <div className="text-gray-500 text-lg mb-2">/ {activeCategory}</div>
+              <div className="text-gray-500 text-lg mb-2"> {activeCategory}</div>
             )}
             <div className="flex justify-center">
               <div className="flex gap-2 flex-wrap justify-center">
@@ -104,7 +187,13 @@ const Products = () => {
                     if (v) setSearchParams({ category: v })
                     else setSearchParams({})
                   }}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400"
+                  className="border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-0 focus:border-gray-400 appearance-none bg-white cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em'
+                  }}
                 >
                   <option value="">All Categories</option>
                   {categoryOptions.map(c => (
@@ -118,6 +207,13 @@ const Products = () => {
                   className="border border-gray-300 rounded-lg px-3 py-2 w-80 max-w-full focus:outline-none focus:ring-0 focus:border-gray-400"
                 />
                 <button onClick={() => { setLoading(true); load(q); }} className="btn-primary">Search</button>
+                <Link 
+                  to="/upload-prescription" 
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  
+                  Order with Prescription
+                </Link>
               </div>
             </div>
           </div>
@@ -175,13 +271,15 @@ function ProductCard({ p, addToCart }) {
   const inStock = (p.stock ?? 0) > 0
   const availableStock = (p.stock ?? 0) - (p.reservedStock ?? 0)
   const isAvailable = availableStock > 0
+  // Get product image (prioritizes uploaded images over assets)
+  const imageSrc = getProductImage(p)
   
   return (
     <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden max-w-xs mx-auto w-full">
       <div className="p-4">
         {/* Image placeholder */}
-        {p.imageUrl ? (
-          <img src={p.imageUrl} alt={p.name} className="w-full h-28 object-cover rounded mb-2" />
+        {imageSrc ? (
+          <img src={imageSrc} alt={p.name} className="w-full h-28 object-cover rounded mb-2" />
         ) : (
           <div className="w-full h-28 bg-gray-100 rounded mb-2 flex items-center justify-center text-gray-400 text-sm">
             No Image
@@ -197,6 +295,23 @@ function ProductCard({ p, addToCart }) {
           )}
         </div>
         {p.description && <div className="text-xs text-gray-500 mt-1 line-clamp-1">{p.description}</div>}
+        
+        {/* Tags */}
+        {p.tags && p.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {p.tags.slice(0, 3).map((tag, index) => (
+              <span key={index} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                {tag}
+              </span>
+            ))}
+            {p.tags.length > 3 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                +{p.tags.length - 3} more
+              </span>
+            )}
+          </div>
+        )}
+        
         <div className="grid grid-cols-2 gap-1 text-xs text-gray-700 mt-2">
           <div><span className="text-gray-500">Form:</span> {p.dosageForm || '-'}</div>
           <div><span className="text-gray-500">Strength:</span> {p.strength || '-'}</div>

@@ -166,17 +166,8 @@ export const createOrder = async (req, res) => {
       }
     })
 
-    // Reserve stock temporarily after successful order creation
-    // This prevents other customers from ordering the same items
-    for (const item of normalizedItems) {
-      if (item.productId) {
-        await Product.findByIdAndUpdate(
-          item.productId,
-          { $inc: { reservedStock: item.quantity } },
-          { new: true }
-        )
-      }
-    }
+    // Stock is already reserved when items are added to cart
+    // No need to reserve again during order creation
 
     return res.status(201).json(order)
   } catch (err) {
@@ -205,7 +196,11 @@ export const listDeliveryOrders = async (req, res) => {
 export const listMyOrders = async (req, res) => {
   try {
     const userId = req.userId
-    const orders = await Order.find({ user: userId }).sort({ createdAt: -1 })
+    // Only return product orders, not prescription orders
+    const orders = await Order.find({ 
+      user: userId,
+      orderType: { $ne: 'prescription' } // Exclude prescription orders
+    }).sort({ createdAt: -1 })
     return res.json(orders)
   } catch (err) {
     console.error('listMyOrders error:', err)
@@ -215,7 +210,10 @@ export const listMyOrders = async (req, res) => {
 
 export const listAllOrders = async (_req, res) => {
   try {
-    const orders = await Order.find({}).sort({ createdAt: -1 })
+    // Only return product orders, not prescription orders
+    const orders = await Order.find({ 
+      orderType: { $ne: 'prescription' } // Exclude prescription orders
+    }).sort({ createdAt: -1 })
     return res.json(orders)
   } catch (err) {
     console.error('listAllOrders error:', err)
@@ -299,8 +297,11 @@ export const confirmPreparation = async (req, res) => {
     const order = await Order.findById(req.params.id)
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
+    // Handle different order types
+    const itemsToProcess = order.orderType === 'prescription' ? order.orderList : order.items
+
     // Deduct actual stock and clear reservations for all items
-    for (const it of order.items) {
+    for (const it of itemsToProcess) {
       if (it.productId && !it.outOfStock) {
         const product = await Product.findById(it.productId)
         if (product) {
@@ -323,6 +324,162 @@ export const confirmPreparation = async (req, res) => {
   } catch (err) {
     console.error('confirmPreparation error:', err)
     return res.status(500).json({ message: 'Failed to confirm preparation' })
+  }
+}
+
+// Delete order (customer only, pending status only)
+// Reserve stock when adding items to cart
+export const reserveStock = async (req, res) => {
+  try {
+    const { productId, quantity } = req.body
+    
+    if (!productId || !quantity) {
+      return res.status(400).json({ message: 'Product ID and quantity are required' })
+    }
+    
+    const product = await Product.findById(productId)
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' })
+    }
+    
+    const requestedQuantity = Number(quantity)
+    const availableStock = (product.stock || 0) - (product.reservedStock || 0)
+    
+    if (availableStock < requestedQuantity) {
+      return res.status(400).json({ 
+        message: 'Insufficient stock available',
+        availableStock,
+        requestedQuantity
+      })
+    }
+    
+    // Reserve the stock
+    await Product.findByIdAndUpdate(
+      productId,
+      { $inc: { reservedStock: requestedQuantity } },
+      { new: true }
+    )
+    
+    return res.json({ 
+      message: 'Stock reserved successfully',
+      productId,
+      reservedQuantity: requestedQuantity
+    })
+  } catch (err) {
+    console.error('reserveStock error:', err)
+    return res.status(500).json({ message: 'Failed to reserve stock' })
+  }
+}
+
+// Release stock when removing items from cart
+export const releaseStock = async (req, res) => {
+  try {
+    const { productId, quantity } = req.body
+    
+    if (!productId || !quantity) {
+      return res.status(400).json({ message: 'Product ID and quantity are required' })
+    }
+    
+    const product = await Product.findById(productId)
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' })
+    }
+    
+    const releaseQuantity = Number(quantity)
+    const currentReservedStock = product.reservedStock || 0
+    
+    // Release the stock (don't go below 0)
+    const newReservedStock = Math.max(0, currentReservedStock - releaseQuantity)
+    
+    await Product.findByIdAndUpdate(
+      productId,
+      { $set: { reservedStock: newReservedStock } },
+      { new: true }
+    )
+    
+    return res.json({ 
+      message: 'Stock released successfully',
+      productId,
+      releasedQuantity: releaseQuantity
+    })
+  } catch (err) {
+    console.error('releaseStock error:', err)
+    return res.status(500).json({ message: 'Failed to release stock' })
+  }
+}
+
+export const deleteOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id
+    const userId = req.userId
+
+    console.log('=== DELETE ORDER START ===')
+    console.log('Order ID:', orderId)
+    console.log('User ID:', userId)
+
+    // Find the order
+    const order = await Order.findById(orderId)
+    if (!order) {
+      console.log('Order not found')
+      return res.status(404).json({ message: 'Order not found' })
+    }
+
+    // Check if user owns the order
+    if (order.user.toString() !== userId) {
+      console.log('User does not own this order')
+      return res.status(403).json({ message: 'You can only delete your own orders' })
+    }
+
+    // Check if order status allows deletion
+    if (order.status !== 'pending') {
+      console.log('Order status does not allow deletion:', order.status)
+      return res.status(400).json({ 
+        message: 'Order cannot be deleted. Only pending orders can be deleted.',
+        currentStatus: order.status
+      })
+    }
+
+    console.log('Order found and eligible for deletion')
+    console.log('Order status:', order.status)
+    console.log('Order items:', order.items)
+
+    // Release reserved stock for each item in the order
+    if (order.items && order.items.length > 0) {
+      console.log('Releasing reserved stock for', order.items.length, 'items')
+      
+      for (const item of order.items) {
+        if (item.productId) {
+          console.log('Releasing reserved stock for product:', item.productId, 'Quantity:', item.quantity)
+          
+          const product = await Product.findById(item.productId)
+          if (product) {
+            // Release reserved stock back to available stock
+            const newReservedStock = Math.max(0, (product.reservedStock || 0) - (item.quantity || 0))
+            product.reservedStock = newReservedStock
+            await product.save()
+            console.log('Reserved stock released for product:', product.name, 'New reserved stock:', product.reservedStock)
+          } else {
+            console.warn('Product not found for stock restoration:', item.productId)
+          }
+        }
+      }
+    }
+
+    // Delete the order
+    await Order.findByIdAndDelete(orderId)
+    console.log('Order deleted successfully')
+
+    return res.status(200).json({
+      message: 'Order deleted successfully. Reserved stock has been released.',
+      deletedOrderId: orderId
+    })
+
+  } catch (err) {
+    console.error('=== DELETE ORDER ERROR ===')
+    console.error('deleteOrder error:', err)
+    console.error('Error message:', err.message)
+    console.error('Error stack:', err.stack)
+    return res.status(500).json({ message: 'Failed to delete order' })
   }
 }
 

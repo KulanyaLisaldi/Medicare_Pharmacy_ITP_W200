@@ -13,6 +13,7 @@ import {
     deleteUser,
     toggleUserStatus,
     getCurrentUserProfile,
+    deleteOwnAccount,
     adminResendVerificationEmail,
     publicListDoctors,
     publicGetDoctorById
@@ -48,13 +49,8 @@ router.use(authenticateToken);
 router.post("/change-password", validateRequest(changePasswordSchema), (req, res, next) => next());
 // changePassword must have access to req.userId; append handler
 import { changePassword, requestPasswordReset, resetPassword } from "../controllers/userController.js";
-import { getMyNotifications, markNotificationRead, createNotification } from "../controllers/notificationController.js";
 router.post("/change-password", changePassword);
 
-// Notifications
-router.get("/notifications", getMyNotifications);
-router.patch("/notifications/:id/read", markNotificationRead);
-router.post("/notifications", requireAdmin, createNotification);
 
 // Token management
 router.post("/refresh", refreshToken);
@@ -62,6 +58,7 @@ router.post("/refresh", refreshToken);
 // User profile management
 router.get("/profile", getCurrentUserProfile);
 router.put("/profile/:id", requireOwnershipOrAdmin, validateRequest(updateProfileSchema), updateUserProfile);
+router.delete("/delete-account", deleteOwnAccount);
 
 // Admin only routes
 router.post("/staff", requireAdmin, validateRequest(createStaffSchema), createStaffMember);
