@@ -44,24 +44,7 @@ export const AppointmentBooking = (props) => {
     props.actionProvider.handleBookingSteps();
   };
 
-  return (
-    <div className="appointment-booking-widget">
-      <div className="booking-options">
-        <button className="book-btn primary" onClick={handleBookingSteps}>
-          🗓️ How to Book Appointment
-        </button>
-        <button className="book-btn" onClick={handleBookAppointment}>
-          🩺 Book New Appointment
-        </button>
-        <button className="book-btn" onClick={() => props.actionProvider.handleButtonClick('View my bookings')}>
-          📋 View My Appointments
-        </button>
-        <button className="book-btn" onClick={() => props.actionProvider.handleButtonClick('Reschedule appointment')}>
-          🔄 Reschedule Appointment
-        </button>
-      </div>
-    </div>
-  );
+  return null;
 };
 
 // Doctor Search Widget
@@ -231,10 +214,6 @@ export const DoctorList = (props) => {
             <li key={d.id} className="doctor-item">
               <div className="doctor-name">{d.name}</div>
               <div className="doctor-spec">{d.specialization}</div>
-              <div className="doctor-contact">
-                {d.email && <span>{d.email}</span>}
-                {d.phone && <span>{d.phone}</span>}
-              </div>
             </li>
           ))}
         </ul>
