@@ -20,7 +20,7 @@ const DialogflowChatbot = () => {
           className="chatbot-toggle"
           onClick={toggleChatbot}
         >
-          🤖
+          🩺
         </button>
       </div>
     );
@@ -30,7 +30,7 @@ const DialogflowChatbot = () => {
     <div className="dialogflow-chatbot-widget">
       <div className="chatbot-container">
         <div className="chatbot-header">
-          <h3>🏥 Medicare Assistant</h3>
+          <h3>.Medicare Assistant</h3>
           <button 
             className="close-btn"
             onClick={toggleChatbot}

@@ -5,8 +5,29 @@ class MessageParser {
 
   parse(message) {
     const lowercase = message.toLowerCase();
-    const state = this.actionProvider?.stateRef?.current;
-    if (state?.awaitingSymptoms || this.actionProvider?.awaitingSymptoms) {
+    
+    // Check if we're waiting for symptoms input - check both instance and state
+    const instanceFlag = this.actionProvider?.awaitingSymptoms;
+    const stateFlag = this.actionProvider?.stateRef?.current?.awaitingSymptoms;
+    
+    console.log('MessageParser - awaitingSymptoms:', instanceFlag);
+    console.log('MessageParser - state awaitingSymptoms:', stateFlag);
+    console.log('MessageParser - actionProvider exists:', !!this.actionProvider);
+    console.log('MessageParser - stateRef exists:', !!this.actionProvider?.stateRef);
+    
+    // If either flag is true, route to symptoms input
+    if (instanceFlag || stateFlag) {
+      console.log('Routing to handleSymptomsInput - instance:', instanceFlag, 'state:', stateFlag);
+      this.actionProvider.handleSymptomsInput(message);
+      return;
+    }
+    
+    // Additional check: if the message looks like symptoms, try to process it anyway
+    const symptomKeywords = ['headache', 'dizziness', 'pain', 'fever', 'cough', 'rash', 'nausea', 'vomiting', 'diarrhea', 'constipation', 'chest', 'heart', 'skin', 'eye', 'ear', 'nose', 'throat', 'stomach', 'back', 'joint', 'bone', 'anxiety', 'depression', 'stress', 'flu', 'infection'];
+    const hasSymptomKeywords = symptomKeywords.some(keyword => lowercase.includes(keyword));
+    
+    if (hasSymptomKeywords) {
+      console.log('Message contains symptom keywords, routing to handleSymptomsInput');
       this.actionProvider.handleSymptomsInput(message);
       return;
     }

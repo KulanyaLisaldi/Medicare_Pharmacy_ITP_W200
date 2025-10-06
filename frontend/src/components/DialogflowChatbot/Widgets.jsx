@@ -136,16 +136,13 @@ export const DoctorFinder = (props) => {
     }
   };
 
-  const handleDescribeSymptoms = () => {
-    if (props?.actionProvider?.handleDescribeSymptoms) {
-      props.actionProvider.handleDescribeSymptoms({});
-    } else {
-      props.actionProvider.handleButtonClick('Describe symptoms for doctor recommendation');
-    }
-  };
 
   const handleViewAllDoctors = () => {
     props.actionProvider.handleButtonClick('Show all available doctors');
+  };
+
+  const handleDescribeSymptoms = () => {
+    props.actionProvider.handleButtonClick('Describe symptoms for doctor recommendation');
   };
 
   return (
@@ -178,7 +175,7 @@ export const DoctorFinder = (props) => {
             👩‍⚕️ Gynecologist
           </button>
           <button className="specialist-btn" onClick={() => handleFindSpecialist('General Practitioner')}>
-            🏥 General Practitioner
+            💉 General Practitioner
           </button>
           <button className="specialist-btn" onClick={() => handleFindSpecialist('Endocrinologist')}>
             🩸 Endocrinologist

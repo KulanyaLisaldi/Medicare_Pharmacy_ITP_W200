@@ -19,6 +19,12 @@ class ActionProvider {
   // Handle Dialogflow responses
   handleDialogflowResponse = async (userMessage) => {
     try {
+      // Don't process through Dialogflow if we're waiting for symptoms
+      if (this.awaitingSymptoms) {
+        console.log('Skipping Dialogflow - awaiting symptoms input');
+        return;
+      }
+      
       const token = localStorage.getItem('token');
       
       // Always allow core flows even if not signed in
@@ -77,35 +83,153 @@ class ActionProvider {
     }
   };
 
-  // Handle free-text symptoms: call backend analyzer then search doctors
+  // Symptom to specialty mapping (exact implementation as provided)
+  symptomToSpecialty = {
+    // Neurology
+    'headache': 'Neurology',
+    'migraine': 'Neurology',
+    'seizure': 'Neurology',
+    'dizziness': 'Neurology',
+    'memory': 'Neurology',
+    'confusion': 'Neurology',
+    'numbness': 'Neurology',
+    'tingling': 'Neurology',
+
+    // Cardiology
+    'chest pain': 'Cardiology',
+    'heart': 'Cardiology',
+    'blood pressure': 'Cardiology',
+    'palpitation': 'Cardiology',
+    'shortness of breath': 'Cardiology',
+
+    // Pulmonology
+    'cough': 'Pulmonology',
+    'asthma': 'Pulmonology',
+    'lung': 'Pulmonology',
+    'wheezing': 'Pulmonology',
+    'chest tightness': 'Pulmonology',
+
+    // Dermatology
+    'skin': 'Dermatology',
+    'rash': 'Dermatology',
+    'acne': 'Dermatology',
+    'mole': 'Dermatology',
+    'itching': 'Dermatology',
+    'dry skin': 'Dermatology',
+
+    // Pediatrics
+    'child': 'Pediatrics',
+    'baby': 'Pediatrics',
+    'infant': 'Pediatrics',
+    'toddler': 'Pediatrics',
+
+    // Gynecology
+    'pregnancy': 'Gynecology',
+    'menstrual': 'Gynecology',
+    'period': 'Gynecology',
+    'fertility': 'Gynecology',
+
+    // Gastroenterology
+    'stomach': 'Gastroenterology',
+    'digestion': 'Gastroenterology',
+    'nausea': 'Gastroenterology',
+    'vomiting': 'Gastroenterology',
+    'diarrhea': 'Gastroenterology',
+    'constipation': 'Gastroenterology',
+    'abdominal pain': 'Gastroenterology',
+
+    // Dentistry
+    'tooth': 'Dentistry',
+    'dental': 'Dentistry',
+    'gum': 'Dentistry',
+    'jaw': 'Dentistry',
+    'mouth': 'Dentistry',
+    'oral': 'Dentistry',
+
+    // Ophthalmology
+    'eye': 'Ophthalmology',
+    'vision': 'Ophthalmology',
+    'blurred': 'Ophthalmology',
+    'glaucoma': 'Ophthalmology',
+
+    // ENT
+    'ear': 'ENT',
+    'nose': 'ENT',
+    'throat': 'ENT',
+    'hearing': 'ENT',
+    'sinus': 'ENT',
+
+    // Psychiatry
+    'anxiety': 'Psychiatry',
+    'depression': 'Psychiatry',
+    'stress': 'Psychiatry',
+    'mental': 'Psychiatry',
+
+    // Orthopedics
+    'bone': 'Orthopedics',
+    'joint': 'Orthopedics',
+    'back': 'Orthopedics',
+    'spine': 'Orthopedics',
+    'fracture': 'Orthopedics',
+
+    // Urology
+    'urine infection': 'Urology',
+    'kidney pain': 'Urology',
+
+    // General Medicine
+    'fever': 'General Medicine',
+    'flu': 'General Medicine',
+    'infection': 'General Medicine'
+  };
+
+  // Analyze symptoms and recommend specialty (exact logic as provided)
+  analyzeSymptoms = (symptomsText) => {
+    const userText = symptomsText.toLowerCase();
+    let recommended = 'General Medicine'; // default fallback
+    
+    for (const [symptom, specialty] of Object.entries(this.symptomToSpecialty)) {
+      if (userText.includes(symptom)) {
+        recommended = specialty;
+        break;
+      }
+    }
+    
+    return recommended;
+  };
+
+  // Handle symptoms input from user (exact implementation as provided)
   handleSymptomsInput = async (symptomsText) => {
+    console.log('handleSymptomsInput called with:', symptomsText);
     try {
-      // reflect state
+      // Reset awaiting flag
+      this.awaitingSymptoms = false;
       this.setState(prev => {
         const next = { ...prev, awaitingSymptoms: false };
         this.stateRef.current = next;
         return next;
       });
-      this.awaitingSymptoms = false;
 
-      const response = await fetch('http://localhost:5001/api/doctor-recommendations/analyze-symptoms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symptoms: symptomsText })
-      });
-      const data = await response.json();
+      // Analyze symptoms locally
+      const recommendedSpecialty = this.analyzeSymptoms(symptomsText);
+      console.log('Recommended specialty:', recommendedSpecialty);
 
-      const specialty = data?.data?.specialty || 'General Medicine';
-
+      // Show recommendation (exact message as provided)
       const analysisMsg = this.createChatBotMessage(
-        `Based on your symptoms, the most suitable specialization is ${specialty}. I'll find available doctors for you.`,
+        `Based on your symptoms, you should consult a **${recommendedSpecialty}** specialist.`
       );
       this.setState(prev => ({ ...prev, messages: [...prev.messages, analysisMsg] }));
 
-      // Reuse existing finder to fetch doctors by specialization
-      await this.findSpecialist(specialty);
+      // Ask if they want to see available doctors (exact message as provided)
+      const followUpMsg = this.createChatBotMessage(
+        "Would you like me to recommend nearby doctors?"
+      );
+      this.setState(prev => ({ ...prev, messages: [...prev.messages, followUpMsg] }));
+
+      // Auto-fetch doctors for the recommended specialty
+      await this.findSpecialist(recommendedSpecialty);
+
     } catch (e) {
-      console.error('Symptom analyze error', e);
+      console.error('Symptom analysis error', e);
       const message = this.createChatBotMessage('Sorry, I could not analyze those symptoms right now.');
       this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
     }
@@ -363,11 +487,28 @@ class ActionProvider {
     this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
   };
 
+  // Handle describe symptoms (exact implementation as provided)
   handleDescribeSymptoms = (data) => {
     const message = this.createChatBotMessage(
-      data.response || "Please describe your symptoms. For example: 'chest pain and shortness of breath' or 'skin rash and itching'."
+      data.response || "What kind of discomfort or symptoms are you experiencing?"
     );
-    this.setState(prev => ({ ...prev, awaitingSymptoms: true, messages: [...prev.messages, message] }));
+    
+    // Set awaiting flag on both instance and state
+    this.awaitingSymptoms = true;
+    this.setState(prev => {
+      const next = { ...prev, awaitingSymptoms: true, messages: [...prev.messages, message] };
+      this.stateRef.current = next;
+      return next;
+    });
+    
+    console.log('Describe symptoms clicked, awaitingSymptoms set to:', this.awaitingSymptoms);
+    console.log('State awaitingSymptoms set to:', this.stateRef.current?.awaitingSymptoms);
+    
+    // Force a re-render to ensure state is updated
+    setTimeout(() => {
+      console.log('After timeout - awaitingSymptoms:', this.awaitingSymptoms);
+      console.log('After timeout - state awaitingSymptoms:', this.stateRef.current?.awaitingSymptoms);
+    }, 100);
   };
 
   handleMedicineRecommendation = (data) => {
@@ -424,12 +565,12 @@ class ActionProvider {
       this.handleViewBookings({});
       return;
     }
-    if (lower.includes('describe symptoms')) {
-      this.handleDescribeSymptoms({});
-      return;
-    }
     if (lower.includes('show all available doctors')) {
       this.handleShowAllDoctors({});
+      return;
+    }
+    if (lower.includes('describe symptoms')) {
+      this.handleDescribeSymptoms({});
       return;
     }
     if (lower.includes('find') && lower.includes('doctor')) {
