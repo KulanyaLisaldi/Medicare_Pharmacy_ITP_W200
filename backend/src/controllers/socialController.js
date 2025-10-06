@@ -15,12 +15,20 @@ export async function googleSignin(req, res){
             user = await User.findOne({ email });
         }
         if(!user){
+            // derive first/last names and required fields
+            const displayName = name || email.split('@')[0];
+            const parts = (displayName || '').trim().split(/\s+/);
+            const firstName = parts[0] || displayName || 'Google';
+            const lastName = parts.slice(1).join(' ') || 'User';
+
             user = await User.create({
-                name: name || email.split('@')[0],
+                firstName,
+                lastName,
                 email,
                 password: jwt.sign({ email, sub }, 'x'),
                 address: 'N/A',
-                phone: 'N/A',
+                // phone must be unique per schema, use stable synthetic value
+                phone: `google:${sub}`,
                 role: 'customer',
                 isVerified: true,
                 provider: 'google',
@@ -30,6 +38,15 @@ export async function googleSignin(req, res){
             user.provider = 'google';
             user.providerId = sub;
             user.isVerified = true;
+            // Backfill missing required fields if this account predates required fields
+            if(!user.firstName || !user.lastName){
+                const displayName = name || email.split('@')[0];
+                const parts = (displayName || '').trim().split(/\s+/);
+                user.firstName = user.firstName || parts[0] || displayName || 'Google';
+                user.lastName = user.lastName || parts.slice(1).join(' ') || 'User';
+            }
+            if(!user.address) user.address = 'N/A';
+            if(!user.phone) user.phone = `google:${sub}`;
             await user.save();
         }
 
