@@ -215,9 +215,12 @@ class ActionProvider {
 
       // Show recommendation (exact message as provided)
       const analysisMsg = this.createChatBotMessage(
-        `Based on your symptoms, you should consult a **${recommendedSpecialty}** specialist.`
+        `Based on your symptoms, you should consult a ${recommendedSpecialty}specialist.`
+        
       );
       this.setState(prev => ({ ...prev, messages: [...prev.messages, analysisMsg] }));
+
+
 
       // Ask if they want to see available doctors (exact message as provided)
       const followUpMsg = this.createChatBotMessage(

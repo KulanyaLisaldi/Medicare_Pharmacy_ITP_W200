@@ -7,7 +7,7 @@ const DoctorFinder = () => {
     const [messages, setMessages] = useState([
         {
             id: 1,
-            text: "👋 Hello! I'm your Medicare Assistant.\nHow can I help you today?",
+            text: "👋 Hello! I'm your Medicare Assistant.\n How can I help you today?",
             sender: 'bot',
             timestamp: new Date(),
             widget: 'welcome-buttons'
@@ -239,7 +239,7 @@ const DoctorFinder = () => {
                     <div className="welcome-buttons-container">
                         <div className="button-grid">
                             <button className="welcome-btn" onClick={() => handleButtonClick('find-doctor')}>
-                                <span className="btn-icon">🏥</span>
+                                <span className="btn-icon">👩‍⚕️</span>
                                 <span className="btn-text">Find Doctor</span>
                             </button>
                             <button className="welcome-btn" onClick={() => handleButtonClick('medicine')}>
@@ -253,10 +253,6 @@ const DoctorFinder = () => {
                             <button className="welcome-btn" onClick={() => handleButtonClick('appointment')}>
                                 <span className="btn-icon">📅</span>
                                 <span className="btn-text">Appointment</span>
-                            </button>
-                            <button className="welcome-btn" onClick={() => handleButtonClick('faqs')}>
-                                <span className="btn-icon">❓</span>
-                                <span className="btn-text">FAQs</span>
                             </button>
                         </div>
                     </div>
@@ -290,7 +286,7 @@ const DoctorFinder = () => {
             {isOpen && (
                 <div className="doctor-finder-container">
                     <div className="doctor-finder-header">
-                        <h3>🏥 Doctor Finder</h3>
+                        <h3>👩‍⚕️ Doctor Finder</h3>
                         <button 
                             className="close-btn"
                             onClick={toggleChatbot}
@@ -357,7 +353,7 @@ const DoctorFinder = () => {
                 className="doctor-finder-toggle"
                 onClick={toggleChatbot}
             >
-                🏥
+                👩‍⚕️
             </button>
         </div>
     );
