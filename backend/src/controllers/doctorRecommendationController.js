@@ -141,8 +141,6 @@ export const getDoctorRecommendations = async (req, res) => {
                     id: doctor._id,
                     name: `Dr. ${doctor.firstName} ${doctor.lastName}`,
                     specialization: doctor.specialization,
-                    email: doctor.email,
-                    phone: doctor.phone
                 }))
             }
         });
