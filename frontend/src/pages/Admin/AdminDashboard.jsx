@@ -1133,6 +1133,17 @@ const AdminDashboard = () => {
                     </div>
                 );
 
+
+
+
+
+
+
+
+
+
+
+
             case 'inventory':
                 return (
                     <div className="inventory-section">
@@ -1192,6 +1203,10 @@ const AdminDashboard = () => {
     if (loading) {
         return <div className="loading">Loading...</div>;
     }
+
+
+
+    //admin dashboard
 
     return (
         <DashboardLayout 
@@ -1762,6 +1777,11 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
+
+
+
+// ChannelCreator Component
 
 function ChannelCreator() {
     const { token } = useAuth();
