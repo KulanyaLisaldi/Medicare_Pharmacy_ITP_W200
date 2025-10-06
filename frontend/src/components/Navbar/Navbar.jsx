@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { LogOut } from 'lucide-react'
+import { LogOut, ShoppingCart } from 'lucide-react'
 import './Navbar.css'
 
 const Navbar = () => {
@@ -81,8 +81,8 @@ const Navbar = () => {
             ) : (
               <>
                 {/* Cart Icon (visible for logged-in users only) */}
-                <Link to="/cart" className="nav-item relative">
-                  🛒
+                <Link to="/cart" className="nav-item relative" aria-label="Cart">
+                  <ShoppingCart size={20} />
                   {cartCount > 0 && (
                     <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5">{cartCount}</span>
                   )}

@@ -310,32 +310,63 @@ const Login = () => {
 
                     <div className="auth-footer" style={{ marginTop: '1.5rem' }}>
                     <div style={{ marginBottom: '12px' }}>
-                        <GoogleLogin
-                            onSuccess={async (credentialResponse) => {
-                                try{
-                                    const idToken = credentialResponse.credential;
-                                    // decode minimal data client-side to get sub/email if available
-                                    const payload = JSON.parse(atob(idToken.split('.')[1]));
-                                    const response = await fetch('http://localhost:5001/api/users/auth/google', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: payload.email, name: payload.name, sub: payload.sub })
-                                    });
-                                    const data = await response.json();
-                                    if (response.ok) {
-                                        toast.success('Logged in with Google');
-                                        // Reuse existing auth flow
-                                        localStorage.setItem('token', data.token);
-                                        window.location.href = '/';
-                                    } else {
-                                        toast.error(data.message || 'Google login failed');
+                        {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
+                            <GoogleLogin
+                                onSuccess={async (credentialResponse) => {
+                                    try {
+                                        const idToken = credentialResponse?.credential;
+                                        if (!idToken) {
+                                            toast.error('Missing Google credential');
+                                            return;
+                                        }
+
+                                        // Safely decode JWT payload
+                                        let payload;
+                                        try {
+                                            const base64 = idToken.split('.')[1];
+                                            const normalized = base64.replace(/-/g, '+').replace(/_/g, '/');
+                                            const json = decodeURIComponent(
+                                                atob(normalized)
+                                                    .split('')
+                                                    .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                                                    .join('')
+                                            );
+                                            payload = JSON.parse(json);
+                                        } catch (decodeErr) {
+                                            toast.error('Invalid Google token');
+                                            return;
+                                        }
+
+                                        const { email, name, sub } = payload || {};
+                                        if (!email || !sub) {
+                                            toast.error('Google response missing required fields');
+                                            return;
+                                        }
+
+                                        const response = await fetch('http://localhost:5001/api/users/auth/google', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ email, name, sub })
+                                        });
+                                        const data = await response.json().catch(() => ({}));
+                                        if (response.ok && data?.token) {
+                                            toast.success('Logged in with Google');
+                                            localStorage.setItem('token', data.token);
+                                            window.location.href = '/';
+                                        } else {
+                                            toast.error(data?.message || 'Google login failed');
+                                        }
+                                    } catch (e) {
+                                        toast.error('Google login error');
                                     }
-                                }catch(e){
-                                    toast.error('Google login error');
-                                }
-                            }}
-                            onError={() => toast.error('Google login failed')}
-                        />
+                                }}
+                                onError={() => toast.error('Google login failed')}
+                            />
+                        ) : (
+                            <div style={{ color: '#aa0000', fontSize: 12, textAlign: 'center' }}>
+                                Google Sign-In unavailable: missing VITE_GOOGLE_CLIENT_ID
+                            </div>
+                        )}
                     </div>
                     <p>
                         Don't have an account?{' '}
