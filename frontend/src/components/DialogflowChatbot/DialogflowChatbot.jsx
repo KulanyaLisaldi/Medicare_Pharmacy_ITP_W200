@@ -20,7 +20,7 @@ const DialogflowChatbot = () => {
           className="chatbot-toggle"
           onClick={toggleChatbot}
         >
-          🩺
+          💬
         </button>
       </div>
     );

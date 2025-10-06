@@ -18,7 +18,7 @@ export const WelcomeButtons = (props) => {
           <span className="btn-text">View Bookings</span>
         </button>
         <button className="welcome-btn" onClick={() => handleClick('Find a doctor')}>
-          <span className="btn-icon">🏥</span>
+          <span className="btn-icon">👨‍⚕️</span>
           <span className="btn-text">Find Doctor</span>
         </button>
         <button className="welcome-btn" onClick={() => handleClick('Medicine recommendation')}>
@@ -87,18 +87,7 @@ export const ViewAppointments = (props) => {
     props.actionProvider.handleHelpOptions('no');
   };
 
-  return (
-    <div className="view-appointments-widget">
-      <div className="help-buttons">
-        <button className="help-btn yes" onClick={handleYes}>
-          ✅ Yes, I need more help
-        </button>
-        <button className="help-btn no" onClick={handleNo}>
-          ❌ No, I'm all set
-        </button>
-      </div>
-    </div>
-  );
+  return null;
 };
 
 // Help Options Widget
@@ -110,19 +99,6 @@ export const HelpOptions = (props) => {
   const handleNo = () => {
     props.actionProvider.handleHelpOptions('no');
   };
-
-  return (
-    <div className="help-options-widget">
-      <div className="help-buttons">
-        <button className="help-btn yes" onClick={handleYes}>
-          ✅ Yes, I need more help
-        </button>
-        <button className="help-btn no" onClick={handleNo}>
-          ❌ No, I'm all set
-        </button>
-      </div>
-    </div>
-  );
 };
 
 // Doctor Finder Widget
