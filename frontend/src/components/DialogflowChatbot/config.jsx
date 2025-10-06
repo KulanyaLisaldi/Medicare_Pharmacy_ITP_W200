@@ -7,8 +7,10 @@ import {
   DeliveryTracking,
   DoctorSearch,
   ViewAppointments,
-  HelpOptions
+  HelpOptions,
+  DoctorList
 } from './Widgets';
+import BotAvatar from './BotAvatar.jsx';
 
 const config = {
   initialMessages: [
@@ -28,6 +30,10 @@ const config = {
     {
       widgetName: 'doctorFinder',
       widgetFunc: (props) => <DoctorFinder {...props} />,
+    },
+    {
+      widgetName: 'doctorList',
+      widgetFunc: (props) => <DoctorList {...props} />,
     },
     {
       widgetName: 'medicineRecommendation',
@@ -59,7 +65,8 @@ const config = {
     },
   },
   customComponents: {
-    header: () => null
+    header: () => null,
+    botAvatar: (props) => <BotAvatar {...props} />
   }
 };
 

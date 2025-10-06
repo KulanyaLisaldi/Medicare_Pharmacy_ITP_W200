@@ -1,15 +1,121 @@
 import User from '../models/User.js';
 
+// Basic symptom/disease to specialization mapping (department style names)
+const SYMPTOM_TO_SPECIALTY = {
+    // Cardiology
+    'chest pain': 'Cardiology',
+    'heart': 'Cardiology',
+    'blood pressure': 'Cardiology',
+    'palpitation': 'Cardiology',
+    'shortness of breath': 'Cardiology',
+    'breathing': 'Cardiology',
+
+    // Dermatology
+    'skin': 'Dermatology',
+    'rash': 'Dermatology',
+    'acne': 'Dermatology',
+    'itch': 'Dermatology',
+    'itching': 'Dermatology',
+
+    // Pediatrics
+    'child': 'Pediatrics',
+    'baby': 'Pediatrics',
+    'infant': 'Pediatrics',
+    'toddler': 'Pediatrics',
+    'child fever': 'Pediatrics',
+    'child cough': 'Pediatrics',
+
+    // Neurology
+    'seizure': 'Neurology',
+    'headache': 'Neurology',
+    'migraine': 'Neurology',
+    'dizziness': 'Neurology',
+    'numbness': 'Neurology',
+
+    // Orthopedics
+    'bone': 'Orthopedics',
+    'fracture': 'Orthopedics',
+    'joint': 'Orthopedics',
+    'back pain': 'Orthopedics',
+
+    // Gynecology
+    'pregnancy': 'Gynecology',
+    'menstrual': 'Gynecology',
+    'period': 'Gynecology',
+
+    // Psychiatry
+    'depression': 'Psychiatry',
+    'anxiety': 'Psychiatry',
+    'stress': 'Psychiatry',
+
+    // General Medicine
+    'fever': 'General Medicine',
+    'flu': 'General Medicine',
+    'infection': 'General Medicine',
+
+    // Ophthalmology
+    'vision': 'Ophthalmology',
+    'eye': 'Ophthalmology',
+    'blurred vision': 'Ophthalmology',
+
+    // ENT
+    'ear': 'ENT',
+    'sore throat': 'ENT',
+    'throat': 'ENT',
+    'sinus': 'ENT',
+
+    // Urology
+    'urine infection': 'Urology',
+    'kidney pain': 'Urology',
+};
+
+function mapSymptomsToSpecialty(symptoms) {
+    if (!symptoms) return null;
+    const text = String(symptoms).toLowerCase();
+    for (const [key, value] of Object.entries(SYMPTOM_TO_SPECIALTY)) {
+        if (text.includes(key)) return value;
+    }
+    return null;
+}
+
+// Normalize common practitioner titles to department-style specializations stored in DB
+const SPECIALTY_ALIASES = {
+    'cardiologist': 'Cardiology',
+    'neurologist': 'Neurology',
+    'dermatologist': 'Dermatology',
+    'pediatrician': 'Pediatrics',
+    'gynecologist': 'Gynecology',
+    'psychiatrist': 'Psychiatry',
+    'endocrinologist': 'Endocrinology',
+    'general practitioner': 'General Medicine',
+    'ophthalmologist': 'Ophthalmology',
+    'ent specialist': 'ENT',
+    'ent': 'ENT',
+    'orthopedist': 'Orthopedics',
+    'pulmonologist': 'Pulmonology',
+    'gastroenterologist': 'Gastroenterology',
+    'dentist': 'Dentistry',
+    'urologist': 'Urology'
+};
+
+function normalizeSpecialty(input) {
+    if (!input) return '';
+    const key = String(input).toLowerCase().trim();
+    return SPECIALTY_ALIASES[key] || input;
+}
+
 // Get doctor recommendations based on symptoms
 export const getDoctorRecommendations = async (req, res) => {
     try {
         const { symptoms, specialty } = req.body;
         
-        // Build query based on specialty
-        let query = { role: 'doctor' };
-        if (specialty) {
-            query.specialization = { $regex: specialty, $options: 'i' };
-        }
+        // Determine target specialization
+        let targetSpecialty = specialty && String(specialty).trim() !== ''
+            ? normalizeSpecialty(specialty)
+            : mapSymptomsToSpecialty(symptoms) || 'General Medicine';
+
+        // Build query based on specialization (department style or practitioner form)
+        let query = { role: 'doctor', specialization: { $regex: targetSpecialty, $options: 'i' } };
         
         // Get available doctors
         const doctors = await User.find(query)
@@ -17,9 +123,11 @@ export const getDoctorRecommendations = async (req, res) => {
             .limit(10);
         
         if (doctors.length === 0) {
+            const specializationName = targetSpecialty;
             return res.status(404).json({
                 success: false,
-                message: 'No doctors found for the specified specialty'
+                message: `Sorry, we currently do not have a ${specializationName} doctor available at our clinic.`,
+                data: { specialization: specializationName }
             });
         }
         
@@ -27,7 +135,7 @@ export const getDoctorRecommendations = async (req, res) => {
             success: true,
             message: 'Doctor recommendations retrieved successfully',
             data: {
-                specialty,
+                specialty: targetSpecialty,
                 symptoms,
                 doctors: doctors.map(doctor => ({
                     id: doctor._id,
@@ -82,106 +190,103 @@ export const analyzeSymptoms = async (req, res) => {
         
         const symptomText = symptoms.toLowerCase();
         
-        // Comprehensive symptom-to-specialty mapping
+        // Symptom-to-specialty mapping (department style to match stored doctor specializations)
         const symptomMapping = {
-            // Neurological symptoms
-            'headache': 'Neurologist',
-            'migraine': 'Neurologist',
-            'seizure': 'Neurologist',
-            'dizziness': 'Neurologist',
-            'memory': 'Neurologist',
-            'confusion': 'Neurologist',
-            'numbness': 'Neurologist',
-            'tingling': 'Neurologist',
-            'neurological': 'Neurologist',
-            
-            // Cardiovascular symptoms
-            'chest pain': 'Cardiologist',
-            'heart': 'Cardiologist',
-            'blood pressure': 'Cardiologist',
-            'breathing': 'Cardiologist',
-            'palpitation': 'Cardiologist',
-            'shortness of breath': 'Cardiologist',
-            'cardiac': 'Cardiologist',
-            
-            // Respiratory symptoms
-            'cough': 'Pulmonologist',
-            'asthma': 'Pulmonologist',
-            'lung': 'Pulmonologist',
-            'wheezing': 'Pulmonologist',
-            'chest tightness': 'Pulmonologist',
-            'respiratory': 'Pulmonologist',
-            
-            // Dermatological symptoms
-            'skin': 'Dermatologist',
-            'rash': 'Dermatologist',
-            'acne': 'Dermatologist',
-            'mole': 'Dermatologist',
-            'itching': 'Dermatologist',
-            'dry skin': 'Dermatologist',
-            'dermatological': 'Dermatologist',
-            
-            // Pediatric symptoms
-            'child': 'Pediatrician',
-            'baby': 'Pediatrician',
-            'infant': 'Pediatrician',
-            'toddler': 'Pediatrician',
-            'pediatric': 'Pediatrician',
-            
-            // Gynecological symptoms
-            'pregnancy': 'Gynecologist',
-            'menstrual': 'Gynecologist',
-            'period': 'Gynecologist',
-            'fertility': 'Gynecologist',
-            'gynecological': 'Gynecologist',
-            
-            // Gastrointestinal symptoms
-            'stomach': 'Gastroenterologist',
-            'digestion': 'Gastroenterologist',
-            'nausea': 'Gastroenterologist',
-            'vomiting': 'Gastroenterologist',
-            'diarrhea': 'Gastroenterologist',
-            'constipation': 'Gastroenterologist',
-            'abdominal pain': 'Gastroenterologist',
-            'gastrointestinal': 'Gastroenterologist',
-            
-            // Dental symptoms
-            'tooth': 'Dentist',
-            'dental': 'Dentist',
-            'gum': 'Dentist',
-            'jaw': 'Dentist',
-            'mouth': 'Dentist',
-            'oral': 'Dentist',
-            
-            // Eye symptoms
-            'eye': 'Ophthalmologist',
-            'vision': 'Ophthalmologist',
-            'blurred': 'Ophthalmologist',
-            'glaucoma': 'Ophthalmologist',
-            'ophthalmic': 'Ophthalmologist',
-            
-            // ENT symptoms
-            'ear': 'ENT Specialist',
-            'nose': 'ENT Specialist',
-            'throat': 'ENT Specialist',
-            'hearing': 'ENT Specialist',
-            'sinus': 'ENT Specialist',
-            'otolaryngology': 'ENT Specialist',
-            
-            // Mental health
-            'anxiety': 'Psychiatrist',
-            'depression': 'Psychiatrist',
-            'stress': 'Psychiatrist',
-            'mental': 'Psychiatrist',
-            'psychiatric': 'Psychiatrist',
-            
-            // Orthopedic symptoms
-            'bone': 'Orthopedist',
-            'joint': 'Orthopedist',
-            'back': 'Orthopedist',
-            'spine': 'Orthopedist',
-            'fracture': 'Orthopedist',
-            'orthopedic': 'Orthopedist'
+            // Neurology
+            'headache': 'Neurology',
+            'migraine': 'Neurology',
+            'seizure': 'Neurology',
+            'dizziness': 'Neurology',
+            'memory': 'Neurology',
+            'confusion': 'Neurology',
+            'numbness': 'Neurology',
+            'tingling': 'Neurology',
+
+            // Cardiology
+            'chest pain': 'Cardiology',
+            'heart': 'Cardiology',
+            'blood pressure': 'Cardiology',
+            'palpitation': 'Cardiology',
+            'shortness of breath': 'Cardiology',
+
+            // Pulmonology
+            'cough': 'Pulmonology',
+            'asthma': 'Pulmonology',
+            'lung': 'Pulmonology',
+            'wheezing': 'Pulmonology',
+            'chest tightness': 'Pulmonology',
+
+            // Dermatology
+            'skin': 'Dermatology',
+            'rash': 'Dermatology',
+            'acne': 'Dermatology',
+            'mole': 'Dermatology',
+            'itching': 'Dermatology',
+            'dry skin': 'Dermatology',
+
+            // Pediatrics
+            'child': 'Pediatrics',
+            'baby': 'Pediatrics',
+            'infant': 'Pediatrics',
+            'toddler': 'Pediatrics',
+
+            // Gynecology
+            'pregnancy': 'Gynecology',
+            'menstrual': 'Gynecology',
+            'period': 'Gynecology',
+            'fertility': 'Gynecology',
+
+            // Gastroenterology
+            'stomach': 'Gastroenterology',
+            'digestion': 'Gastroenterology',
+            'nausea': 'Gastroenterology',
+            'vomiting': 'Gastroenterology',
+            'diarrhea': 'Gastroenterology',
+            'constipation': 'Gastroenterology',
+            'abdominal pain': 'Gastroenterology',
+
+            // Dentistry
+            'tooth': 'Dentistry',
+            'dental': 'Dentistry',
+            'gum': 'Dentistry',
+            'jaw': 'Dentistry',
+            'mouth': 'Dentistry',
+            'oral': 'Dentistry',
+
+            // Ophthalmology
+            'eye': 'Ophthalmology',
+            'vision': 'Ophthalmology',
+            'blurred': 'Ophthalmology',
+            'glaucoma': 'Ophthalmology',
+
+            // ENT
+            'ear': 'ENT',
+            'nose': 'ENT',
+            'throat': 'ENT',
+            'hearing': 'ENT',
+            'sinus': 'ENT',
+
+            // Psychiatry
+            'anxiety': 'Psychiatry',
+            'depression': 'Psychiatry',
+            'stress': 'Psychiatry',
+            'mental': 'Psychiatry',
+
+            // Orthopedics
+            'bone': 'Orthopedics',
+            'joint': 'Orthopedics',
+            'back': 'Orthopedics',
+            'spine': 'Orthopedics',
+            'fracture': 'Orthopedics',
+
+            // Urology
+            'urine infection': 'Urology',
+            'kidney pain': 'Urology',
+
+            // General Medicine
+            'fever': 'General Medicine',
+            'flu': 'General Medicine',
+            'infection': 'General Medicine'
         };
         
         // Find matching specialty
@@ -198,7 +303,7 @@ export const analyzeSymptoms = async (req, res) => {
                 success: true,
                 message: 'No specific specialty identified',
                 data: {
-                    specialty: 'General Practitioner',
+                    specialty: 'General Medicine',
                     confidence: 'low',
                     reason: 'Symptoms do not clearly indicate a specific specialty'
                 }
@@ -211,7 +316,7 @@ export const analyzeSymptoms = async (req, res) => {
             data: {
                 specialty: recommendedSpecialty,
                 confidence: 'high',
-                reason: `Based on your symptoms, you may need to consult a ${recommendedSpecialty}`
+                reason: `Based on your symptoms, we recommend consulting ${recommendedSpecialty}`
             }
         });
         

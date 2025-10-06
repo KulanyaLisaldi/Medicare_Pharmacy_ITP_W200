@@ -71,8 +71,8 @@ const App = () => {
         <Route path="*" element={<CatchAllRoute />} />
       </Routes>
       
-      {/* Dialogflow Chatbot Widget */}
-      <DialogflowChatbot />
+      {/* Dialogflow Chatbot Widget (visible only to patients/customers) */}
+      <ChatbotGate />
     </AuthProvider>
   )
 }
@@ -148,4 +148,13 @@ const RequireRole = ({ roles, children }) => {
   if (!user) return <Navigate to="/login" replace />;
   if (!roles.includes(user.role)) return <Navigate to="/" replace />;
   return children;
+};
+
+// Only render chatbot for patients (customers). Hidden for admin, doctor, pharmacist, delivery.
+const ChatbotGate = () => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return null;
+  if (user.role !== 'customer') return null;
+  return <DialogflowChatbot />;
 };

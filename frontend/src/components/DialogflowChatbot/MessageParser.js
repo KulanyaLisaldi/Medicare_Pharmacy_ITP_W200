@@ -5,13 +5,16 @@ class MessageParser {
 
   parse(message) {
     const lowercase = message.toLowerCase();
+    const state = this.actionProvider?.stateRef?.current;
+    if (state?.awaitingSymptoms || this.actionProvider?.awaitingSymptoms) {
+      this.actionProvider.handleSymptomsInput(message);
+      return;
+    }
 
     // Handle greetings first
     if (lowercase.includes('hi') || lowercase.includes('hello') || lowercase.includes('hey') || 
         lowercase.includes('hy') || lowercase.includes('hii') || lowercase.includes('good morning') ||
         lowercase.includes('good afternoon') || lowercase.includes('good evening') ||
-        lowercase.includes('greetings') || lowercase.includes('hiya') || lowercase.includes('hi there') ||
-        lowercase.includes('hey there') || lowercase.includes('howdy') || lowercase.includes('sup') ||
         lowercase.includes('what\'s up') || lowercase.includes('whats up') || lowercase.includes('yo')) {
       this.actionProvider.handleGreeting();
     }
