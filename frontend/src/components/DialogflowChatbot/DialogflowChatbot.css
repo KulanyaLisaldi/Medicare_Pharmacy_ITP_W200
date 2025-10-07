@@ -161,6 +161,33 @@
   outline: none !important;
 }
 
+/* Medicine symptoms widget styles */
+.medicine-symptoms-widget {
+  padding: 8px 4px;
+}
+.medicine-symptoms-widget .symptoms-header {
+  font-size: 13px;
+  color: #334155;
+  margin-bottom: 8px;
+}
+.medicine-symptoms-widget .symptoms-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.medicine-symptoms-widget .symptom-btn {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.medicine-symptoms-widget .symptom-btn:hover {
+  background: #dbeafe;
+}
+
 .react-chatbot-kit-chat-btn-send {
   background: #3b82f6 !important;
   border: none !important;

@@ -3,7 +3,8 @@ import {
   WelcomeButtons, 
   AppointmentBooking, 
   DoctorFinder, 
-  MedicineRecommendation, 
+  MedicineRecommendation,
+  MedicineSymptoms,
   DeliveryTracking,
   DoctorSearch,
   ViewAppointments,
@@ -38,6 +39,10 @@ const config = {
     {
       widgetName: 'medicineRecommendation',
       widgetFunc: (props) => <MedicineRecommendation {...props} />,
+    },
+    {
+      widgetName: 'medicineSymptoms',
+      widgetFunc: (props) => <MedicineSymptoms {...props} />,
     },
           {
             widgetName: 'deliveryTracking',
