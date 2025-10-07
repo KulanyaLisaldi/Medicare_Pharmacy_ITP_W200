@@ -300,13 +300,13 @@ const Cart = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowClearConfirm(true)}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-7 py-3 text-base bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Clear All Items
               </button>
               <button
                 onClick={() => navigate('/products')}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-7 py-3 text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Continue Shopping
               </button>
@@ -320,7 +320,7 @@ const Cart = () => {
                 </div>
                 <button
                   onClick={proceedToCheckout}
-                  className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full px-8 py-3 text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Proceed to Checkout
                 </button>
