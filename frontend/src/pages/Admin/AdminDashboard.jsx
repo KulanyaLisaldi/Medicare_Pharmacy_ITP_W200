@@ -185,36 +185,60 @@ const AdminDashboard = () => {
         }
     };
 
-    // Simple CSV export for orders
-    const exportOrdersCSV = (rows) => {
+    // PDF export for orders (jsPDF + autoTable)
+    const exportOrdersPDF = (rows) => {
         try {
-            const headers = ['Order ID','Customer','Phone','Items','Total','Date','Payment','Status'];
-            const lines = [headers.join(',')];
-            rows.forEach(o => {
+            const doc = new jsPDF('landscape');
+            const title = 'Orders Report';
+            const generatedAt = new Date().toLocaleString();
+
+            doc.setFontSize(16);
+            doc.text(title, 14, 14);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${generatedAt}`, 14, 20);
+
+            const headers = [['Order', 'Customer', 'Phone', 'Items', 'Total ($)', 'Date', 'Payment', 'Status']];
+            const body = rows.map(o => {
                 const count = Array.isArray(o.items) ? o.items.reduce((s,it)=>s+(it.quantity||0),0) : 0;
-                const row = [
+                return [
                     `#${(o._id||'').slice(-6)}`,
-                    (o?.customer?.name||'').replace(/,/g,' '),
-                    (o?.customer?.phone||'').replace(/,/g,' '),
-                    count,
+                    o?.customer?.name || '-',
+                    o?.customer?.phone || '-',
+                    String(count),
                     Number(o.total||0).toFixed(2),
                     new Date(o.createdAt||Date.now()).toLocaleDateString(),
                     (o.paymentMethod||'cod').toUpperCase(),
-                    (o.status||'pending')
+                    formatStatus(o.status)
                 ];
-                lines.push(row.join(','));
             });
-            const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'orders.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+
+            autoTable(doc, {
+                head: headers,
+                body,
+                startY: 26,
+                styles: { fontSize: 9 },
+                headStyles: { fillColor: [59, 130, 246] },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: {
+                    0: { cellWidth: 28 }, // Order
+                    1: { cellWidth: 50 }, // Customer
+                    2: { cellWidth: 35 }, // Phone
+                    3: { cellWidth: 18 }, // Items
+                    4: { cellWidth: 24 }, // Total
+                    5: { cellWidth: 28 }, // Date
+                    6: { cellWidth: 26 }, // Payment
+                    7: { cellWidth: 30 }  // Status
+                },
+                didDrawPage: (data) => {
+                    const pageCount = doc.getNumberOfPages();
+                    doc.setFontSize(9);
+                    doc.text(`Page ${data.pageNumber} of ${pageCount}`, doc.internal.pageSize.getWidth() - 30, doc.internal.pageSize.getHeight() - 8);
+                }
+            });
+
+            doc.save('orders.pdf');
         } catch (e) {
-            console.error('Export failed', e);
+            console.error('PDF export failed', e);
         }
     };
 
@@ -1334,7 +1358,7 @@ const AdminDashboard = () => {
                                 <input className="search-input" placeholder="Search by order ID or customer" value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} />
                             </div>
                             <div className="toolbar-right">
-                                <button className="export-btn pdf" onClick={() => exportOrdersCSV(filtered)}>Export</button>
+                                <button className="export-btn pdf" onClick={() => exportOrdersPDF(filtered)}>Export</button>
                                 <select className="filter-select" value={orderSort} onChange={e=>setOrderSort(e.target.value)}>
                                     <option value="newest">Sort: newest</option>
                                     <option value="oldest">Sort: oldest</option>
