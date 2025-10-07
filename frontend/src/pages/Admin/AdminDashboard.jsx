@@ -15,9 +15,10 @@ import {
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
+    BarElement
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 
 ChartJS.register(
     CategoryScale,
@@ -27,11 +28,12 @@ ChartJS.register(
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
+    BarElement
 );
 
 const AdminDashboard = () => {
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterRole, setFilterRole] = useState('all');
@@ -94,6 +96,28 @@ const AdminDashboard = () => {
     const [notificationCount, setNotificationCount] = useState(0);
     const [showNotificationPopup, setShowNotificationPopup] = useState(false);
 
+    // Inventory/Revenue analytics state
+    const [invLoading, setInvLoading] = useState(false);
+    const [invError, setInvError] = useState('');
+    const [invReport, setInvReport] = useState(null);
+
+    const loadInventoryAnalytics = async () => {
+        setInvLoading(true);
+        setInvError('');
+        try {
+            const res = await fetch('http://localhost:5001/api/reports/pharmacy', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok || !data?.success) throw new Error(data?.message || 'Failed to load analytics');
+            setInvReport(data.data);
+        } catch (e) {
+            setInvError(e.message);
+        } finally {
+            setInvLoading(false);
+        }
+    };
+
     const sidebarItems = [
         { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
         { id: 'users', label: 'Users', icon: <Users size={18} /> },
@@ -132,6 +156,13 @@ const AdminDashboard = () => {
         };
         loadProductsCount();
     }, []);
+
+    // Load analytics when visiting Inventory tab
+    useEffect(() => {
+        if (activeSection === 'inventory' && !invReport && !invLoading) {
+            loadInventoryAnalytics();
+        }
+    }, [activeSection]);
 
     const fetchUsers = async () => {
         try {
@@ -1203,8 +1234,107 @@ const AdminDashboard = () => {
             case 'inventory':
                 return (
                     <div className="inventory-section">
-                        <h2>Inventory Management</h2>
-                        <p>Inventory management features coming soon...</p>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2>Inventory & Revenue Analytics</h2>
+                            <div className="flex items-center gap-2">
+                                <button className="btn-outline" onClick={loadInventoryAnalytics}>Refresh</button>
+                            </div>
+                        </div>
+                        {invError && (
+                            <div className="mb-3 px-3 py-2 rounded bg-red-50 text-red-700 text-sm">{invError}</div>
+                        )}
+                        {!invReport ? (
+                            <div className="text-sm text-gray-600">{invLoading ? 'Loading...' : 'Click Refresh to load analytics.'}</div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                    <div className="bg-white p-4 rounded border">
+                                        <div className="text-xs text-gray-500">Total Earnings</div>
+                                        <div className="text-2xl font-semibold">Rs.{Number(invReport.summary?.totalRevenue || 0).toFixed(2)}</div>
+                                    </div>
+                                    <div className="bg-white p-4 rounded border">
+                                        <div className="text-xs text-gray-500">Average Order Value</div>
+                                        <div className="text-2xl font-semibold">Rs.{Number(invReport.summary?.averageOrderValue || 0).toFixed(2)}</div>
+                                    </div>
+                                    <div className="bg-white p-4 rounded border">
+                                        <div className="text-xs text-gray-500">Orders (30d)</div>
+                                        <div className="text-2xl font-semibold">{invReport.orderAnalysis?.orderStats?.total || 0}</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="bg-white p-4 rounded border lg:col-span-2">
+                                        <div className="font-semibold mb-2">Regular Sales (Revenue by Day)</div>
+                                        <div style={{height:'280px'}}>
+                                            <Bar 
+                                                data={{
+                                                    labels: (invReport.orderAnalysis?.orderTrends || []).map(t => t.date),
+                                                    datasets: [{
+                                                        label: 'Revenue',
+                                                        data: (invReport.orderAnalysis?.orderTrends || []).map(t => t.revenue),
+                                                        backgroundColor: 'rgba(59,130,246,0.5)',
+                                                        borderColor: 'rgba(59,130,246,1)',
+                                                    }]
+                                                }}
+                                                options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    plugins: { legend: { display: false } },
+                                                    scales: { y: { beginAtZero: true } }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-4 rounded border">
+                                        <div className="font-semibold mb-2">Top Selling Products</div>
+                                        <div className="space-y-2">
+                                            {(invReport.orderAnalysis?.topSellingProducts || []).slice(0, 8).map((p, idx) => (
+                                                <div key={idx} className="flex items-center justify-between text-sm">
+                                                    <div className="truncate mr-2">{p.name}</div>
+                                                    <div className="text-gray-600">{p.quantity}</div>
+                                                </div>
+                                            ))}
+                                            {(!invReport.orderAnalysis?.topSellingProducts || invReport.orderAnalysis.topSellingProducts.length === 0) && (
+                                                <div className="text-xs text-gray-500">No data</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-4 rounded border mt-6">
+                                    <div className="font-semibold mb-2">Category Stock Analysis</div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="text-left text-gray-600">
+                                                    <th className="p-2">Category</th>
+                                                    <th className="p-2">Total</th>
+                                                    <th className="p-2">Low</th>
+                                                    <th className="p-2">Out</th>
+                                                    <th className="p-2">Expired</th>
+                                                    <th className="p-2">Near Expiry</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(invReport.categoryAnalysis || []).map((c) => (
+                                                    <tr key={c.category} className="border-t">
+                                                        <td className="p-2">{c.category}</td>
+                                                        <td className="p-2">{c.total}</td>
+                                                        <td className="p-2">{c.lowStock}</td>
+                                                        <td className="p-2">{c.outOfStock}</td>
+                                                        <td className="p-2">{c.expired}</td>
+                                                        <td className="p-2">{c.nearExpiry}</td>
+                                                    </tr>
+                                                ))}
+                                                {(invReport.categoryAnalysis || []).length === 0 && (
+                                                    <tr><td className="p-2 text-xs text-gray-500" colSpan={6}>No data</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 );
 
