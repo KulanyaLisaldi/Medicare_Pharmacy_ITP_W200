@@ -8,7 +8,8 @@ import {
   DoctorSearch,
   ViewAppointments,
   HelpOptions,
-  DoctorList
+  DoctorList,
+  SymptomSelector
 } from './Widgets';
 import BotAvatar from './BotAvatar.jsx';
 
@@ -30,6 +31,10 @@ const config = {
     {
       widgetName: 'doctorFinder',
       widgetFunc: (props) => <DoctorFinder {...props} />,
+    },
+    {
+      widgetName: 'symptomSelector',
+      widgetFunc: (props) => <SymptomSelector {...props} />,
     },
     {
       widgetName: 'doctorList',

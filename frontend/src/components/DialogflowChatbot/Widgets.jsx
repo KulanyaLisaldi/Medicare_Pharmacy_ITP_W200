@@ -100,9 +100,6 @@ export const DoctorFinder = (props) => {
     props.actionProvider.handleButtonClick('Show all available doctors');
   };
 
-  const handleDescribeSymptoms = () => {
-    props.actionProvider.handleButtonClick('Describe symptoms for doctor recommendation');
-  };
 
   return (
     <div className="doctor-finder-widget">
@@ -110,7 +107,7 @@ export const DoctorFinder = (props) => {
         <button className="doctor-finder-btn primary" onClick={handleViewAllDoctors}>
           👥 View All Doctors
         </button>
-        <button className="doctor-finder-btn" onClick={handleDescribeSymptoms}>
+        <button className="doctor-finder-btn" onClick={() => props.actionProvider.handleButtonClick('Describe symptoms')}>
           🩺 Describe Symptoms
         </button>
       </div>
@@ -143,6 +140,32 @@ export const DoctorFinder = (props) => {
             🧠 Psychiatrist
           </button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Symptom Selector Widget
+export const SymptomSelector = (props) => {
+  const action = props?.actionProvider;
+  const symptoms = [
+    'Headache', 'Migraine', 'Dizziness', 'Chest pain', 'Shortness of breath',
+    'Cough', 'Wheezing', 'Skin rash', 'Acne', 'Itching',
+    'Stomach pain', 'Nausea', 'Diarrhea', 'Constipation',
+    'Tooth pain', 'Gum pain', 'Eye problem', 'Blurred vision',
+    'Ear pain', 'Sore throat', 'Sinus',
+    'Anxiety', 'Depression', 'Back pain', 'Joint pain',
+    'Fever', 'Flu'
+  ];
+
+  return (
+    <div className="symptom-selector-widget">
+      <div className="symptom-grid">
+        {symptoms.map((s) => (
+          <button key={s} className="symptom-btn" onClick={() => action.handleSymptomChoice(s)}>
+            {s}
+          </button>
+        ))}
       </div>
     </div>
   );

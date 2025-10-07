@@ -1,14 +1,12 @@
 import express from 'express';
 import { 
     getDoctorRecommendations, 
-    getSpecialties, 
-    analyzeSymptoms 
+    getSpecialties
 } from '../controllers/doctorRecommendationController.js';
 
 const router = express.Router();
 
-// Analyze symptoms and recommend specialty (public)
-router.post('/analyze-symptoms', analyzeSymptoms);
+// analyze-symptoms endpoint removed
 
 // Get doctor recommendations based on specialty (public)
 router.post('/recommendations', getDoctorRecommendations);
