@@ -16,6 +16,7 @@ class ActionProvider {
     this.createClientMessage = createClientMessage;
     // awaitingSymptoms feature removed
     this.awaitingSymptoms = false;
+    this.selectedMedicineCategory = null;
   }
 
   // Handle Dialogflow responses
@@ -442,6 +443,158 @@ class ActionProvider {
     this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
   };
 
+  // When a medicine category is selected, show symptom choices for that category
+  handleMedicineCategory = (category) => {
+    const normalized = (category || '').toLowerCase();
+    this.selectedMedicineCategory = normalized;
+
+    // If user chose Prescription, describe the upload process instead of showing symptoms
+    if (normalized === 'prescription') {
+      this.handlePrescriptionUploadSteps();
+      return;
+    }
+
+    const intro = this.createChatBotMessage(
+      `You selected ${category}. Please choose a symptom to refine recommendations:`
+    );
+    const widgetMsg = this.createChatBotMessage('', { widget: 'medicineSymptoms', payload: { category: normalized } });
+
+    this.setState(prev => ({ ...prev, messages: [...prev.messages, intro, widgetMsg] }));
+  };
+
+  // Explain how to upload a prescription step-by-step
+  handlePrescriptionUploadSteps = () => {
+    const steps =
+      "📄 Upload Prescription — How it works\n\n" +
+      "1️⃣ Prepare your prescription: Clear photo or PDF with doctor details.\n" +
+      "2️⃣ Open Upload Prescription: From the menu or your dashboard.\n" +
+      "3️⃣ Attach file: Choose image/PDF of the prescription.\n" +
+      "4️⃣ Add notes: Add delivery info or special instructions (optional).\n" +
+      "5️⃣ Submit: Our pharmacist will verify and contact you if needed.\n\n" +
+      "⏱️ Processing: You’ll receive confirmation and can track your order in Orders.";
+
+    const msg = this.createChatBotMessage(steps);
+    this.setState(prev => ({ ...prev, messages: [...prev.messages, msg] }));
+  };
+
+  // After symptom selection, provide guidance or link to category-filtered products
+  handleMedicineSymptomSelect = (category, symptom) => {
+    const c = (category || '').toLowerCase();
+    const s = symptom;
+
+    // Echo the user's selection as a user message in the chat
+    const userMsg = this.createClientMessage(s);
+    this.setState(prev => ({ ...prev, messages: [...prev.messages, userMsg] }));
+
+    // Curated OTC suggestions by category/symptom (active ingredients, examples)
+    const SUGGESTIONS = {
+      'pain relief': {
+        'headache': [
+          'Paracetamol (Acetaminophen) 500 mg',
+          'Ibuprofen 200 mg (with food)',
+          'Aspirin 300 mg (adults only)'
+        ],
+        'muscle pain': [
+          'Ibuprofen 200–400 mg',
+          'Naproxen 220 mg',
+          'Topical diclofenac gel'
+        ],
+        'back pain': [
+          'Ibuprofen 200–400 mg',
+          'Naproxen 220 mg',
+          'Paracetamol 500 mg'
+        ],
+        'toothache': [
+          'Ibuprofen 200–400 mg',
+          'Paracetamol 500 mg',
+          'Benzocaine topical gel (temporary)'
+        ],
+        'menstrual cramps': [
+          'Ibuprofen 200–400 mg',
+          'Naproxen 220 mg',
+          'Mefenamic acid (if prescribed)'
+        ]
+      },
+      'cold and flu': {
+        'fever': [
+          'Paracetamol 500 mg',
+          'Ibuprofen 200 mg (if not contraindicated)'
+        ],
+        'cough': [
+          'Dextromethorphan syrup',
+          'Guaifenesin expectorant',
+          'Honey/lemon lozenges'
+        ],
+        'sore throat': [
+          'Benzydamine gargle/spray',
+          'Menthol lozenges',
+          'Paracetamol 500 mg'
+        ],
+        'nasal congestion': [
+          'Oxymetazoline nasal spray (≤3 days)',
+          'Pseudoephedrine tablets (age/contraindications apply)',
+          'Saline nasal spray'
+        ],
+        'runny nose': [
+          'Cetirizine 10 mg',
+          'Loratadine 10 mg'
+        ]
+      },
+      'vitamins': {
+        'low energy': [
+          'Vitamin B-complex',
+          'Iron + Vitamin C (if iron-deficient)'
+        ],
+        'immunity support': [
+          'Vitamin C 500 mg',
+          'Vitamin D3 1000 IU',
+          'Zinc 10–20 mg'
+        ],
+        'bone health': [
+          'Calcium + Vitamin D3'
+        ],
+        'anemia': [
+          'Ferrous fumarate/ferrous sulfate (check with doctor if persistent)'
+        ],
+        'hair & nail health': [
+          'Biotin',
+          'Multivitamin with minerals'
+        ]
+      },
+      'prescription': {
+        'hypertension': [
+          'Consult pharmacist/doctor for prescription options (ACE inhibitors, ARBs, etc.)'
+        ],
+        'diabetes': [
+          'Consult pharmacist/doctor for prescription options (e.g., Metformin)'
+        ],
+        'high cholesterol': [
+          'Consult pharmacist/doctor for prescription statins as appropriate'
+        ],
+        'thyroid': [
+          'Consult pharmacist/doctor for levothyroxine dosing and monitoring'
+        ],
+        'asthma': [
+          'Consult pharmacist/doctor for inhaled therapies (SABA/ICS, etc.)'
+        ]
+      }
+    };
+
+    const symptomKey = (s || '').toLowerCase();
+    const list = (SUGGESTIONS[c] && SUGGESTIONS[c][symptomKey]) || [];
+
+    const listText = list.length
+      ? list.map((item) => `• ${item}`).join('\n')
+      : 'No specific OTC suggestions available. Please consult a pharmacist or doctor.';
+
+    const guidance = this.createChatBotMessage(
+      `Recommended options for ${s.toLowerCase()} (${category}):\n\n${listText}`
+    );
+
+    // Only show the recommendations message as requested
+    this.setState(prev => ({ ...prev, messages: [...prev.messages, guidance] }));
+  };
+
   handleTrackDelivery = (data) => {
     const message = this.createChatBotMessage(
       data.response || "I can help you track your delivery! Please provide your order number or tracking ID.",
@@ -502,6 +655,10 @@ class ActionProvider {
     }
     if (lower.includes('medicine')) {
       this.handleMedicineRecommendation({});
+      return;
+    }
+    if (lower.includes('prescription')) {
+      this.handlePrescriptionUploadSteps();
       return;
     }
     if (lower.includes('track') && lower.includes('delivery')) {

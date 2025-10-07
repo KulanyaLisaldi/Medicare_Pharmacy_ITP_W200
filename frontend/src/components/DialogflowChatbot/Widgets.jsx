@@ -174,7 +174,11 @@ export const SymptomSelector = (props) => {
 // Medicine Recommendation Widget
 export const MedicineRecommendation = (props) => {
   const handleMedicineSearch = (category) => {
-    props.actionProvider.handleButtonClick(`Find ${category} medicine`);
+    if (props?.actionProvider?.handleMedicineCategory) {
+      props.actionProvider.handleMedicineCategory(category);
+    } else {
+      props.actionProvider.handleButtonClick(`Find ${category} medicine`);
+    }
   };
 
   return (
@@ -192,6 +196,41 @@ export const MedicineRecommendation = (props) => {
         <button className="medicine-btn" onClick={() => handleMedicineSearch('prescription')}>
           📋 Prescription
         </button>
+      </div>
+    </div>
+  );
+};
+
+// Medicine Symptoms Widget (shown after selecting a category)
+export const MedicineSymptoms = (props) => {
+  const category = (props?.payload?.category || '').toLowerCase();
+
+  const CATEGORY_SYMPTOMS = {
+    'pain relief': ['Headache', 'Muscle pain', 'Back pain', 'Toothache', 'Menstrual cramps'],
+    'cold and flu': ['Fever', 'Cough', 'Sore throat', 'Nasal congestion', 'Runny nose'],
+    'vitamins': ['Low energy', 'Immunity support', 'Bone health', 'Anemia', 'Hair & nail health'],
+    'prescription': ['Hypertension', 'Diabetes', 'High cholesterol', 'Thyroid', 'Asthma']
+  };
+
+  const symptoms = CATEGORY_SYMPTOMS[category] || [];
+
+  const onSelectSymptom = (symptom) => {
+    if (props?.actionProvider?.handleMedicineSymptomSelect) {
+      props.actionProvider.handleMedicineSymptomSelect(category, symptom);
+    }
+  };
+
+  if (!category) return null;
+
+  return (
+    <div className="medicine-symptoms-widget">
+      <div className="symptoms-header">Select the symptom you want to address:</div>
+      <div className="symptoms-grid">
+        {symptoms.map((s) => (
+          <button key={s} className="symptom-btn" onClick={() => onSelectSymptom(s)}>
+            {s}
+          </button>
+        ))}
       </div>
     </div>
   );
