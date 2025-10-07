@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import './DashboardLayout.css'
 import { useAuth } from '../context/AuthContext'
-import { LogOut } from 'lucide-react'
+import { LogOut, Bell } from 'lucide-react'
 
 const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, activeSection, notificationCount = 0, notifications = [], onNotificationUpdate, showNotificationPopup = false, setShowNotificationPopup }) => {
 	const location = useLocation()
@@ -552,7 +552,7 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 								onClick={() => setShowNotificationPopup && setShowNotificationPopup(!showNotificationPopup)}
 								style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative' }}
 							>
-								<span style={{ fontSize: '20px' }}>🔔</span>
+								<Bell size={20} />
 								{notificationCount > 0 && (
 									<span className="notification-badge">
 										{notificationCount > 99 ? '99+' : notificationCount}
@@ -888,7 +888,12 @@ const DashboardLayout = ({ sidebarItems = [], title, children, onSectionChange, 
 									<p className="notification-main-message"><strong>{selectedNotification.title || 'Notification'}</strong></p>
 									<div className="appointment-details-modal">
 										<p>📝 <strong>Message:</strong> {selectedNotification.message || 'No additional details available'}</p>
-										<p>🕒 <strong>Time:</strong> {selectedNotification.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : 'N/A'}</p>
+									<p>🕒 <strong>Time:</strong> {selectedNotification.createdAt 
+										? new Date(selectedNotification.createdAt).toLocaleString() 
+										: (selectedNotification.timestamp 
+											? new Date(selectedNotification.timestamp).toLocaleString() 
+											: 'N/A')}
+									</p>
 										{selectedNotification.data && (
 											<div>
 												<p><strong>Additional Data:</strong></p>

@@ -16,6 +16,7 @@ const DeliveryDashboard = () => {
 	const [recentDeliveriesLoading, setRecentDeliveriesLoading] = useState(true)
 	const [notifications, setNotifications] = useState([])
 	const [notificationCount, setNotificationCount] = useState(0)
+	const [showNotificationPopup, setShowNotificationPopup] = useState(false)
 	const { token } = useAuth()
 
 	const sidebar = [
@@ -402,6 +403,9 @@ const DeliveryDashboard = () => {
 			activeSection={activeSection}
 			notificationCount={notificationCount}
 			notifications={notifications.filter(n => !n.read)}
+			onNotificationUpdate={markNotificationAsRead}
+			showNotificationPopup={showNotificationPopup}
+			setShowNotificationPopup={setShowNotificationPopup}
 		>
 			<div className="delivery-dashboard">
 				{renderSection()}
