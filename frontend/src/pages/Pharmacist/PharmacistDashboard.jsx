@@ -789,6 +789,7 @@ const PharmacistDashboard = () => {
 	const [notifications, setNotifications] = useState([])
 	const [allProducts, setAllProducts] = useState([])
 	const [readNotifications, setReadNotifications] = useState(new Set())
+	const [showNotificationPopup, setShowNotificationPopup] = useState(false)
 
 	const { token } = useAuth()
 
@@ -1133,6 +1134,9 @@ const PharmacistDashboard = () => {
 			activeSection={activeSection}
 			notificationCount={notifications.filter(n => !readNotifications.has(n.id)).length}
 			notifications={notifications.filter(n => !readNotifications.has(n.id))}
+			onNotificationUpdate={markNotificationAsRead}
+			showNotificationPopup={showNotificationPopup}
+			setShowNotificationPopup={setShowNotificationPopup}
 		>
 			<div className="pharmacist-dashboard">
 				{renderSection()}

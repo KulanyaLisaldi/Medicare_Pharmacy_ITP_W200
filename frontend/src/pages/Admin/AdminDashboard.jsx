@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import './AdminDashboard.css';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { BarChart3, Users, Package, ShoppingCart, Calendar, Truck, FileText, Bell } from 'lucide-react';
+import { BarChart3, Users, Package, ShoppingCart, Calendar, Truck, FileText, MessageSquare } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -90,6 +90,9 @@ const AdminDashboard = () => {
     const [activeSection, setActiveSection] = useState('overview');
     const [recentUsers, setRecentUsers] = useState([]);
     const [productsCount, setProductsCount] = useState(0);
+    const [notifications, setNotifications] = useState([]);
+    const [notificationCount, setNotificationCount] = useState(0);
+    const [showNotificationPopup, setShowNotificationPopup] = useState(false);
 
     const sidebarItems = [
         { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
@@ -99,7 +102,7 @@ const AdminDashboard = () => {
         { id: 'appointments', label: 'Appointments', icon: <Calendar size={18} /> },
         { id: 'delivery', label: 'Delivery', icon: <Truck size={18} /> },
         { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
-        { id: 'messages', label: 'Notifications', icon: <Bell size={18} /> },
+        { id: 'messages', label: 'Messages', icon: <MessageSquare size={18} /> },
     ];
 
     useEffect(() => {
@@ -148,6 +151,59 @@ const AdminDashboard = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Generate admin notifications
+    useEffect(() => {
+        const generateNotifications = () => {
+            const notificationList = [];
+
+            // New users notifications (last 3 users)
+            if (recentUsers.length > 0) {
+                recentUsers.slice(0, 3).forEach(user => {
+                    notificationList.push({
+                        _id: `user-${user._id}`,
+                        id: `user-${user._id}`,
+                        type: 'user',
+                        title: 'New User Registered',
+                        message: `${user.firstName} ${user.lastName} (${user.role}) joined the system`,
+                        icon: '👤',
+                        timestamp: new Date(user.createdAt || Date.now()),
+                        read: false
+                    });
+                });
+            }
+
+            // System notifications (placeholder for future use)
+            const now = new Date();
+            notificationList.push({
+                _id: 'system-welcome',
+                id: 'system-welcome',
+                type: 'system',
+                title: 'System Status',
+                message: 'All systems are operational',
+                icon: '✅',
+                timestamp: now,
+                read: false
+            });
+
+            setNotifications(notificationList);
+            setNotificationCount(notificationList.filter(n => !n.read).length);
+        };
+
+        generateNotifications();
+    }, [recentUsers]);
+
+    // Function to mark notification as read
+    const markNotificationAsRead = (notificationId) => {
+        setNotifications(prev =>
+            prev.map(notification =>
+                notification._id === notificationId || notification.id === notificationId
+                    ? { ...notification, read: true }
+                    : notification
+            )
+        );
+        setNotificationCount(prev => Math.max(0, prev - 1));
     };
 
     const handleCreateStaff = async (e) => {
@@ -1214,6 +1270,11 @@ const AdminDashboard = () => {
             sidebarItems={sidebarItems}
             onSectionChange={setActiveSection}
             activeSection={activeSection}
+            notificationCount={notificationCount}
+            notifications={notifications.filter(n => !n.read)}
+            onNotificationUpdate={markNotificationAsRead}
+            showNotificationPopup={showNotificationPopup}
+            setShowNotificationPopup={setShowNotificationPopup}
         >
             <div className="admin-dashboard">
                 {renderSection()}

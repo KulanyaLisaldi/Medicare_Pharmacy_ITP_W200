@@ -11,7 +11,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #dac8ca;
+  background: rgb(37, 74, 235);
   color: rgb(59, 54, 184);
   border: none;
   cursor: pointer;
@@ -76,7 +76,7 @@
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(67, 16, 16, 0.1);
 }
 
 .chatbot-body {
@@ -159,6 +159,33 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
   background: white !important;
   outline: none !important;
+}
+
+/* Medicine symptoms widget styles */
+.medicine-symptoms-widget {
+  padding: 8px 4px;
+}
+.medicine-symptoms-widget .symptoms-header {
+  font-size: 13px;
+  color: #334155;
+  margin-bottom: 8px;
+}
+.medicine-symptoms-widget .symptoms-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.medicine-symptoms-widget .symptom-btn {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.medicine-symptoms-widget .symptom-btn:hover {
+  background: #dbeafe;
 }
 
 .react-chatbot-kit-chat-btn-send {
@@ -301,6 +328,37 @@
 .medicine-widget,
 .delivery-widget {
   margin-top: 8px;
+}
+
+/* Symptom Selector */
+.symptom-selector-widget {
+  margin-top: 8px;
+}
+
+.symptom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+
+.symptom-btn {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid #bae6fd;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.symptom-btn:hover {
+  background: #38bdf8;
+  color: white;
+  border-color: #0ea5e9;
+  transform: translateY(-1px);
 }
 
 /* Doctor Finder Widget Styles */

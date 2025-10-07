@@ -36,6 +36,7 @@ const DialogflowChatbot = () => {
             onClick={toggleChatbot}
           >
             ×
+            
           </button>
         </div>
         <div className="chatbot-body">

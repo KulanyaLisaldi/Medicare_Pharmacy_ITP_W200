@@ -150,7 +150,7 @@ const handleUnauthenticatedIntent = (intent, parameters, originalMessage) => {
       return "To view your bookings, please sign in to your account first.";
     
     case 'FindDoctor':
-      return "I can help you find doctors! Here are some ways to get started:\n\n• Browse by specialty\n• Describe your symptoms\n• View all available doctors\n\nPlease sign in to access the full doctor directory.";
+      return "I can help you find doctors! You can browse by specialty or view all available doctors. Please sign in to access the full doctor directory.";
     
     case 'MedicineRecommendation':
       return "I can help you with medicine information! What type of medication are you looking for?";
@@ -216,7 +216,7 @@ const handleViewBookings = async (userId) => {
 // Find Doctor Intent
 const handleFindDoctor = async (parameters, originalMessage) => {
   const specialty = parameters.specialty?.stringValue;
-  const symptoms = parameters.symptoms?.stringValue;
+  const symptoms = undefined; // symptoms flow removed
   const action = parameters.action?.stringValue;
 
   // Handle "Show all available doctors" action
@@ -224,10 +224,7 @@ const handleFindDoctor = async (parameters, originalMessage) => {
     return await handleShowAllDoctors();
   }
 
-  // Handle "Describe symptoms" action
-  if (action === 'describe_symptoms' || originalMessage.toLowerCase().includes('describe symptoms') || originalMessage.toLowerCase().includes('symptom')) {
-    return "Please describe your symptoms or health concerns, and I'll recommend the best specialist for you. For example: 'I have chest pain' or 'I have a skin rash'.";
-  }
+  // Describe symptoms flow removed
 
   if (specialty) {
     // Find doctors by specialty
@@ -252,12 +249,11 @@ const handleFindDoctor = async (parameters, originalMessage) => {
     response += "Would you like to book an appointment with any of these doctors?";
     return response;
 
-  } else if (symptoms || originalMessage.toLowerCase().includes('symptom') || originalMessage.toLowerCase().includes('pain') || originalMessage.toLowerCase().includes('ache')) {
-    // Analyze symptoms and recommend specialty
-    const symptomAnalysis = analyzeSymptoms(originalMessage);
-    return `Based on your symptoms, I recommend consulting a ${symptomAnalysis.specialty}. ${symptomAnalysis.reason} Would you like me to find available ${symptomAnalysis.specialty} specialists?`;
+  } else if (false) {
+    // symptoms flow removed
+    return "";
   } else {
-    return "I can help you find the right doctor! Choose an option:\n\n• View all available doctors\n• Describe your symptoms for recommendations\n• Browse by specialty";
+    return "I can help you find the right doctor! Choose an option:\n\n• View all available doctors\n• Browse by specialty";
   }
 };
 
@@ -363,85 +359,4 @@ const handleTrackDelivery = async (parameters, userId) => {
 };
 
 
-// Analyze symptoms and recommend specialty
-const analyzeSymptoms = (message) => {
-  const symptomText = message.toLowerCase();
-  
-  const symptomMapping = {
-    // Cardiovascular symptoms
-    'chest pain': { specialty: 'Cardiologist', reason: 'Chest pain requires immediate cardiac evaluation.' },
-    'heart palpitation': { specialty: 'Cardiologist', reason: 'Heart palpitations need cardiac assessment.' },
-    'shortness of breath': { specialty: 'Cardiologist', reason: 'Breathing difficulties may indicate heart issues.' },
-    'high blood pressure': { specialty: 'Cardiologist', reason: 'Blood pressure issues need cardiac monitoring.' },
-    
-    // Neurological symptoms
-    'headache': { specialty: 'Neurologist', reason: 'Headaches may indicate neurological issues.' },
-    'migraine': { specialty: 'Neurologist', reason: 'Migraines require neurological evaluation.' },
-    'seizure': { specialty: 'Neurologist', reason: 'Seizures need immediate neurological assessment.' },
-    'dizziness': { specialty: 'Neurologist', reason: 'Dizziness may indicate neurological problems.' },
-    'numbness': { specialty: 'Neurologist', reason: 'Numbness requires neurological evaluation.' },
-    
-    // Respiratory symptoms
-    'cough': { specialty: 'Pulmonologist', reason: 'Persistent cough may indicate respiratory issues.' },
-    'asthma': { specialty: 'Pulmonologist', reason: 'Asthma requires pulmonary specialist care.' },
-    'wheezing': { specialty: 'Pulmonologist', reason: 'Wheezing indicates respiratory problems.' },
-    
-    // Dermatological symptoms
-    'skin rash': { specialty: 'Dermatologist', reason: 'Skin issues are best handled by dermatologists.' },
-    'acne': { specialty: 'Dermatologist', reason: 'Acne treatment needs dermatological expertise.' },
-    'mole': { specialty: 'Dermatologist', reason: 'Mole changes require dermatological evaluation.' },
-    'itching': { specialty: 'Dermatologist', reason: 'Persistent itching needs skin specialist care.' },
-    
-    // Pediatric symptoms
-    'child': { specialty: 'Pediatrician', reason: 'Children need specialized pediatric care.' },
-    'baby': { specialty: 'Pediatrician', reason: 'Infants require pediatric specialist care.' },
-    'fever': { specialty: 'General Practitioner', reason: 'Fever is best evaluated by a general practitioner first.' },
-    
-    // Gynecological symptoms
-    'pregnancy': { specialty: 'Gynecologist', reason: 'Pregnancy-related concerns need obstetric care.' },
-    'menstrual': { specialty: 'Gynecologist', reason: 'Menstrual issues need gynecological evaluation.' },
-    'fertility': { specialty: 'Gynecologist', reason: 'Fertility concerns need reproductive health specialist.' },
-    
-    // Gastrointestinal symptoms
-    'stomach pain': { specialty: 'Gastroenterologist', reason: 'Digestive issues require gastroenterology expertise.' },
-    'nausea': { specialty: 'Gastroenterologist', reason: 'Persistent nausea needs digestive system evaluation.' },
-    'diarrhea': { specialty: 'Gastroenterologist', reason: 'Digestive problems need gastroenterology care.' },
-    'constipation': { specialty: 'Gastroenterologist', reason: 'Bowel issues require gastroenterology assessment.' },
-    
-    // Endocrine symptoms
-    'diabetes': { specialty: 'Endocrinologist', reason: 'Diabetes management needs endocrinology expertise.' },
-    'thyroid': { specialty: 'Endocrinologist', reason: 'Thyroid issues require endocrinology specialist.' },
-    'weight gain': { specialty: 'Endocrinologist', reason: 'Unexplained weight changes need endocrine evaluation.' },
-    
-    // Mental health symptoms
-    'anxiety': { specialty: 'Psychiatrist', reason: 'Anxiety disorders need psychiatric evaluation.' },
-    'depression': { specialty: 'Psychiatrist', reason: 'Depression requires mental health specialist care.' },
-    'stress': { specialty: 'Psychiatrist', reason: 'Chronic stress needs mental health assessment.' },
-    'mental health': { specialty: 'Psychiatrist', reason: 'Mental health concerns need psychiatric evaluation.' },
-    
-    // Orthopedic symptoms
-    'bone pain': { specialty: 'Orthopedist', reason: 'Bone and joint issues need orthopedic care.' },
-    'back pain': { specialty: 'Orthopedist', reason: 'Back problems require orthopedic evaluation.' },
-    'joint pain': { specialty: 'Orthopedist', reason: 'Joint issues need orthopedic specialist care.' },
-    'fracture': { specialty: 'Orthopedist', reason: 'Bone fractures require orthopedic treatment.' },
-    
-    // Eye symptoms
-    'eye problem': { specialty: 'Ophthalmologist', reason: 'Eye issues need specialized eye care.' },
-    'vision': { specialty: 'Ophthalmologist', reason: 'Vision problems require ophthalmology evaluation.' },
-    'blurred vision': { specialty: 'Ophthalmologist', reason: 'Vision changes need eye specialist assessment.' },
-    
-    // ENT symptoms
-    'ear pain': { specialty: 'ENT Specialist', reason: 'Ear, nose, and throat issues need ENT expertise.' },
-    'hearing': { specialty: 'ENT Specialist', reason: 'Hearing problems require ENT specialist care.' },
-    'sinus': { specialty: 'ENT Specialist', reason: 'Sinus issues need ENT evaluation.' },
-    'throat pain': { specialty: 'ENT Specialist', reason: 'Throat problems require ENT specialist care.' }
-  };
-
-  for (const [symptom, recommendation] of Object.entries(symptomMapping)) {
-    if (symptomText.includes(symptom)) {
-      return recommendation;
-    }
-  }
-
-  return { specialty: 'General Practitioner', reason: 'For general health concerns, start with a general practitioner who can refer you to the appropriate specialist.' };
-};
+// analyzeSymptoms removed

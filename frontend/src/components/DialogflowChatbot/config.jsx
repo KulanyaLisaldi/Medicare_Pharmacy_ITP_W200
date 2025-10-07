@@ -3,12 +3,14 @@ import {
   WelcomeButtons, 
   AppointmentBooking, 
   DoctorFinder, 
-  MedicineRecommendation, 
+  MedicineRecommendation,
+  MedicineSymptoms,
   DeliveryTracking,
   DoctorSearch,
   ViewAppointments,
   HelpOptions,
-  DoctorList
+  DoctorList,
+  SymptomSelector
 } from './Widgets';
 import BotAvatar from './BotAvatar.jsx';
 
@@ -32,12 +34,20 @@ const config = {
       widgetFunc: (props) => <DoctorFinder {...props} />,
     },
     {
+      widgetName: 'symptomSelector',
+      widgetFunc: (props) => <SymptomSelector {...props} />,
+    },
+    {
       widgetName: 'doctorList',
       widgetFunc: (props) => <DoctorList {...props} />,
     },
     {
       widgetName: 'medicineRecommendation',
       widgetFunc: (props) => <MedicineRecommendation {...props} />,
+    },
+    {
+      widgetName: 'medicineSymptoms',
+      widgetFunc: (props) => <MedicineSymptoms {...props} />,
     },
           {
             widgetName: 'deliveryTracking',
@@ -58,7 +68,7 @@ const config = {
         ],
   customStyles: {
     botMessageBox: {
-      backgroundColor: '#3b82f6',
+      backgroundColor: '#3873d2ff',
     },
     chatButton: {
       backgroundColor: '#3b82f6',
