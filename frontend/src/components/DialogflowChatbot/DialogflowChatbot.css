@@ -11,7 +11,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #dac8ca;
+  background: rgb(37, 74, 235);
   color: rgb(59, 54, 184);
   border: none;
   cursor: pointer;
@@ -328,6 +328,37 @@
 .medicine-widget,
 .delivery-widget {
   margin-top: 8px;
+}
+
+/* Symptom Selector */
+.symptom-selector-widget {
+  margin-top: 8px;
+}
+
+.symptom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+
+.symptom-btn {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid #bae6fd;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.symptom-btn:hover {
+  background: #38bdf8;
+  color: white;
+  border-color: #0ea5e9;
+  transform: translateY(-1px);
 }
 
 /* Doctor Finder Widget Styles */
