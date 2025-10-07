@@ -3,6 +3,9 @@ import DashboardLayout from '../../layouts/DashboardLayout'
 import './DeliveryDashboard.css'
 import { useAuth } from '../../context/AuthContext'
 import { Home, Truck, History, Bell } from 'lucide-react'
+import TrackingMap from '../../components/GoogleMap/TrackingMap'
+import { useLocationTracking } from '../../hooks/useWebSocket'
+import ErrorBoundary from '../../components/ErrorBoundary'
 
 const DeliveryDashboard = () => {
 	const [activeSection, setActiveSection] = useState('overview')
@@ -396,21 +399,23 @@ const DeliveryDashboard = () => {
 	}
 
 	return (
-		<DashboardLayout 
-			title="Delivery Dashboard" 
-			sidebarItems={sidebar}
-			onSectionChange={setActiveSection}
-			activeSection={activeSection}
-			notificationCount={notificationCount}
-			notifications={notifications.filter(n => !n.read)}
-			onNotificationUpdate={markNotificationAsRead}
-			showNotificationPopup={showNotificationPopup}
-			setShowNotificationPopup={setShowNotificationPopup}
-		>
-			<div className="delivery-dashboard">
-				{renderSection()}
-			</div>
-		</DashboardLayout>
+		<ErrorBoundary>
+			<DashboardLayout 
+				title="Delivery Dashboard" 
+				sidebarItems={sidebar}
+				onSectionChange={setActiveSection}
+				activeSection={activeSection}
+				notificationCount={notificationCount}
+				notifications={notifications.filter(n => !n.read)}
+				onNotificationUpdate={markNotificationAsRead}
+				showNotificationPopup={showNotificationPopup}
+				setShowNotificationPopup={setShowNotificationPopup}
+			>
+				<div className="delivery-dashboard">
+					{renderSection()}
+				</div>
+			</DashboardLayout>
+		</ErrorBoundary>
 	)
 }
 
@@ -436,6 +441,30 @@ function AssignmentsSection() {
     const [openDropdowns, setOpenDropdowns] = useState(new Set());
     const [availableAgents, setAvailableAgents] = useState([]);
     const [selectedAgentId, setSelectedAgentId] = useState('');
+    
+    // GPS Tracking state
+    const [showTrackingModal, setShowTrackingModal] = useState(false);
+    const [trackingData, setTrackingData] = useState(null);
+    const [trackingLoading, setTrackingLoading] = useState(false);
+    const [currentLocation, setCurrentLocation] = useState(null);
+    const [locationPermission, setLocationPermission] = useState(null);
+    const [isTracking, setIsTracking] = useState(false);
+    const [locationUpdateInterval, setLocationUpdateInterval] = useState(null);
+    
+    // WebSocket tracking hook - re-enabled
+    const assignmentId = trackingData?.assignment?._id;
+    const wsHook = useLocationTracking(assignmentId || null, (data) => {
+        console.log('Real-time location update:', data);
+        setCurrentLocation(data.location);
+    });
+    
+    // Extract WebSocket hook values
+    const wsTracking = wsHook?.isTracking || false;
+    const wsLocation = wsHook?.currentLocation || null;
+    const startTracking = wsHook?.startTracking || (() => {});
+    const stopTracking = wsHook?.stopTracking || (() => {});
+    const wsUpdateLocation = wsHook?.updateLocation || (() => {});
+    const wsConnected = wsHook?.isConnected || false;
 
     const loadAvailableOrders = async () => {
         try {
@@ -544,6 +573,18 @@ function AssignmentsSection() {
     useEffect(() => {
         setError('');
     }, [token]);
+
+    // Cleanup location tracking on component unmount
+    useEffect(() => {
+        return () => {
+            if (locationUpdateInterval) {
+                clearInterval(locationUpdateInterval);
+            }
+            if (isTracking) {
+                stopLocationTracking();
+            }
+        };
+    }, [locationUpdateInterval, isTracking]);
 
     const acceptOrder = async (orderId) => {
         try {
@@ -831,6 +872,149 @@ function AssignmentsSection() {
         } catch (error) {
             console.warn('Error in post-handover operations (non-critical):', error);
             // Don't set error state for post-handover operations
+        }
+    };
+
+    // GPS Tracking Functions
+    const handleTrackOrder = async (assignmentId) => {
+        setTrackingLoading(true);
+        try {
+            const res = await fetch(`http://localhost:5001/api/delivery/tracking/${assignmentId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await res.json();
+            if (res.ok) {
+                setTrackingData(data);
+                setShowTrackingModal(true);
+            } else {
+                throw new Error(data.message || 'Failed to fetch tracking data');
+            }
+        } catch (error) {
+            console.error('Track order error:', error);
+            alert('Failed to load tracking data: ' + error.message);
+        } finally {
+            setTrackingLoading(false);
+        }
+    };
+
+    const startLocationTracking = async () => {
+        console.log('startLocationTracking called');
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by this browser.');
+            return;
+        }
+
+        try {
+            // Request location permission
+            const position = await getCurrentPosition();
+            const locationData = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy
+            };
+            
+            console.log('Location obtained:', locationData);
+            setCurrentLocation(locationData);
+            setLocationPermission('granted');
+            setIsTracking(true);
+            
+            // Start WebSocket tracking
+            if (trackingData?.assignment?._id && startTracking) {
+                console.log('Starting WebSocket tracking');
+                startTracking();
+            }
+            
+            // Update location on server via WebSocket
+            if (wsUpdateLocation) {
+                console.log('Updating location via WebSocket');
+                wsUpdateLocation(locationData);
+            }
+            
+            // Set up interval to update location every 30 seconds
+            const interval = setInterval(async () => {
+                try {
+                    const newPosition = await getCurrentPosition();
+                    const newLocationData = {
+                        latitude: newPosition.coords.latitude,
+                        longitude: newPosition.coords.longitude,
+                        accuracy: newPosition.coords.accuracy
+                    };
+                    
+                    setCurrentLocation(newLocationData);
+                    
+                    // Update via WebSocket
+                    if (wsUpdateLocation) {
+                        wsUpdateLocation(newLocationData);
+                    }
+                } catch (error) {
+                    console.error('Location update error:', error);
+                }
+            }, 30000); // Update every 30 seconds
+            
+            setLocationUpdateInterval(interval);
+            console.log('Location tracking started successfully');
+            
+        } catch (error) {
+            console.error('Location tracking error:', error);
+            setLocationPermission('denied');
+            alert('Location access denied. Please enable location services to use GPS tracking.');
+        }
+    };
+
+    const stopLocationTracking = () => {
+        console.log('stopLocationTracking called');
+        if (locationUpdateInterval) {
+            clearInterval(locationUpdateInterval);
+            setLocationUpdateInterval(null);
+        }
+        setIsTracking(false);
+        
+        // Stop WebSocket tracking
+        if (trackingData?.assignment?._id && stopTracking) {
+            console.log('Stopping WebSocket tracking');
+            stopTracking();
+        }
+        
+        // Set offline status
+        fetch('http://localhost:5001/api/delivery/status/online', {
+            method: 'PATCH',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ isOnline: false })
+        }).catch(error => console.error('Failed to set offline status:', error));
+        
+        console.log('Location tracking stopped');
+    };
+
+    const getCurrentPosition = () => {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+            });
+        });
+    };
+
+    const updateLocationOnServer = async (latitude, longitude, accuracy) => {
+        try {
+            await fetch('http://localhost:5001/api/delivery/location/update', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    latitude,
+                    longitude,
+                    accuracy
+                })
+            });
+        } catch (error) {
+            console.error('Failed to update location on server:', error);
         }
     };
 
@@ -1153,6 +1337,14 @@ function AssignmentsSection() {
                                                         }}
                                                     >
                                                         {loadingDetails ? 'Loading...' : 'View Details'}
+                                                    </button>
+                                                    
+                                                    <button
+                                                        className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:opacity-50"
+                                                        disabled={loadingDetails}
+                                                        onClick={() => handleTrackOrder(assignment._id)}
+                                                    >
+                                                        Track Order
                                                     </button>
                                                         
                                                         <div className="flex flex-col gap-1">
@@ -1619,6 +1811,173 @@ function AssignmentsSection() {
                             >
                                 Submit Handover Request
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* GPS Tracking Modal */}
+            {showTrackingModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white w-full max-w-4xl h-3/4 rounded-xl shadow-lg p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold text-gray-800">
+                                Track Order {trackingData?.assignment?.order?.orderNumber || trackingData?.assignment?.order?._id?.slice(-8) || 'Loading...'}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowTrackingModal(false);
+                                    setTrackingData(null);
+                                }}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+                            {/* Map Section */}
+                            <div className="bg-gray-100 rounded-lg p-4">
+                                <h4 className="text-lg font-medium mb-3">Live Tracking Map</h4>
+                                {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+                                    <div className="h-64">
+                                        <TrackingMap
+                                            deliveryAgentLocation={currentLocation}
+                                            deliveryAddress={trackingData?.assignment?.order?.deliveryCoordinates}
+                                            orderNumber={trackingData?.assignment?.order?.orderNumber || trackingData?.assignment?.order?._id?.slice(-8)}
+                                            isTracking={isTracking || wsTracking}
+                                            onLocationUpdate={(location) => {
+                                                setCurrentLocation(location);
+                                                if (wsUpdateLocation) {
+                                                    wsUpdateLocation(location);
+                                                }
+                                            }}
+                                            apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="bg-white rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-gray-300">
+                                        <div className="text-center">
+                                            <div className="text-gray-400 mb-2">
+                                                <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-sm text-gray-600">Google Maps API Key Required</p>
+                                            <p className="text-xs text-gray-500 mt-1">Please add VITE_GOOGLE_MAPS_API_KEY to your .env file</p>
+                                            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                                                <p className="text-xs text-yellow-700">
+                                                    <strong>Quick Setup:</strong>
+                                                </p>
+                                                <ol className="text-xs text-yellow-600 mt-1 list-decimal list-inside">
+                                                    <li>Get API key from Google Cloud Console</li>
+                                                    <li>Create frontend/.env file</li>
+                                                    <li>Add: VITE_GOOGLE_MAPS_API_KEY=your_key</li>
+                                                    <li>Restart the development server</li>
+                                                </ol>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Location Status */}
+                                <div className="mt-4 flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <div className={`w-3 h-3 rounded-full mr-2 ${(isTracking || wsTracking) ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                        <span className="text-sm text-gray-600">
+                                            {(isTracking || wsTracking) ? 'Location Tracking Active' : 'Location Tracking Inactive'}
+                                        </span>
+                                        {wsConnected && (
+                                            <div className="ml-2 w-2 h-2 bg-green-500 rounded-full" title="WebSocket Connected"></div>
+                                        )}
+                                    </div>
+                                    {(isTracking || wsTracking) ? (
+                                        <button
+                                            onClick={stopLocationTracking}
+                                            className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                        >
+                                            Stop Tracking
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={startLocationTracking}
+                                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                        >
+                                            Start Tracking
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Order Details Section */}
+                            <div className="space-y-4">
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <h4 className="text-lg font-medium mb-3">Order Information</h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Order Number:</span>
+                                            <span className="font-medium">#{trackingData.assignment?.order?.orderNumber || trackingData.assignment?.order?._id?.slice(-8)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Customer:</span>
+                                            <span className="font-medium">{trackingData.assignment?.order?.customer?.name}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Phone:</span>
+                                            <span className="font-medium">{trackingData.assignment?.order?.customer?.phone}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Status:</span>
+                                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeColor(trackingData.assignment?.status)}`}>
+                                                {getStatusText(trackingData.assignment?.status)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <h4 className="text-lg font-medium mb-3">Delivery Address</h4>
+                                    <p className="text-sm text-gray-700">{trackingData.assignment?.order?.customer?.address}</p>
+                                    {trackingData.assignment?.order?.deliveryCoordinates && (
+                                        <div className="mt-2 text-xs text-gray-500">
+                                            <p>Coordinates: {trackingData.assignment.order.deliveryCoordinates.latitude?.toFixed(6)}, {trackingData.assignment.order.deliveryCoordinates.longitude?.toFixed(6)}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <h4 className="text-lg font-medium mb-3">Delivery Agent</h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Agent:</span>
+                                            <span className="font-medium">{trackingData.assignment?.deliveryAgent?.name}</span>
+                                        </div>
+                                        {trackingData.assignment?.deliveryAgent?.currentLocation && (
+                                            <>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Current Location:</span>
+                                                    <span className="font-medium">
+                                                        {trackingData.assignment.deliveryAgent.currentLocation.latitude?.toFixed(6)}, 
+                                                        {trackingData.assignment.deliveryAgent.currentLocation.longitude?.toFixed(6)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Last Updated:</span>
+                                                    <span className="font-medium">
+                                                        {trackingData.assignment.deliveryAgent.currentLocation.lastUpdated ? 
+                                                            new Date(trackingData.assignment.deliveryAgent.currentLocation.lastUpdated).toLocaleTimeString() : 
+                                                            'Never'
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

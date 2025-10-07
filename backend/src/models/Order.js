@@ -126,6 +126,38 @@ const OrderSchema = new mongoose.Schema(
     handoverAt: { 
       type: Date, 
       default: null },
+    
+    // GPS coordinates for delivery address
+    deliveryCoordinates: {
+      latitude: {
+        type: Number,
+        default: null
+      },
+      longitude: {
+        type: Number,
+        default: null
+      },
+      address: {
+        type: String,
+        default: ''
+      },
+      placeId: {
+        type: String,
+        default: null
+      }
+    },
+    
+    // Tracking information
+    trackingNumber: {
+      type: String,
+      default: ''
+    },
+    
+    orderNumber: {
+      type: String,
+      unique: true,
+      sparse: true
+    }
   },
   
   { timestamps: true }

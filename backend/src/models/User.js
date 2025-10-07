@@ -121,6 +121,29 @@ const userSchema = new mongoose.Schema({
     providerId: {
         type: String,
         default: null
+    },
+    // GPS Location fields for delivery agents
+    currentLocation: {
+        latitude: {
+            type: Number,
+            default: null
+        },
+        longitude: {
+            type: Number,
+            default: null
+        },
+        accuracy: {
+            type: Number,
+            default: null
+        },
+        lastUpdated: {
+            type: Date,
+            default: null
+        },
+        isOnline: {
+            type: Boolean,
+            default: false
+        }
     }
 }, {
     timestamps: true
