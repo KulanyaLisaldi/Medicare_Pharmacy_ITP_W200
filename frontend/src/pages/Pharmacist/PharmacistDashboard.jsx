@@ -1473,6 +1473,7 @@ function InventorySection() {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="text-left text-gray-600">
+                                <th className="p-2">Image</th>
                                 <th className="p-2">Name</th>
                                 <th className="p-2">Category</th>
                                 <th className="p-2">Details</th>
@@ -1488,6 +1489,18 @@ function InventorySection() {
                         <tbody>
                             {items.map(p => (
                                 <tr key={p._id} className="border-t">
+                                    <td className="p-2">
+                                        {p.image ? (
+                                            <img
+                                                src={p.image}
+                                                alt={p.name}
+                                                className="w-12 h-12 object-cover rounded border"
+                                                onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded border bg-gray-50 flex items-center justify-center text-xs text-gray-400">No image</div>
+                                        )}
+                                    </td>
                                     <td className="p-2">
                                         <div className="text-gray-800 font-medium">{p.name}</div>
                                         <div className="text-gray-500 text-xs max-w-xs truncate" title={p.description}>{p.description}</div>
