@@ -1151,8 +1151,10 @@ function InventorySection() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
+    const [emailLogs, setEmailLogs] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
 
-    const emptyForm = { name: '', category: '', subcategory: '', brand: '', dosageForm: '', strength: '', packSize: '', batchNumber: '', manufacturingDate: '', expiryDate: '', description: '', price: 0, stock: 0, prescriptionRequired: false, tags: [], image: '' };
+    const emptyForm = { name: '', category: '', subcategory: '', brand: '', dosageForm: '', strength: '', packSize: '', batchNumber: '', manufacturingDate: '', expiryDate: '', description: '', price: 0, stock: 0, prescriptionRequired: false, tags: [], image: '', supplierEmail: '', reorderLevel: 0 };
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState(emptyForm);
     const [fieldErrors, setFieldErrors] = useState({
@@ -1238,7 +1240,21 @@ function InventorySection() {
         }
     };
 
-    useEffect(() => { load(); /* eslint-disable-next-line */ }, [token]);
+    const loadEmailLogs = async () => {
+        setLoadingLogs(true);
+        try {
+            const res = await fetch('http://localhost:5001/api/products/reorder/logs?limit=50', { headers: { 'Authorization': `Bearer ${token}` } });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to load email logs');
+            setEmailLogs(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingLogs(false);
+        }
+    }
+
+    useEffect(() => { load(); loadEmailLogs(); /* eslint-disable-next-line */ }, [token]);
 
     const openCreate = () => { 
         setEditing(null); 
@@ -1480,6 +1496,8 @@ function InventorySection() {
                                 <th className="p-2">Pack Size</th>
                                 <th className="p-2">Price</th>
                                 <th className="p-2">Stock</th>
+                                <th className="p-2">Reorder Level</th>
+                                <th className="p-2">Supplier</th>
                                 <th className="p-2">Expiry</th>
                                 <th className="p-2">Prescription</th>
                                 <th className="p-2">Added Date</th>
@@ -1516,6 +1534,8 @@ function InventorySection() {
                                     <td className="p-2">{p.packSize}</td>
                                     <td className="p-2">Rs.{Number(p.price ?? 0).toFixed(2)}</td>
                                     <td className="p-2">{p.stock}</td>
+                                    <td className="p-2">{p.reorderLevel ?? 0}</td>
+                                    <td className="p-2 text-xs truncate max-w-[160px]" title={p.supplierEmail || ''}>{p.supplierEmail || '-'}</td>
                                     <td className="p-2 text-xs">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString() : '-'}</td>
                                     <td className="p-2 text-xs">{p.prescriptionRequired ? 'Required' : 'Not Required'}</td>
 									<td className="p-2 text-xs">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '-'}</td>
@@ -1540,6 +1560,56 @@ function InventorySection() {
                         </tbody>
                     </table>
                 )}
+            </div>
+
+            {/* Reorder Emails Activity */}
+            <div className="bg-white rounded-xl shadow mt-6">
+                <div className="flex items-center justify-between p-4 border-b">
+                    <div className="font-semibold">Recent Supplier Emails</div>
+                    <div className="flex items-center gap-2">
+                        <button className="btn-outline px-3 py-1.5 text-xs" onClick={loadEmailLogs}>Refresh</button>
+                        <button className="btn-primary px-3 py-1.5 text-xs" onClick={async () => {
+                            try {
+                                const res = await fetch('http://localhost:5001/api/products/reorder/check', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                                const data = await res.json();
+                                if (!res.ok) throw new Error(data.message || 'Failed to trigger reorder');
+                                alert(`Reorder check completed. Suppliers notified: ${data.totalSuppliersNotified}`);
+                                loadEmailLogs();
+                            } catch (e) {
+                                alert(e.message);
+                            }
+                        }}>Run Reorder Check</button>
+                    </div>
+                </div>
+                <div className="p-4 overflow-x-auto">
+                    {loadingLogs ? (
+                        <div className="text-sm text-gray-500">Loading...</div>
+                    ) : emailLogs.length === 0 ? (
+                        <div className="text-sm text-gray-500">No emails sent yet</div>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-gray-600">
+                                    <th className="p-2">Time</th>
+                                    <th className="p-2">Supplier</th>
+                                    <th className="p-2">Items</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {emailLogs.map(log => (
+                                    <tr key={log._id} className="border-t">
+                                        <td className="p-2 text-xs">{new Date(log.createdAt).toLocaleString()}</td>
+                                        <td className="p-2 text-xs">{log.metadata?.supplierEmail || '-'}</td>
+                                        <td className="p-2 text-xs">
+                                            {(log.metadata?.items || []).slice(0, 3).map(i => i.name).join(', ')}
+                                            {Array.isArray(log.metadata?.items) && log.metadata.items.length > 3 ? ` +${log.metadata.items.length - 3} more` : ''}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
             </div>
 
             {showForm && (
@@ -1652,6 +1722,27 @@ function InventorySection() {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-600">Supplier Email</label>
+                                <input 
+                                    type="email"
+                                    className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" 
+                                    value={form.supplierEmail} 
+                                    onChange={e => setForm({ ...form, supplierEmail: e.target.value })}
+                                    placeholder="supplier@example.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-600">Reorder Level</label>
+                                <input 
+                                    type="number"
+                                    name="reorderLevel"
+                                    min="0"
+                                    className="mt-1 w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-0 focus:border-gray-400" 
+                                    value={form.reorderLevel}
+                                    onChange={handleNumericChange}
+                                />
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm text-gray-600">Tags</label>

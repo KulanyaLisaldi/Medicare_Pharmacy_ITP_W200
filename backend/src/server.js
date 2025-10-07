@@ -17,6 +17,8 @@ import messageRoutes from "./routes/messageRoutes.js";
 import doctorRecommendationRoutes from "./routes/doctorRecommendationRoutes.js";
 import dialogflowRoutes from "./routes/dialogflowRoutes.js";
 import rateLimiter from "./middleware/rateLimiter.js";
+import Product from "./models/Product.js";
+import { sendReorderEmail } from "./utils/mailer.js";
 
 dotenv.config(); // Load .env first
 
@@ -63,4 +65,26 @@ app.use("/api/dialogflow", dialogflowRoutes);
 // Connect DB and start server
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  // Lightweight periodic low-stock check (every 30 minutes)
+  setInterval(async () => {
+    try {
+      const candidates = await Product.find({ reorderLevel: { $gt: 0 } })
+      const eligible = candidates.filter(p => (p.stock ?? 0) <= (p.reorderLevel ?? 0))
+      const groups = new Map()
+      for (const p of eligible) {
+        const key = (p.supplierEmail || '').trim().toLowerCase()
+        if (!key) continue
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(p)
+      }
+      for (const [email, products] of groups.entries()) {
+        await sendReorderEmail(email, {
+          items: products.map(p => ({ name: p.name, stock: p.stock, reorderLevel: p.reorderLevel, packSize: p.packSize }))
+        })
+      }
+      if (eligible.length > 0) console.info(`[reorder] Notified ${groups.size} suppliers for ${eligible.length} low-stock products`)
+    } catch (err) {
+      console.error('[reorder] periodic check failed:', err.message)
+    }
+  }, 30 * 60 * 1000)
 });

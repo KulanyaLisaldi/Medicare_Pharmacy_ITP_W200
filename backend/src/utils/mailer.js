@@ -313,4 +313,56 @@ export async function sendStaffWelcomeEmail(toEmail, name, role, additionalInfo 
     if (preview) console.info('Staff welcome email preview:', preview)
 }
 
+// Sends a consolidated reorder email to a supplier for low-stock products
+export async function sendReorderEmail(toEmail, { supplierName = 'Supplier', items = [], storeName = 'MediCare Pharmacy' } = {}){
+    if (!toEmail || !Array.isArray(items) || items.length === 0) return
+
+    const appUrl = process.env.APP_URL || 'http://localhost:5173'
+
+    const rows = items.map((p) => `
+        <tr>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${p.name}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${p.stock ?? 0}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${p.reorderLevel ?? 0}</td>
+            <td style="padding:8px;border:1px solid #e5e7eb;">${p.packSize || '-'}</td>
+        </tr>
+    `).join('')
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+            <div style="background-color: #ffffff; padding: 24px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+                <div style="margin-bottom: 16px;">
+                    <h2 style="margin:0;color:#111827;">Automated Reorder Request</h2>
+                    <p style="margin:4px 0 0;color:#6b7280;">${storeName}</p>
+                </div>
+                <p style="color:#374151;">Hello ${supplierName},</p>
+                <p style="color:#374151;">We detected the following products are at or below the reorder threshold. Please process a restock at your earliest convenience.</p>
+                <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+                    <thead>
+                        <tr>
+                            <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;background:#f9fafb;">Product</th>
+                            <th style="padding:8px;border:1px solid #e5e7eb;text-align:center;background:#f9fafb;">Current Stock</th>
+                            <th style="padding:8px;border:1px solid #e5e7eb;text-align:center;background:#f9fafb;">Reorder Level</th>
+                            <th style="padding:8px;border:1px solid #e5e7eb;text-align:left;background:#f9fafb;">Pack</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <p style="color:#6b7280;margin-top:16px;">This email was generated automatically. For questions, contact the pharmacy team.</p>
+                <div style="margin-top:16px;color:#9ca3af;font-size:12px;">${appUrl}</div>
+            </div>
+        </div>
+    `
+
+    const transporter = await getTransporter()
+    const info = await transporter.sendMail({
+        from: process.env.MAIL_FROM || 'no-reply@medicare.local',
+        to: toEmail,
+        subject: 'Automated Reorder Request - Low Stock Items',
+        html
+    })
+    const preview = nodemailer.getTestMessageUrl(info)
+    if (preview) console.info('Reorder email preview:', preview)
+}
+
 

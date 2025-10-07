@@ -70,6 +70,18 @@ const productSchema = new mongoose.Schema({
         default: ''
     }, // Product image URL
 
+    // Supplier contact email for automated reorders
+    supplierEmail: {
+        type: String,
+        default: ''
+    },
+
+    // Threshold at or below which a reorder should be triggered
+    reorderLevel: {
+        type: Number,
+        default: 0
+    },
+
     isActive: { 
         type: Boolean, 
         default: true }
