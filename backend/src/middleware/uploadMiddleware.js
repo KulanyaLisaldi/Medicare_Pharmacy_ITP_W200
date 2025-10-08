@@ -58,12 +58,26 @@ const prescriptionStorage = multer.diskStorage({
   }
 });
 
+// Restrictive filter for prescriptions: only pdf, jpg, jpeg
+const prescriptionFileFilter = (req, file, cb) => {
+  const allowedPrescriptionTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'application/pdf'
+  ];
+  if (allowedPrescriptionTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only PDF, JPG and JPEG are allowed for prescriptions.'), false);
+  }
+};
+
 export const upload = multer({
   storage: prescriptionStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
   },
-  fileFilter: fileFilter
+  fileFilter: prescriptionFileFilter
 });
 
 // Configure multer for product image uploads

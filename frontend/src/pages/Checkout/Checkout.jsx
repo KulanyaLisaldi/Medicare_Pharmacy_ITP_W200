@@ -25,6 +25,14 @@ const Checkout = () => {
     name: '',
     phone: ''
   })
+  // Prescription upload state
+  const [prescriptionFile, setPrescriptionFile] = useState(null)
+  const [prescriptionPreviewUrl, setPrescriptionPreviewUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadedPrescriptionMeta, setUploadedPrescriptionMeta] = useState(null)
+  const [uploadError, setUploadError] = useState('')
+  
 
   useEffect(() => {
     if (!user) {
@@ -243,7 +251,51 @@ const Checkout = () => {
       return
     }
 
-    // Build order payload for API
+    // If a prescription was uploaded, place prescription order flow
+    if (uploadedPrescriptionMeta?.fileName) {
+      try {
+        const resp = await fetch('http://localhost:5001/api/prescriptions/create-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            prescriptionFile: uploadedPrescriptionMeta.fileName,
+            prescriptionDetails: {
+              patientName: formData.name,
+              patientPhone: formData.phone,
+              patientAddress: formData.address,
+              notes: formData.notes || ''
+            },
+            paymentMethod: formData.paymentMethod,
+            deliveryType: formData.deliveryType,
+            customer: {
+              name: formData.name,
+              phone: formData.phone,
+              address: formData.address,
+              notes: formData.notes || ''
+            },
+            total: 0
+          })
+        })
+        const data = await resp.json()
+        if (!resp.ok) {
+          throw new Error(data?.message || 'Failed to place prescription order')
+        }
+        alert('Prescription uploaded and order created successfully!')
+        // Reset local cart because this is a prescription-only order
+        localStorage.removeItem('cart')
+        window.dispatchEvent(new Event('order:placed'))
+        navigate('/orders')
+        return
+      } catch (err) {
+        alert(err.message)
+        return
+      }
+    }
+
+    // Build order payload for API (regular product order)
     const payload = {
       items: cart.map(it => ({
         productId: it._id || it.id || undefined,
@@ -321,6 +373,60 @@ const Checkout = () => {
     }
   }
 
+  const onSelectPrescription = (file) => {
+    if (!file) return
+    setPrescriptionFile(file) // always set so the Upload button is enabled
+    setUploadError('')
+    if (file.type && file.type.startsWith('image/')) {
+      setPrescriptionPreviewUrl(URL.createObjectURL(file))
+    } else {
+      setPrescriptionPreviewUrl('')
+    }
+  }
+
+  const handleUploadPrescription = async () => {
+    if (!prescriptionFile) return
+    // Validate on click to provide clear feedback
+    const allowed = ['image/jpeg', 'image/jpg', 'application/pdf']
+    if (!allowed.includes(prescriptionFile.type)) {
+      setUploadError('Invalid file type. Only PDF, JPG and JPEG are allowed.')
+      return
+    }
+    if (prescriptionFile.size > 10 * 1024 * 1024) {
+      setUploadError('Prescription must be less than 10MB in size')
+      return
+    }
+    setUploading(true)
+    setUploadProgress(0)
+    try {
+      const form = new FormData()
+      form.append('prescriptionFile', prescriptionFile)
+
+      const resp = await fetch('http://localhost:5001/api/prescriptions/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: form
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data?.message || 'Upload failed')
+      setUploadedPrescriptionMeta({ fileName: data.fileName, filePath: data.filePath })
+      const publicUrl = `http://localhost:5001/uploads/prescriptions/${data.fileName}`
+      alert(`Prescription uploaded successfully.\n\nURL: ${publicUrl}`)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setUploading(false)
+      setUploadProgress(100)
+    }
+  }
+
+  const removePrescription = () => {
+    setPrescriptionFile(null)
+    setPrescriptionPreviewUrl('')
+    setUploadedPrescriptionMeta(null)
+    setUploadProgress(0)
+  }
+
   if (!user) {
     return null // Will redirect to login
   }
@@ -333,7 +439,8 @@ const Checkout = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Order Summary */}
+            {/* Order Summary */
+            }
             <div className="bg-white rounded-xl shadow p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
               
@@ -360,7 +467,81 @@ const Checkout = () => {
                   <span className="text-xl font-bold text-gray-900">Rs.{subtotal.toFixed(2)}</span>
                 </div>
               </div>
+
+              {/* Prescription Upload inside Order Summary */}
+              <div id="prescription-upload" className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Prescription (optional)
+                </label>
+                <div className="rounded-lg border border-dashed border-gray-300 p-4">
+                  {!prescriptionFile && !uploadedPrescriptionMeta && (
+                    <div className="flex items-center justify-between gap-3">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,application/pdf"
+                        onChange={(e) => onSelectPrescription(e.target.files?.[0])}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUploadPrescription}
+                        disabled={!prescriptionFile || uploading}
+                        className="bg-gray-800 text-white px-3 py-2 rounded disabled:opacity-50"
+                      >
+                        {uploading ? 'Uploading...' : 'Upload'}
+                      </button>
+                    </div>
+                  )}
+
+                  {(prescriptionFile || uploadedPrescriptionMeta) && (
+                    <div className="flex items-center gap-4">
+                      {prescriptionPreviewUrl ? (
+                        <img src={prescriptionPreviewUrl} alt="Prescription preview" className="w-20 h-20 object-cover rounded" />
+                      ) : (
+                        <div className="text-sm text-gray-700">
+                          {uploadedPrescriptionMeta?.fileName || prescriptionFile?.name}
+                        </div>
+                      )}
+                      {!uploadedPrescriptionMeta && (
+                        <button
+                          type="button"
+                          onClick={handleUploadPrescription}
+                          disabled={uploading}
+                          className="bg-blue-600 text-white px-3 py-2 rounded disabled:opacity-50"
+                        >
+                          {uploading ? 'Uploading...' : 'Confirm Upload'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={removePrescription}
+                        className="text-red-600 px-3 py-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="mt-2 h-2 bg-gray-200 rounded">
+                      <div className="h-2 bg-blue-600 rounded" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
+                </div>
+                {uploadedPrescriptionMeta && (
+                  <p className="text-xs text-green-700 mt-2">
+                    Prescription uploaded: <a className="underline text-blue-700" href={`http://localhost:5001/uploads/prescriptions/${uploadedPrescriptionMeta.fileName}`} target="_blank" rel="noreferrer">{uploadedPrescriptionMeta.fileName}</a>
+                  </p>
+                )}
+                {!uploadedPrescriptionMeta && (
+                  <p className="text-xs text-gray-500 mt-2">Max 10MB; PDF/JPG/JPEG only</p>
+                )}
+                {uploadError && (
+                  <p className="text-xs text-red-600 mt-1">{uploadError}</p>
+                )}
+              </div>
             </div>
+
+            
 
             {/* Customer Details & Payment */}
             <div className="bg-white rounded-xl shadow p-6">
@@ -425,6 +606,8 @@ const Checkout = () => {
                   </div>
                 </div>
 
+                
+
                 {/* Delivery Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -478,7 +661,7 @@ const Checkout = () => {
                     type="submit"
                     className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                   >
-                    Place Order
+                    {uploadedPrescriptionMeta ? 'Place Prescription Order' : 'Place Order'}
                   </button>
                 </div>
               </form>

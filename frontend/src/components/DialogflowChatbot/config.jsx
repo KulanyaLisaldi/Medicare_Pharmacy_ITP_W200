@@ -10,7 +10,8 @@ import {
   ViewAppointments,
   HelpOptions,
   DoctorList,
-  SymptomSelector
+  SymptomSelector,
+  OrderTracking
 } from './Widgets';
 import BotAvatar from './BotAvatar.jsx';
 
@@ -64,6 +65,10 @@ const config = {
           {
             widgetName: 'helpOptions',
             widgetFunc: (props) => <HelpOptions {...props} />,
+          },
+          {
+            widgetName: 'orderTracking',
+            widgetFunc: (props) => <OrderTracking {...props} />,
           }
         ],
   customStyles: {

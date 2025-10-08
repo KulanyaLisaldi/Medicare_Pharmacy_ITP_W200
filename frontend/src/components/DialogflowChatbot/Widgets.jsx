@@ -283,3 +283,104 @@ export const DoctorList = (props) => {
     </div>
   );
 };
+
+// Order Tracking Widget
+export const OrderTracking = (props) => {
+  const { order, statusMessage, estimatedDelivery } = props.payload || {};
+  
+  if (!order) {
+    return (
+      <div className="order-tracking-container">
+        <div className="tracking-error">
+          <h4>❌ Order Not Found</h4>
+          <p>Please check your order number and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'delivered': return '#28a745';
+      case 'out_for_delivery': return '#17a2b8';
+      case 'ready': return '#ffc107';
+      case 'preparing': return '#fd7e14';
+      case 'confirmed': return '#6f42c1';
+      case 'pending': return '#6c757d';
+      case 'cancelled': return '#dc3545';
+      default: return '#6c757d';
+    }
+  };
+
+  return (
+    <div className="order-tracking-container">
+      <div className="order-header">
+        <h4>📦 Order Details</h4>
+        <div className="order-number">Order #: {order.orderNumber}</div>
+      </div>
+      
+      <div className="order-status">
+        <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
+          {order.status.replace('_', ' ').toUpperCase()}
+        </div>
+        <p className="status-message">{statusMessage}</p>
+        {estimatedDelivery && (
+          <p className="estimated-delivery">📅 Estimated Delivery: {estimatedDelivery}</p>
+        )}
+      </div>
+
+      <div className="order-info">
+        <div className="info-section">
+          <h5>👤 Customer Information</h5>
+          <p><strong>Name:</strong> {order.customer.name}</p>
+          <p><strong>Email:</strong> {order.customer.email}</p>
+          <p><strong>Phone:</strong> {order.customer.phone}</p>
+        </div>
+
+        <div className="info-section">
+          <h5>📅 Order Information</h5>
+          <p><strong>Order Date:</strong> {formatDate(order.orderDate)}</p>
+          <p><strong>Total Amount:</strong> ${order.totalAmount}</p>
+          <p><strong>Payment Method:</strong> {order.paymentMethod}</p>
+        </div>
+
+        <div className="info-section">
+          <h5>📍 Delivery Address</h5>
+          <p>{order.deliveryAddress}</p>
+        </div>
+
+        <div className="info-section">
+          <h5>💊 Products Ordered</h5>
+          <div className="products-list">
+            {order.products.map((product, index) => (
+              <div key={index} className="product-item">
+                <span className="product-name">{product.name}</span>
+                <span className="product-quantity">Qty: {product.quantity}</span>
+                <span className="product-price">${product.total}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {order.notes && (
+          <div className="info-section">
+            <h5>📝 Notes</h5>
+            <p>{order.notes}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
