@@ -1818,8 +1818,8 @@ function AssignmentsSection() {
 
             {/* GPS Tracking Modal */}
             {showTrackingModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white w-full max-w-4xl h-3/4 rounded-xl shadow-lg p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white w-full max-w-6xl max-h-[90vh] rounded-xl shadow-lg p-6 overflow-y-auto">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xl font-semibold text-gray-800">
                                 Track Order {trackingData?.assignment?.order?.orderNumber || trackingData?.assignment?.order?._id?.slice(-8) || 'Loading...'}
@@ -1843,10 +1843,13 @@ function AssignmentsSection() {
                             <div className="bg-gray-100 rounded-lg p-4">
                                 <h4 className="text-lg font-medium mb-3">Live Tracking Map</h4>
                                 {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
-                                    <div className="h-64">
+                                    <div className="h-80">
                                         <TrackingMap
                                             deliveryAgentLocation={currentLocation}
-                                            deliveryAddress={trackingData?.assignment?.order?.deliveryCoordinates}
+                                            deliveryAddress={{
+                                                ...trackingData?.assignment?.order?.deliveryCoordinates,
+                                                address: trackingData?.assignment?.order?.customer?.address
+                                            }}
                                             orderNumber={trackingData?.assignment?.order?.orderNumber || trackingData?.assignment?.order?._id?.slice(-8)}
                                             isTracking={isTracking || wsTracking}
                                             onLocationUpdate={(location) => {
@@ -1859,7 +1862,7 @@ function AssignmentsSection() {
                                         />
                                     </div>
                                 ) : (
-                                    <div className="bg-white rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-gray-300">
+                                    <div className="bg-white rounded-lg h-80 flex items-center justify-center border-2 border-dashed border-gray-300">
                                         <div className="text-center">
                                             <div className="text-gray-400 mb-2">
                                                 <svg className="w-12 h-12 mx-auto" fill="currentColor" viewBox="0 0 20 20">
@@ -1888,7 +1891,7 @@ function AssignmentsSection() {
                                     <div className="flex items-center">
                                         <div className={`w-3 h-3 rounded-full mr-2 ${(isTracking || wsTracking) ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                                         <span className="text-sm text-gray-600">
-                                            {(isTracking || wsTracking) ? 'Location Tracking Active' : 'Location Tracking Inactive'}
+                                            {(isTracking || wsTracking) ? 'Location Tracking Active' : 'Click "Start Tracking" to begin GPS monitoring'}
                                         </span>
                                         {wsConnected && (
                                             <div className="ml-2 w-2 h-2 bg-green-500 rounded-full" title="WebSocket Connected"></div>

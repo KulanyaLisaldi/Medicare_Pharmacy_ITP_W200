@@ -15,8 +15,17 @@ const TrackingMap = ({
   const [route, setRoute] = useState(null);
 
   useEffect(() => {
-    // Set initial map center
-    if (deliveryAgentLocation && deliveryAgentLocation.latitude && deliveryAgentLocation.longitude) {
+    // Set initial map center - prioritize showing both locations
+    if (deliveryAgentLocation && deliveryAgentLocation.latitude && deliveryAgentLocation.longitude &&
+        deliveryAddress && deliveryAddress.latitude && deliveryAddress.longitude) {
+      // If both locations exist, center between them
+      const centerLat = (deliveryAgentLocation.latitude + deliveryAddress.latitude) / 2;
+      const centerLng = (deliveryAgentLocation.longitude + deliveryAddress.longitude) / 2;
+      setMapCenter({
+        lat: centerLat,
+        lng: centerLng
+      });
+    } else if (deliveryAgentLocation && deliveryAgentLocation.latitude && deliveryAgentLocation.longitude) {
       setMapCenter({
         lat: deliveryAgentLocation.latitude,
         lng: deliveryAgentLocation.longitude
@@ -32,8 +41,12 @@ const TrackingMap = ({
   useEffect(() => {
     const newMarkers = [];
 
+    console.log('TrackingMap - deliveryAgentLocation:', deliveryAgentLocation);
+    console.log('TrackingMap - deliveryAddress:', deliveryAddress);
+
     // Add delivery agent marker
     if (deliveryAgentLocation && deliveryAgentLocation.latitude && deliveryAgentLocation.longitude) {
+      console.log('Adding delivery agent marker at:', deliveryAgentLocation.latitude, deliveryAgentLocation.longitude);
       newMarkers.push({
         position: {
           lat: deliveryAgentLocation.latitude,
@@ -57,33 +70,42 @@ const TrackingMap = ({
           fontWeight: 'bold'
         }
       });
+    } else {
+      console.log('Delivery agent location missing or invalid:', deliveryAgentLocation);
     }
 
     // Add delivery address marker
     if (deliveryAddress && deliveryAddress.latitude && deliveryAddress.longitude) {
+      console.log('Adding delivery address marker at:', deliveryAddress.latitude, deliveryAddress.longitude);
       newMarkers.push({
         position: {
           lat: deliveryAddress.latitude,
           lng: deliveryAddress.longitude
         },
-        title: 'Delivery Address',
+        title: `Delivery Address: ${deliveryAddress.address || 'Unknown Address'}`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="16" cy="16" r="12" fill="#EF4444" stroke="#DC2626" stroke-width="2"/>
-              <path d="M16 6l-2 4h4l-2-4z" fill="white"/>
+            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="20" cy="20" r="16" fill="#EF4444" stroke="#DC2626" stroke-width="3"/>
+              <path d="M20 8l-3 6h6l-3-6z" fill="white"/>
+              <circle cx="20" cy="20" r="4" fill="white"/>
             </svg>
           `),
-          scaledSize: { width: 32, height: 32 },
-          anchor: { x: 16, y: 16 }
+          scaledSize: { width: 40, height: 40 },
+          anchor: { x: 20, y: 20 }
         },
         label: {
           text: '📍',
-          fontSize: '16px'
-        }
+          fontSize: '18px',
+          color: 'white'
+        },
+        animation: null
       });
+    } else {
+      console.log('Delivery address missing or invalid:', deliveryAddress);
     }
 
+    console.log('Total markers to add:', newMarkers.length);
     setMarkers(newMarkers);
   }, [deliveryAgentLocation, deliveryAddress]);
 
@@ -117,25 +139,54 @@ const TrackingMap = ({
           </div>
           <div className="flex items-center">
             <div className={`w-3 h-3 rounded-full mr-2 ${isTracking ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-            <span>{isTracking ? 'Tracking Active' : 'Tracking Inactive'}</span>
+            <span>{isTracking ? 'Tracking Active' : 'Click "Start Tracking" to begin'}</span>
           </div>
         </div>
       </div>
 
       <div className="relative">
-        <GoogleMap
-          center={mapCenter}
-          zoom={15}
-          markers={markers}
-          onMapClick={handleMapClick}
-          onMarkerClick={handleMarkerClick}
-          height="400px"
-          width="100%"
-          className="rounded-lg border border-gray-300"
-          apiKey={apiKey}
-        />
+        {/* Check if API key is properly configured */}
+        {(!apiKey || apiKey === 'your_google_maps_api_key_here') ? (
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 mb-4">
+            <div className="text-center">
+              <div className="text-yellow-500 mb-4">
+                <svg className="w-16 h-16 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+                Google Maps API Key Required
+              </h3>
+              <p className="text-sm text-yellow-700 mb-4">
+                To display the interactive map, please configure your Google Maps API key in the environment variables.
+              </p>
+              <div className="bg-white rounded-lg p-4 text-left">
+                <h4 className="font-medium text-gray-800 mb-2">Setup Instructions:</h4>
+                <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                  <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google Cloud Console</a></li>
+                  <li>Enable Maps JavaScript API and Geocoding API</li>
+                  <li>Create an API key</li>
+                  <li>Add <code className="bg-gray-100 px-1 rounded">VITE_GOOGLE_MAPS_API_KEY=your_actual_api_key</code> to your <code className="bg-gray-100 px-1 rounded">frontend/.env</code> file</li>
+                  <li>Restart your development server</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <GoogleMap
+            center={mapCenter}
+            zoom={15}
+            markers={markers}
+            onMapClick={handleMapClick}
+            onMarkerClick={handleMarkerClick}
+            height="400px"
+            width="100%"
+            className="rounded-lg border border-gray-300"
+            apiKey={apiKey}
+          />
+        )}
         
-        {/* Fallback coordinate display */}
+        {/* Always show coordinate display as fallback */}
         <div className="mt-4">
           <CoordinateDisplay
             deliveryAgentLocation={deliveryAgentLocation}

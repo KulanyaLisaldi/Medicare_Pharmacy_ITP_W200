@@ -76,9 +76,9 @@ const CoordinateDisplay = ({
           )}
         </div>
         
-        <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded">
-          <p className="text-xs text-yellow-700">
-            <strong>Note:</strong> To see the interactive map, please configure your Google Maps API key.
+        <div className="mt-4 p-2 bg-blue-50 border border-blue-200 rounded">
+          <p className="text-xs text-blue-700">
+            <strong>Location Data:</strong> This shows the coordinate information for tracking purposes.
           </p>
         </div>
       </div>
