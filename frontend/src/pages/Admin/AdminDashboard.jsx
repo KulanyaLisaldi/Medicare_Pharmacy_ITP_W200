@@ -93,6 +93,14 @@ const AdminDashboard = () => {
     const [notifications, setNotifications] = useState([]);
     const [notificationCount, setNotificationCount] = useState(0);
     const [showNotificationPopup, setShowNotificationPopup] = useState(false);
+    // Orders state
+    const [orders, setOrders] = useState([]);
+    const [ordersLoading, setOrdersLoading] = useState(false);
+    const [ordersError, setOrdersError] = useState('');
+    const [orderSearch, setOrderSearch] = useState('');
+    const [orderStatus, setOrderStatus] = useState('all');
+    const [orderPayment, setOrderPayment] = useState('all');
+    const [orderSort, setOrderSort] = useState('newest');
 
     const sidebarItems = [
         { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
@@ -133,6 +141,30 @@ const AdminDashboard = () => {
         loadProductsCount();
     }, []);
 
+    // Fetch orders for admin Orders section
+    useEffect(() => {
+        const loadOrders = async () => {
+            if (activeSection !== 'orders') return;
+            try {
+                setOrdersLoading(true);
+                setOrdersError('');
+                const res = await fetch('http://localhost:5001/api/orders', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.message || 'Failed to load orders');
+                setOrders(Array.isArray(data) ? data : []);
+            } catch (e) {
+                setOrdersError(e.message);
+            } finally {
+                setOrdersLoading(false);
+            }
+        };
+        loadOrders();
+    }, [activeSection]);
+
     const fetchUsers = async () => {
         try {
             const response = await fetch('http://localhost:5001/api/users/all', {
@@ -150,6 +182,76 @@ const AdminDashboard = () => {
             console.error('Error fetching users:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // PDF export for orders (jsPDF + autoTable)
+    const exportOrdersPDF = (rows) => {
+        try {
+            const doc = new jsPDF('landscape');
+            const title = 'Orders Report';
+            const generatedAt = new Date().toLocaleString();
+
+            doc.setFontSize(16);
+            doc.text(title, 14, 14);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${generatedAt}`, 14, 20);
+
+            const headers = [['Order', 'Customer', 'Phone', 'Items', 'Total ($)', 'Date', 'Payment', 'Status']];
+            const body = rows.map(o => {
+                const count = Array.isArray(o.items) ? o.items.reduce((s,it)=>s+(it.quantity||0),0) : 0;
+                return [
+                    `#${(o._id||'').slice(-6)}`,
+                    o?.customer?.name || '-',
+                    o?.customer?.phone || '-',
+                    String(count),
+                    Number(o.total||0).toFixed(2),
+                    new Date(o.createdAt||Date.now()).toLocaleDateString(),
+                    (o.paymentMethod||'cod').toUpperCase(),
+                    formatStatus(o.status)
+                ];
+            });
+
+            autoTable(doc, {
+                head: headers,
+                body,
+                startY: 26,
+                styles: { fontSize: 9 },
+                headStyles: { fillColor: [59, 130, 246] },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: {
+                    0: { cellWidth: 28 }, // Order
+                    1: { cellWidth: 50 }, // Customer
+                    2: { cellWidth: 35 }, // Phone
+                    3: { cellWidth: 18 }, // Items
+                    4: { cellWidth: 24 }, // Total
+                    5: { cellWidth: 28 }, // Date
+                    6: { cellWidth: 26 }, // Payment
+                    7: { cellWidth: 30 }  // Status
+                },
+                didDrawPage: (data) => {
+                    const pageCount = doc.getNumberOfPages();
+                    doc.setFontSize(9);
+                    doc.text(`Page ${data.pageNumber} of ${pageCount}`, doc.internal.pageSize.getWidth() - 30, doc.internal.pageSize.getHeight() - 8);
+                }
+            });
+
+            doc.save('orders.pdf');
+        } catch (e) {
+            console.error('PDF export failed', e);
+        }
+    };
+
+    const formatStatus = (s) => {
+        switch (s) {
+            case 'pending': return 'on way' === 'on way' && 'pending'.length ? 'pending' : 'Pending';
+            case 'ready': return 'await';
+            case 'out_for_delivery': return 'on way';
+            case 'picked_up': return 'on way';
+            case 'delivered': return 'delivered';
+            case 'canceled': return 'canceled';
+            case 'failed': return 'failed';
+            default: return s || 'pending';
         }
     };
 
@@ -1209,10 +1311,128 @@ const AdminDashboard = () => {
                 );
 
             case 'orders':
+                // Derive metrics
+                const filtered = orders.filter(o => {
+                    const matchesSearch = !orderSearch || (
+                        (o._id || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
+                        (o?.customer?.name || '').toLowerCase().includes(orderSearch.toLowerCase())
+                    );
+                    const matchesStatus = orderStatus === 'all' || (o.status || 'pending') === orderStatus;
+                    const matchesPayment = orderPayment === 'all' || (o.paymentMethod || 'cod') === orderPayment;
+                    return matchesSearch && matchesStatus && matchesPayment;
+                }).sort((a,b)=>{
+                    if (orderSort === 'newest') return new Date(b.createdAt||0) - new Date(a.createdAt||0);
+                    if (orderSort === 'oldest') return new Date(a.createdAt||0) - new Date(b.createdAt||0);
+                    if (orderSort === 'amount_desc') return (b.total||0)-(a.total||0);
+                    if (orderSort === 'amount_asc') return (a.total||0)-(b.total||0);
+                    return 0;
+                });
+
+                const countBy = (status) => orders.filter(o => (o.status||'pending') === status).length;
+
                 return (
                     <div className="orders-section">
-                        <h2>Order Management</h2>
-                        <p>Order management features coming soon...</p>
+                        {/* Summary cards */}
+                        <div className="orders-kpis">
+                            <div className="kpi-card new">
+                                <div className="kpi-title">New orders</div>
+                                <div className="kpi-value">{countBy('pending')}</div>
+                            </div>
+                            <div className="kpi-card accept">
+                                <div className="kpi-title">Await accepting</div>
+                                <div className="kpi-value">{countBy('ready')}</div>
+                            </div>
+                            <div className="kpi-card onway">
+                                <div className="kpi-title">On way orders</div>
+                                <div className="kpi-value">{countBy('out_for_delivery') + countBy('picked_up')}</div>
+                            </div>
+                            <div className="kpi-card delivered">
+                                <div className="kpi-title">Delivered orders</div>
+                                <div className="kpi-value">{countBy('delivered')}</div>
+                            </div>
+                        </div>
+
+                        {/* Toolbar */}
+                        <div className="orders-toolbar">
+                            <div className="search-box">
+                                <input className="search-input" placeholder="Search by order ID or customer" value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} />
+                            </div>
+                            <div className="toolbar-right">
+                                <button className="export-btn pdf" onClick={() => exportOrdersPDF(filtered)}>Export</button>
+                                <select className="filter-select" value={orderSort} onChange={e=>setOrderSort(e.target.value)}>
+                                    <option value="newest">Sort: newest</option>
+                                    <option value="oldest">Sort: oldest</option>
+                                    <option value="amount_desc">Amount: high → low</option>
+                                    <option value="amount_asc">Amount: low → high</option>
+                                </select>
+                                <select className="filter-select" value={orderStatus} onChange={e=>setOrderStatus(e.target.value)}>
+                                    <option value="all">All statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="ready">Ready</option>
+                                    <option value="out_for_delivery">On way</option>
+                                    <option value="picked_up">Picked up</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="canceled">Canceled</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                                <select className="filter-select" value={orderPayment} onChange={e=>setOrderPayment(e.target.value)}>
+                                    <option value="all">All payments</option>
+                                    <option value="cod">Cash on delivery</option>
+                                    <option value="card">Card</option>
+                                    <option value="paypal">PayPal</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="orders-table-container">
+                            {ordersLoading ? (
+                                <div className="loading">Loading orders...</div>
+                            ) : ordersError ? (
+                                <div className="error-box">{ordersError}</div>
+                            ) : (
+                                <div className="orders-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Order</th>
+                                                <th>Customer</th>
+                                                <th>Items</th>
+                                                <th>Total</th>
+                                                <th>Date</th>
+                                                <th>Payment</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filtered.map(o => (
+                                                <tr key={o._id}>
+                                                    <td>#{(o._id||'').slice(-6)}</td>
+                                                    <td>
+                                                        <div className="order-customer">
+                                                            <div className="name">{o?.customer?.name || '-'}</div>
+                                                            <div className="sub">{o?.customer?.phone || ''}</div>
+                                                        </div>
+                                                    </td>
+                                                    <td>{Array.isArray(o.items) ? o.items.reduce((s,it)=>s+(it.quantity||0),0) : 0}</td>
+                                                    <td>${Number(o.total||0).toFixed(2)}</td>
+                                                    <td>{new Date(o.createdAt||Date.now()).toLocaleDateString()}</td>
+                                                    <td className="payment-cell">{(o.paymentMethod||'cod').toUpperCase()}</td>
+                                                    <td>
+                                                        <span className={`order-status ${o.status||'pending'}`}>
+                                                            {formatStatus(o.status)}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {filtered.length === 0 && (
+                                        <div className="empty-state">No orders match your filters.</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
 

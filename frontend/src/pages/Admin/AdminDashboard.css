@@ -8,6 +8,51 @@
     animation: fadeIn 0.5s ease-in;
 }
 
+/* Orders Section */
+.orders-section {
+    animation: fadeIn 0.3s ease-in;
+}
+.orders-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+}
+.kpi-card {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid #e5e7eb;
+}
+.kpi-card .kpi-title { color:#6b7280; font-size:13px; margin-bottom:8px; }
+.kpi-card .kpi-value { font-size:28px; font-weight:700; color:#111827; }
+.kpi-card.new { border-left-color:#6366f1; }
+.kpi-card.accept { border-left-color:#f59e0b; }
+.kpi-card.onway { border-left-color:#fbbf24; }
+.kpi-card.delivered { border-left-color:#10b981; }
+
+.orders-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.orders-toolbar .toolbar-right { display:flex; gap:8px; align-items:center; }
+
+.orders-table-container { background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.08); overflow:hidden; }
+.orders-table table { width:100%; border-collapse:collapse; }
+.orders-table th { background:#f9fafb; text-align:left; padding:12px 16px; font-size:13px; color:#374151; border-bottom:1px solid #e5e7eb; }
+.orders-table td { padding:12px 16px; border-bottom:1px solid #f3f4f6; }
+.orders-table tbody tr:hover { background:#f9fafb; }
+.payment-cell { font-weight:600; color:#334155; }
+.order-customer .name { font-weight:600; color:#111827; }
+.order-customer .sub { font-size:12px; color:#6b7280; }
+.order-status { padding:4px 10px; border-radius:12px; font-size:12px; font-weight:600; text-transform:capitalize; }
+.order-status.pending { background:#fef3c7; color:#92400e; }
+.order-status.ready { background:#e0f2fe; color:#075985; }
+.order-status.out_for_delivery, .order-status.picked_up { background:#fff7ed; color:#9a3412; }
+.order-status.delivered { background:#dcfce7; color:#166534; }
+.order-status.canceled { background:#fee2e2; color:#991b1b; }
+.order-status.failed { background:#ffe4e6; color:#9f1239; }
+.empty-state { padding:20px; text-align:center; color:#6b7280; }
+.error-box { padding:12px 16px; border-left:4px solid #ef4444; background:#fee2e2; color:#991b1b; margin-bottom:12px; }
+
 /* Stats Grid */
 .admin-stats {
     display: grid;
