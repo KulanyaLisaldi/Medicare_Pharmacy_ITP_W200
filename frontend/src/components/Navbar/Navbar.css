@@ -70,6 +70,10 @@
 .nav-item:hover {
   color: #2563eb;
 }
+.nav-item.active {
+  color: #2563eb;
+  font-weight: 600;
+}
 
 /* Buttons */
 .btn-primary {
@@ -215,13 +219,29 @@
 }
 .mobile-item {
   display: block;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0 0.5rem 1rem;
   color: #374151;
   font-size: 1rem;
   text-decoration: none;
 }
 .mobile-item:hover {
   color: #2563eb;
+}
+.mobile-item.active {
+  color: #2563eb;
+  font-weight: 600;
+  position: relative;
+}
+.mobile-item.active::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: #2563eb;
+  border-radius: 2px;
 }
 .mobile-auth {
   margin-top: 1rem;
