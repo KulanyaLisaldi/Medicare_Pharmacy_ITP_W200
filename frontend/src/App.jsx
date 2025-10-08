@@ -26,6 +26,7 @@ import Checkout from "./pages/Checkout/Checkout"
 import Orders from "./pages/Orders/Orders"
 import UploadPrescription from "./pages/UploadPrescription/UploadPrescription"
 import DialogflowChatbot from "./components/DialogflowChatbot/DialogflowChatbot"
+import Contact from "./pages/Contact/Contact"
 
 const App = () => {
   return (
@@ -60,7 +61,7 @@ const App = () => {
         <Route path="/checkout" element={<RequireAuth><Checkout /></RequireAuth>} /> 
         <Route path="/doctors" element={<Doctors />} /> 
         <Route path="/doctors/:id" element={<DoctorProfile />} /> 
-        <Route path="/contact" element={<div className="min-h-screen bg-white flex items-center justify-center"><h1 className="text-4xl font-bold text-blue-600">Contact Us Page - Coming Soon</h1></div>} /> 
+        <Route path="/contact" element={<Contact />} /> 
         <Route path="/appointments" element={<Appointments />} /> 
         <Route path="/my-appointments" element={<RequireAuth><UserAppointments /></RequireAuth>} /> 
         <Route path="/my-messages" element={<RequireAuth><MyMessages /></RequireAuth>} /> 
