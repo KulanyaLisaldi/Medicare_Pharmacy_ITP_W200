@@ -392,8 +392,8 @@ const Checkout = () => {
       setUploadError('Invalid file type. Only PDF, JPG and JPEG are allowed.')
       return
     }
-    if (prescriptionFile.size < 10 * 1024 * 1024) {
-      setUploadError('Prescription must be at least 10MB in size')
+    if (prescriptionFile.size > 10 * 1024 * 1024) {
+      setUploadError('Prescription must be less than 10MB in size')
       return
     }
     setUploading(true)
@@ -533,7 +533,7 @@ const Checkout = () => {
                   </p>
                 )}
                 {!uploadedPrescriptionMeta && (
-                  <p className="text-xs text-gray-500 mt-2">Min 10MB; PDF/JPG/JPEG only</p>
+                  <p className="text-xs text-gray-500 mt-2">Max 10MB; PDF/JPG/JPEG only</p>
                 )}
                 {uploadError && (
                   <p className="text-xs text-red-600 mt-1">{uploadError}</p>

@@ -3570,7 +3570,10 @@ function OrdersSection() {
             
 
             const allOrders = [...processedProductOrders, ...processedPrescriptionOrders];
-
+            
+            // Sort orders by creation date (newest first)
+            allOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
             setOrders(allOrders);
 
         } catch (e) {
