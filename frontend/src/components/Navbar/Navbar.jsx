@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { LogOut, ShoppingCart } from 'lucide-react'
 import './Navbar.css'
@@ -9,6 +9,7 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user, logout, isAdmin } = useAuth()
   const [cartCount, setCartCount] = useState(0)
+  const location = useLocation()
 
   useEffect(() => {
     const calc = () => {
@@ -31,6 +32,14 @@ const Navbar = () => {
     }
   }, [])
   const navigate = useNavigate()
+
+  // Function to check if a nav item is active
+  const isActive = (path) => {
+    if (path === '/') {
+      return location.pathname === '/'
+    }
+    return location.pathname.startsWith(path)
+  }
 
   const handleLogout = () => {
     logout()
@@ -64,11 +73,11 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="nav-links">
-            <Link to="/" className="nav-item">Home</Link>
-            <Link to="/products" className="nav-item">Products</Link>
-            <Link to="/doctors" className="nav-item">Doctors</Link>
-            <Link to="/about" className="nav-item">About Us</Link>
-            <Link to="/contact" className="nav-item">Contact Us</Link>
+            <Link to="/" className={`nav-item ${isActive('/') ? 'active' : ''}`}>Home</Link>
+            <Link to="/products" className={`nav-item ${isActive('/products') ? 'active' : ''}`}>Products</Link>
+            <Link to="/doctors" className={`nav-item ${isActive('/doctors') ? 'active' : ''}`}>Doctors</Link>
+            <Link to="/about" className={`nav-item ${isActive('/about') ? 'active' : ''}`}>About Us</Link>
+            <Link to="/contact" className={`nav-item ${isActive('/contact') ? 'active' : ''}`}>Contact Us</Link>
           </div>
 
           {/* Right Side Buttons */}
@@ -147,11 +156,11 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="mobile-menu">
-          <Link to="/" className="mobile-item">Home</Link>
-          <Link to="/products" className="mobile-item">Products</Link>
-          <Link to="/doctors" className="mobile-item">Doctors</Link>
-          <Link to="/about" className="mobile-item">About Us</Link>
-          <Link to="/contact" className="mobile-item">Contact Us</Link>
+          <Link to="/" className={`mobile-item ${isActive('/') ? 'active' : ''}`}>Home</Link>
+          <Link to="/products" className={`mobile-item ${isActive('/products') ? 'active' : ''}`}>Products</Link>
+          <Link to="/doctors" className={`mobile-item ${isActive('/doctors') ? 'active' : ''}`}>Doctors</Link>
+          <Link to="/about" className={`mobile-item ${isActive('/about') ? 'active' : ''}`}>About Us</Link>
+          <Link to="/contact" className={`mobile-item ${isActive('/contact') ? 'active' : ''}`}>Contact Us</Link>
 
           {!user ? (
             <div className="mobile-auth">

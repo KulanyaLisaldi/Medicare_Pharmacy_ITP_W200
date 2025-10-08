@@ -5,6 +5,44 @@ class MessageParser {
 
   parse(message) {
     const lowercase = message.toLowerCase();
+    
+    // Check if we're waiting for order number input
+    const awaitingOrderNumber = this.actionProvider?.awaitingOrderNumber;
+    const stateAwaitingOrderNumber = this.actionProvider?.stateRef?.current?.awaitingOrderNumber;
+    
+    console.log('MessageParser - awaitingOrderNumber:', awaitingOrderNumber);
+    console.log('MessageParser - state awaitingOrderNumber:', stateAwaitingOrderNumber);
+    console.log('MessageParser - actionProvider exists:', !!this.actionProvider);
+    console.log('MessageParser - stateRef exists:', !!this.actionProvider?.stateRef);
+    
+    // If either flag is true, route to order number input
+    if (awaitingOrderNumber || stateAwaitingOrderNumber) {
+      console.log('Routing to handleOrderNumberInput with:', message);
+      this.actionProvider.handleOrderNumberInput(message);
+      return;
+    }
+    
+    // Additional check: if the message looks like an order number, try to process it anyway
+    const orderNumberPattern = /^#?[a-f0-9]{8,}$/i; // Matches order numbers like #4b7fe266 or 4b7fe266
+    const looksLikeOrderNumber = orderNumberPattern.test(message.trim());
+    
+    if (looksLikeOrderNumber) {
+      console.log('Message looks like order number, routing to handleOrderNumberInput');
+      this.actionProvider.handleOrderNumberInput(message);
+      return;
+    }
+    
+    // Check if user wants to see detailed order information
+    if (lowercase.includes('yes') && this.actionProvider?.stateRef?.current?.currentOrderDetails) {
+      this.actionProvider.showDetailedOrderInfo();
+      return;
+    }
+    
+    if (lowercase.includes('no') && this.actionProvider?.stateRef?.current?.currentOrderDetails) {
+      this.actionProvider.handleThankYouMessage();
+      return;
+    }
+    
     // Route describe symptoms command to the selector
 
     // Handle greetings first
