@@ -461,6 +461,150 @@
   box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
 }
 
+/* Order Tracking Widget Styles */
+.order-tracking-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.order-header h4 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.order-number {
+  background: #3b82f6;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.order-status {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.status-badge {
+  display: inline-block;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.status-message {
+  margin: 8px 0;
+  color: #374151;
+  font-weight: 500;
+}
+
+.estimated-delivery {
+  margin: 8px 0 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-section {
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.info-section h5 {
+  margin: 0 0 8px 0;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.info-section p {
+  margin: 4px 0;
+  color: #374151;
+  font-size: 14px;
+}
+
+.info-section strong {
+  color: #1f2937;
+}
+
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.product-name {
+  font-weight: 500;
+  color: #1f2937;
+  flex: 1;
+}
+
+.product-quantity {
+  color: #6b7280;
+  font-size: 12px;
+  margin: 0 8px;
+}
+
+.product-price {
+  font-weight: 600;
+  color: #059669;
+}
+
+.tracking-error {
+  text-align: center;
+  padding: 20px;
+}
+
+.tracking-error h4 {
+  color: #dc2626;
+  margin-bottom: 8px;
+}
+
+.tracking-error p {
+  color: #6b7280;
+  margin: 0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .chatbot-container {

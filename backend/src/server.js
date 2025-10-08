@@ -16,6 +16,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import doctorRecommendationRoutes from "./routes/doctorRecommendationRoutes.js";
 import dialogflowRoutes from "./routes/dialogflowRoutes.js";
+import orderTrackingRoutes from "./routes/orderTrackingRoutes.js";
 import rateLimiter from "./middleware/rateLimiter.js";
 
 dotenv.config(); // Load .env first
@@ -59,6 +60,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/doctor-recommendations", doctorRecommendationRoutes);
 app.use("/api/dialogflow", dialogflowRoutes);
+app.use("/api/order-tracking", orderTrackingRoutes);
 
 // Connect DB and start server
 connectDB().then(() => {

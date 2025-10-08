@@ -14,15 +14,20 @@ class ActionProvider {
       });
     };
     this.createClientMessage = createClientMessage;
-    // awaitingSymptoms feature removed
-    this.awaitingSymptoms = false;
-    this.selectedMedicineCategory = null;
+     // awaitingSymptoms feature removed
+     this.awaitingSymptoms = false;
+     this.selectedMedicineCategory = null;
+     this.awaitingOrderNumber = false;
   }
 
   // Handle Dialogflow responses
   handleDialogflowResponse = async (userMessage) => {
     try {
-      // awaitingSymptoms flow removed
+      // Don't process through Dialogflow if we're waiting for order number
+      if (this.awaitingOrderNumber) {
+        console.log('Skipping Dialogflow - awaiting order number input');
+        return;
+      }
       
       const token = localStorage.getItem('token');
       
@@ -595,14 +600,104 @@ class ActionProvider {
     this.setState(prev => ({ ...prev, messages: [...prev.messages, guidance] }));
   };
 
-  handleTrackDelivery = (data) => {
-    const message = this.createChatBotMessage(
-      data.response || "I can help you track your delivery! Please provide your order number or tracking ID.",
-      { widget: 'deliveryTracking' }
-    );
-    this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
-  };
+   handleTrackDelivery = (data) => {
+     const message = this.createChatBotMessage(
+       data.response || "📦 Track Your Order\n\nI can help you track your delivery! Please provide your order number."
+     );
+     
+     // Set awaiting order number flag on both instance and state
+     this.awaitingOrderNumber = true;
+     this.setState(prev => {
+       const next = { ...prev, awaitingOrderNumber: true, messages: [...prev.messages, message] };
+       this.stateRef.current = next;
+       return next;
+     });
+     
+     console.log('Track delivery clicked, awaitingOrderNumber set to:', this.awaitingOrderNumber);
+     console.log('State awaitingOrderNumber set to:', this.stateRef.current?.awaitingOrderNumber);
+   };
 
+   // Handle order number input
+   handleOrderNumberInput = async (orderNumber) => {
+     try {
+       // Reset awaiting flag
+       this.awaitingOrderNumber = false;
+       this.setState(prev => {
+         const next = { ...prev, awaitingOrderNumber: false };
+         this.stateRef.current = next;
+         return next;
+       });
+
+       if (!orderNumber || orderNumber.trim() === '') {
+         const message = this.createChatBotMessage('Please provide a valid order number.');
+         this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
+         return;
+       }
+
+       // Show loading message
+       const loadingMessage = this.createChatBotMessage('🔍 Looking up your order...');
+       this.setState(prev => ({ ...prev, messages: [...prev.messages, loadingMessage] }));
+
+       // Call tracking API
+       const response = await fetch('http://localhost:5001/api/order-tracking/track', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json'
+         },
+         body: JSON.stringify({ orderNumber: orderNumber.trim() })
+       });
+
+       const data = await response.json();
+
+       if (response.ok && data.success) {
+         // Show simple status message first
+         const orderDetails = data.data.order;
+         const statusMessage = data.data.statusMessage;
+         const estimatedDelivery = data.data.estimatedDelivery;
+
+         // Show simple status message
+         const statusMsg = this.createChatBotMessage(
+           `Your order status is: ${orderDetails.status.replace('_', ' ').toUpperCase()}\n\n${statusMessage}`
+         );
+         this.setState(prev => ({ ...prev, messages: [...prev.messages, statusMsg] }));
+
+         // Ask if they want detailed information
+         const detailMsg = this.createChatBotMessage(
+           "Would you like to see detailed order information?"
+         );
+         this.setState(prev => ({ ...prev, messages: [...prev.messages, detailMsg] }));
+
+         // Store order details for potential detailed view
+         this.setState(prev => ({ ...prev, currentOrderDetails: { order: orderDetails, statusMessage, estimatedDelivery } }));
+       } else {
+         // Show error message
+         const errorMessage = this.createChatBotMessage(
+           data.message || 'Order not found. Please check your order number and try again.'
+         );
+         this.setState(prev => ({ ...prev, messages: [...prev.messages, errorMessage] }));
+       }
+     } catch (error) {
+       console.error('Order tracking error:', error);
+       const message = this.createChatBotMessage('Sorry, I encountered an error while tracking your order. Please try again later.');
+       this.setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
+     }
+   };
+
+   // Show detailed order information
+   showDetailedOrderInfo = () => {
+     const orderDetails = this.stateRef?.current?.currentOrderDetails;
+     if (!orderDetails) return;
+
+     const orderInfo = this.createChatBotMessage('', { 
+       widget: 'orderTracking', 
+       payload: { 
+         order: orderDetails.order, 
+         statusMessage: orderDetails.statusMessage, 
+         estimatedDelivery: orderDetails.estimatedDelivery 
+       } 
+     });
+     this.setState(prev => ({ ...prev, messages: [...prev.messages, orderInfo] }));
+   };
 
   handleDefaultResponse = (data) => {
     const message = this.createChatBotMessage(
