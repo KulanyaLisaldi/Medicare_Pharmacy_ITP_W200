@@ -4,8 +4,6 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { createServer } from "http";
-import { Server } from "socket.io";
 import { connectDB } from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
@@ -20,21 +18,12 @@ import doctorRecommendationRoutes from "./routes/doctorRecommendationRoutes.js";
 import dialogflowRoutes from "./routes/dialogflowRoutes.js";
 import orderTrackingRoutes from "./routes/orderTrackingRoutes.js";
 import rateLimiter from "./middleware/rateLimiter.js";
-import { setupSocketHandlers } from "./utils/socketHandlers.js";
 import cron from 'node-cron';
 import { checkLowStockAndSendReorderEmails } from './controllers/productController.js';
 
 dotenv.config(); // Load .env first
 
 const app = express();
-const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST"]
-  }
-});
-
 const PORT = process.env.PORT || 5001;
 
 // Get __dirname equivalent for ES modules
@@ -75,14 +64,8 @@ app.use("/api/doctor-recommendations", doctorRecommendationRoutes);
 app.use("/api/dialogflow", dialogflowRoutes);
 app.use("/api/order-tracking", orderTrackingRoutes);
 
-// Setup Socket.IO handlers
-setupSocketHandlers(io);
-
 // Connect DB and start server
 connectDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`WebSocket server ready for real-time connections`);
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   
   // Schedule low stock check to run every 30 minutes
@@ -90,4 +73,6 @@ connectDB().then(() => {
     console.log('Running scheduled low stock check...');
     await checkLowStockAndSendReorderEmails();
   });
+});
+
 });
