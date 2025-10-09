@@ -1,4 +1,6 @@
 import Product from "../models/Product.js";
+import { sendReorderEmail } from "../utils/mailer.js";
+import AuditLog from "../models/AuditLog.js";
 
 export async function getProduct(req, res) {
     try {
@@ -73,6 +75,93 @@ export async function uploadProductImage(req, res) {
     } catch (error) {
         console.error('Error in uploadProductImage', error);
         return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+export async function checkLowStockAndSendReorderEmails(req, res) {
+    try {
+        const lowStockProducts = await Product.find({
+            $expr: { $lte: ["$stock", "$reorderLevel"] },
+            reorderLevel: { $gt: 0 },
+            supplierEmail: { $ne: null, $ne: '' }
+        });
+
+        if (lowStockProducts.length === 0) {
+            if (res) return res.status(200).json({ message: 'No low stock products found to reorder.' });
+            return;
+        }
+
+        const productsBySupplier = lowStockProducts.reduce((acc, product) => {
+            if (!acc[product.supplierEmail]) {
+                acc[product.supplierEmail] = [];
+            }
+            acc[product.supplierEmail].push(product);
+            return acc;
+        }, {});
+
+        let totalSuppliersNotified = 0;
+        for (const supplierEmail in productsBySupplier) {
+            const productsToReorder = productsBySupplier[supplierEmail];
+            try {
+                await sendReorderEmail(supplierEmail, productsToReorder);
+                totalSuppliersNotified++;
+                // Log the email sent
+                await AuditLog.create({
+                    action: 'reorder_email_sent',
+                    metadata: {
+                        supplierEmail,
+                        items: productsToReorder.map(p => ({
+                            _id: p._id,
+                            name: p.name,
+                            stock: p.stock,
+                            reorderLevel: p.reorderLevel
+                        }))
+                    },
+                    // If triggered by a user, req.user will be available
+                    userId: req?.user?._id || null,
+                    ip: req?.ip || null,
+                    userAgent: req?.headers?.['user-agent'] || null,
+                });
+            } catch (emailError) {
+                console.error(`Failed to send reorder email to ${supplierEmail}:`, emailError);
+                // Continue processing other suppliers even if one fails
+            }
+        }
+
+        if (res) {
+            return res.status(200).json({
+                message: `Low stock check completed. ${totalSuppliersNotified} suppliers notified.`,
+                totalSuppliersNotified
+            });
+        }
+    } catch (error) {
+        console.error('Error in checkLowStockAndSendReorderEmails:', error);
+        if (res) return res.status(500).json({ message: 'Internal server error during low stock check.' });
+    }
+}
+
+export async function getReorderEmailLogs(req, res) {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const logs = await AuditLog.find({ action: 'reorder_email_sent' })
+            .sort({ createdAt: -1 })
+            .limit(limit);
+        return res.status(200).json(logs);
+    } catch (error) {
+        console.error('Error in getReorderEmailLogs:', error);
+        return res.status(500).json({ message: 'Internal server error fetching reorder email logs.' });
+    }
+}
+
+export async function deleteReorderEmailLog(req, res) {
+    try {
+        const { id } = req.params;
+        const deleted = await AuditLog.findOneAndDelete({ _id: id, action: 'reorder_email_sent' });
+        if (!deleted) return res.status(404).json({ message: 'Log not found' });
+        return res.status(200).json({ message: 'Log deleted' });
+    } catch (error) {
+        console.error('Error in deleteReorderEmailLog:', error);
+        return res.status(500).json({ message: 'Internal server error deleting reorder email log.' });
     }
 }
 

@@ -1462,3 +1462,106 @@
 .resend-verification-btn:active {
     background: #b45309;
 }
+
+/* Inventory Analytics */
+.inventory-section h2 {
+    margin: 0 0 14px 0;
+}
+
+.inventory-analytics {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.inventory-analytics .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.inventory-analytics .kpi-card {
+    background: #ffffff;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border-left: 4px solid #2563eb;
+}
+
+.inventory-analytics .kpi-card .kpi-title {
+    color: #6b7280;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.inventory-analytics .kpi-card .kpi-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.inventory-analytics .card {
+    background: #ffffff;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.inventory-analytics .card-title {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 12px;
+}
+
+/* Make chart taller */
+.inventory-analytics .card canvas {
+    max-height: 360px !important;
+}
+
+/* Top store list */
+.inventory-analytics .simple-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.inventory-analytics .list-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.inventory-analytics .list-row .rank {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #eff6ff;
+    color: #1d4ed8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.inventory-analytics .list-row .name {
+    color: #111827;
+    font-weight: 600;
+}
+
+.inventory-analytics .list-row .value {
+    color: #374151;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .inventory-analytics .kpi-card .kpi-value { font-size: 28px; }
+    .inventory-analytics .card canvas { max-height: 300px !important; }
+}

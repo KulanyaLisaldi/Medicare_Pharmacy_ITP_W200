@@ -313,4 +313,171 @@ export async function sendStaffWelcomeEmail(toEmail, name, role, additionalInfo 
     if (preview) console.info('Staff welcome email preview:', preview)
 }
 
+export async function sendAppointmentConfirmationEmail(appointmentData) {
+    const {
+        patientEmail,
+        patientName,
+        doctorName,
+        specialization,
+        appointmentNumber,
+        date,
+        startTime,
+        location,
+        mode,
+        notes,
+        documents
+    } = appointmentData;
+
+    // Format date and time
+    const appointmentDate = new Date(date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    const appointmentTime = new Date(`2000-01-01T${startTime}`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    // Documents section
+    let documentsSection = '';
+    if (documents && documents.length > 0) {
+        documentsSection = `
+            <div style="background-color: #f0f9ff; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                <h3 style="color: #1e40af; margin: 0 0 10px 0; font-size: 18px;">📎 Attached Documents:</h3>
+                <ul style="color: #1e40af; margin: 0; padding-left: 20px;">
+                    ${documents.map(doc => `<li>${doc.originalName}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+            <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #2563eb; margin: 0; font-size: 28px;">Appointment Confirmed! ✅</h1>
+                </div>
+                
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear <strong>${patientName}</strong>,
+                </p>
+                
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    Your appointment has been successfully booked! We're looking forward to providing you with excellent healthcare services.
+                </p>
+                
+                <div style="background-color: #f0f9ff; border-left: 4px solid #2563eb; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                    <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 18px;">📋 Appointment Details:</h3>
+                    <div style="color: #1e40af; font-size: 14px; line-height: 1.8;">
+                        <p style="margin: 5px 0;"><strong>Appointment Number:</strong> ${appointmentNumber}</p>
+                        <p style="margin: 5px 0;"><strong>Doctor:</strong> Dr. ${doctorName}</p>
+                        <p style="margin: 5px 0;"><strong>Specialization:</strong> ${specialization}</p>
+                        <p style="margin: 5px 0;"><strong>Date:</strong> ${appointmentDate}</p>
+                        <p style="margin: 5px 0;"><strong>Time:</strong> ${appointmentTime}</p>
+                        <p style="margin: 5px 0;"><strong>Location:</strong> ${location}</p>
+                        <p style="margin: 5px 0;"><strong>Mode:</strong> ${mode === 'online' ? 'Online Consultation' : 'In-Person Visit'}</p>
+                        ${notes ? `<p style="margin: 5px 0;"><strong>Notes:</strong> ${notes}</p>` : ''}
+                    </div>
+                </div>
+                
+                ${documentsSection}
+                
+                <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                    <h3 style="color: #d97706; margin: 0 0 10px 0; font-size: 18px;">⚠️ Important Reminders:</h3>
+                    <ul style="color: #d97706; margin: 0; padding-left: 20px; font-size: 14px;">
+                        <li>Please arrive 10-15 minutes before your appointment time</li>
+                        <li>Bring a valid ID and any relevant medical documents</li>
+                        ${mode === 'online' ? '<li>For online consultations, ensure you have a stable internet connection</li>' : ''}
+                        <li>If you need to reschedule or cancel, please contact us at least 24 hours in advance</li>
+                    </ul>
+                </div>
+                
+                <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                    <h3 style="color: #047857; margin: 0 0 10px 0; font-size: 18px;">📞 Need Help?</h3>
+                    <p style="color: #047857; margin: 0; font-size: 14px;">
+                        If you have any questions or need to make changes to your appointment, please contact our support team.
+                    </p>
+                </div>
+                
+                <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-top: 30px; text-align: center;">
+                    Thank you for choosing MediCare for your healthcare needs. We look forward to seeing you soon!
+                </p>
+                
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                        © 2024 MediCare. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const transporter = await getTransporter();
+    const info = await transporter.sendMail({
+        from: process.env.MAIL_FROM || 'no-reply@medicare.local',
+        to: patientEmail,
+        subject: `Appointment Confirmed - ${appointmentNumber} | MediCare`,
+        html
+    });
+    
+    const preview = nodemailer.getTestMessageUrl(info);
+    if (preview) console.info('Appointment confirmation email preview:', preview);
+}
+
+export async function sendReorderEmail(toEmail, products) {
+    const productListHtml = products.map(p => `
+        <li>${p.name} (Current Stock: ${p.stock}, Reorder Level: ${p.reorderLevel})</li>
+    `).join('');
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+            <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #dc2626; margin: 0; font-size: 28px;">Low Stock Alert - Reorder Request</h1>
+                </div>
+
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear Supplier,
+                </p>
+
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    This is an automated notification from MediCare Pharmacy. The following products are running low in stock and require reordering:
+                </p>
+
+                <ul style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px; padding-left: 20px;">
+                    ${productListHtml}
+                </ul>
+
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                    Please process a reorder for these items at your earliest convenience.
+                </p>
+
+                <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-top: 30px; text-align: center;">
+                    If you have any questions, please contact us.
+                </p>
+
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                        © 2024 MediCare. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const transporter = await getTransporter();
+    const info = await transporter.sendMail({
+        from: process.env.MAIL_FROM || 'no-reply@medicare.local',
+        to: toEmail,
+        subject: 'MediCare Pharmacy: Low Stock Reorder Request',
+        html
+    });
+    const preview = nodemailer.getTestMessageUrl(info);
+    if (preview) console.info('Reorder email preview:', preview);
+}
+
 
