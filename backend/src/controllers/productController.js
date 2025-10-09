@@ -153,4 +153,16 @@ export async function getReorderEmailLogs(req, res) {
     }
 }
 
+export async function deleteReorderEmailLog(req, res) {
+    try {
+        const { id } = req.params;
+        const deleted = await AuditLog.findOneAndDelete({ _id: id, action: 'reorder_email_sent' });
+        if (!deleted) return res.status(404).json({ message: 'Log not found' });
+        return res.status(200).json({ message: 'Log deleted' });
+    } catch (error) {
+        console.error('Error in deleteReorderEmailLog:', error);
+        return res.status(500).json({ message: 'Internal server error deleting reorder email log.' });
+    }
+}
+
 
