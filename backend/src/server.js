@@ -18,6 +18,8 @@ import doctorRecommendationRoutes from "./routes/doctorRecommendationRoutes.js";
 import dialogflowRoutes from "./routes/dialogflowRoutes.js";
 import orderTrackingRoutes from "./routes/orderTrackingRoutes.js";
 import rateLimiter from "./middleware/rateLimiter.js";
+import cron from 'node-cron';
+import { checkLowStockAndSendReorderEmails } from './controllers/productController.js';
 
 dotenv.config(); // Load .env first
 
@@ -65,4 +67,10 @@ app.use("/api/order-tracking", orderTrackingRoutes);
 // Connect DB and start server
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  
+  // Schedule low stock check to run every 30 minutes
+  cron.schedule('*/30 * * * *', async () => {
+    console.log('Running scheduled low stock check...');
+    await checkLowStockAndSendReorderEmails();
+  });
 });

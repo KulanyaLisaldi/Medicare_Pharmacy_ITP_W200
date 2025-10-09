@@ -428,4 +428,56 @@ export async function sendAppointmentConfirmationEmail(appointmentData) {
     if (preview) console.info('Appointment confirmation email preview:', preview);
 }
 
+export async function sendReorderEmail(toEmail, products) {
+    const productListHtml = products.map(p => `
+        <li>${p.name} (Current Stock: ${p.stock}, Reorder Level: ${p.reorderLevel})</li>
+    `).join('');
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+            <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #dc2626; margin: 0; font-size: 28px;">Low Stock Alert - Reorder Request</h1>
+                </div>
+
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    Dear Supplier,
+                </p>
+
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+                    This is an automated notification from MediCare Pharmacy. The following products are running low in stock and require reordering:
+                </p>
+
+                <ul style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 20px; padding-left: 20px;">
+                    ${productListHtml}
+                </ul>
+
+                <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                    Please process a reorder for these items at your earliest convenience.
+                </p>
+
+                <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-top: 30px; text-align: center;">
+                    If you have any questions, please contact us.
+                </p>
+
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                        © 2024 MediCare. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const transporter = await getTransporter();
+    const info = await transporter.sendMail({
+        from: process.env.MAIL_FROM || 'no-reply@medicare.local',
+        to: toEmail,
+        subject: 'MediCare Pharmacy: Low Stock Reorder Request',
+        html
+    });
+    const preview = nodemailer.getTestMessageUrl(info);
+    if (preview) console.info('Reorder email preview:', preview);
+}
+
 
