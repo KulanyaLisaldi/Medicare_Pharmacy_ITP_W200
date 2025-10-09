@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
-import { listProducts, createProduct, updateProduct, deleteProduct, getProduct, uploadProductImage, checkLowStockAndSendReorderEmails, getReorderEmailLogs } from '../controllers/productController.js';
+import { listProducts, createProduct, updateProduct, deleteProduct, getProduct, uploadProductImage, checkLowStockAndSendReorderEmails, getReorderEmailLogs, deleteReorderEmailLog } from '../controllers/productController.js';
 import { uploadProductImage as uploadMiddleware } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
@@ -17,6 +17,7 @@ router.post('/upload-image', authenticateToken, uploadMiddleware.single('image')
 // Automated Reorder System Endpoints
 router.post('/reorder/check', authenticateToken, checkLowStockAndSendReorderEmails);
 router.get('/reorder/logs', authenticateToken, getReorderEmailLogs);
+router.delete('/reorder/logs/:id', authenticateToken, deleteReorderEmailLog);
 
 export default router;
 
