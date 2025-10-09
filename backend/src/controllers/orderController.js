@@ -1,5 +1,6 @@
 import Order from '../models/Order.js'
 import Product from '../models/Product.js'
+import { geocodeAddress, generateOrderNumber } from '../utils/geocoding.js'
 
 // Check stock availability for cart items
 export const checkStockAvailability = async (req, res) => {
@@ -150,6 +151,23 @@ export const createOrder = async (req, res) => {
 
     const computedTotal = normalizedItems.reduce((s, it) => s + it.lineTotal, 0)
 
+    // Geocode the delivery address
+    let deliveryCoordinates = null;
+    if (customer?.address && deliveryType === 'home_delivery') {
+      try {
+        const geocodeResult = await geocodeAddress(customer.address);
+        deliveryCoordinates = {
+          latitude: geocodeResult.latitude,
+          longitude: geocodeResult.longitude,
+          address: geocodeResult.formattedAddress || customer.address,
+          placeId: geocodeResult.placeId
+        };
+      } catch (error) {
+        console.warn('Failed to geocode address:', error.message);
+        // Continue without coordinates if geocoding fails
+      }
+    }
+
     // Create the order
     const order = await Order.create({
       user: userId,
@@ -158,12 +176,14 @@ export const createOrder = async (req, res) => {
       paymentMethod: paymentMethod || 'cod',
       deliveryType: deliveryType || 'home_delivery',
       status: 'pending',
+      orderNumber: generateOrderNumber(),
       customer: {
         name: customer?.name,
         phone: customer?.phone,
         address: customer?.address,
         notes: customer?.notes || ''
-      }
+      },
+      deliveryCoordinates: deliveryCoordinates
     })
 
     // Stock is already reserved when items are added to cart

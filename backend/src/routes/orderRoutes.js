@@ -1,6 +1,7 @@
 import express from 'express'
 import { authenticateToken, requirePharmacist, requireAdmin, requireDeliveryAgent } from '../middleware/auth.js'
 import { createOrder, listMyOrders, listAllOrders, listDeliveryOrders, getOrderById, updateOrder, confirmPreparation, checkStockAvailability, cancelOrder, deleteOrder, reserveStock, releaseStock } from '../controllers/orderController.js'
+import { getLiveTracking } from '../controllers/deliveryController.js'
 
 const router = express.Router()
 
@@ -20,6 +21,9 @@ router.get('/', requirePharmacist, listAllOrders)
 router.get('/:id', requirePharmacist, getOrderById)
 router.patch('/:id', requirePharmacist, updateOrder)
 router.post('/:id/confirm-preparation', requirePharmacist, confirmPreparation)
+
+// Public tracking endpoint (no authentication required)
+router.get('/:orderId/tracking', getLiveTracking)
 
 export default router
 

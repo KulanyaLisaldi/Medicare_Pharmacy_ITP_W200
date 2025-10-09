@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API Test</title>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+        .error {
+            color: red;
+            padding: 20px;
+            border: 1px solid red;
+            margin: 20px 0;
+        }
+        .success {
+            color: green;
+            padding: 20px;
+            border: 1px solid green;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Maps API Test</h1>
+    <div id="status"></div>
+    <div id="map"></div>
+    
+    <script>
+        const API_KEY = 'AIzaSyD1bRRiA2aFh8uNRl32KayagVKZl865TnY';
+        const statusDiv = document.getElementById('status');
+        
+        function showError(message) {
+            statusDiv.innerHTML = `<div class="error">❌ ${message}</div>`;
+        }
+        
+        function showSuccess(message) {
+            statusDiv.innerHTML = `<div class="success">✅ ${message}</div>`;
+        }
+        
+        function initMap() {
+            try {
+                const map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 6.9271, lng: 79.8612 },
+                    zoom: 15
+                });
+                
+                // Add a marker
+                new google.maps.Marker({
+                    position: { lat: 6.9271, lng: 79.8612 },
+                    map: map,
+                    title: 'Test Location'
+                });
+                
+                showSuccess('Google Maps loaded successfully! API key is working.');
+            } catch (error) {
+                showError(`Map initialization failed: ${error.message}`);
+            }
+        }
+        
+        function handleError() {
+            showError('Google Maps API authentication failed. Check your API key configuration.');
+        }
+        
+        // Set up error handler
+        window.gm_authFailure = handleError;
+        
+        // Load Google Maps
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap`;
+        script.async = true;
+        script.defer = true;
+        
+        script.onerror = function() {
+            showError('Failed to load Google Maps script. Check your API key and internet connection.');
+        };
+        
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>

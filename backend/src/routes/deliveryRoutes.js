@@ -15,7 +15,11 @@ import {
   getDeliveryNotifications,
   markNotificationAsRead,
   deleteAssignment,
-  getCompletedDeliveries
+  getCompletedDeliveries,
+  updateLocation,
+  getOrderTracking,
+  getLiveTracking,
+  setOnlineStatus
 } from '../controllers/deliveryController.js';
 
 const router = express.Router();
@@ -68,5 +72,15 @@ router.delete('/assignments/:assignmentId', deleteAssignment);
 
 // Get completed delivery history
 router.get('/completed', getCompletedDeliveries);
+
+// GPS Tracking routes
+// Update delivery agent's current location
+router.post('/location/update', updateLocation);
+
+// Get tracking information for an order (for delivery agent)
+router.get('/tracking/:assignmentId', getOrderTracking);
+
+// Set delivery agent online/offline status
+router.patch('/status/online', setOnlineStatus);
 
 export default router;
