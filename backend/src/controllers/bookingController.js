@@ -2,6 +2,7 @@ import Appointment from "../models/Appointment.js";
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
+import { sendAppointmentConfirmationEmail } from "../utils/mailer.js";
 
 // Public: create a booking for an appointment session
 export async function createBooking(req, res) {
@@ -98,6 +99,26 @@ export async function createBooking(req, res) {
                 notes: notes
             }
         });
+
+        // Send email confirmation to patient
+        try {
+            await sendAppointmentConfirmationEmail({
+                patientEmail,
+                patientName,
+                doctorName: doctor ? `${doctor.firstName} ${doctor.lastName}` : 'Doctor',
+                specialization: doctor?.specialization || '',
+                appointmentNumber,
+                date: session.date,
+                startTime: bookedSlot.time,
+                location: session.location || 'MediCare Clinic',
+                mode: session.mode || 'physical',
+                notes: notes || '',
+                documents: documents.length > 0 ? documents : null
+            });
+        } catch (emailError) {
+            console.error('Failed to send appointment confirmation email:', emailError);
+            // Don't fail the booking if email fails
+        }
 
         return res.status(201).json({ 
             message: 'Booked successfully', 
