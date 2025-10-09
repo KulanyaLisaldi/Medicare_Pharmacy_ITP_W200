@@ -12,18 +12,20 @@ import {
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
     Filler
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 
 ChartJS.register(
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
@@ -92,6 +94,67 @@ const AdminDashboard = () => {
     const [productsCount, setProductsCount] = useState(0);
     const [notifications, setNotifications] = useState([]);
     const [notificationCount, setNotificationCount] = useState(0);
+
+    const InventoryAnalytics = () => {
+        if (invLoading) return <div className="inventory-analytics"><div className="loading">Loading analytics...</div></div>;
+        if (invError) return <div className="inventory-analytics"><div className="error">{invError}</div></div>;
+        if (!invReport) return <div className="inventory-analytics"><div className="empty">No data</div></div>;
+
+        const totalEarnings = Number(invReport.summary?.totalRevenue || 0);
+        const averageEarnings = Number(invReport.summary?.averageOrderValue || 0);
+        const orders30 = invReport.orderAnalysis?.orderTrends || [];
+        const topSelling = invReport.orderAnalysis?.topSellingProducts || [];
+
+        const barData = {
+            labels: orders30.map(o => o.date.slice(5)),
+            datasets: [{
+                label: 'Revenue',
+                data: orders30.map(o => o.revenue || 0),
+                backgroundColor: 'rgba(37, 99, 235, 0.5)',
+                borderColor: 'rgb(37, 99, 235)'
+            }]
+        };
+
+        const barOptions = { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } };
+
+        return (
+            <div className="inventory-analytics">
+                <div className="kpi-grid">
+                    <div className="kpi-card">
+                        <div className="kpi-title">Total Earnings</div>
+                        <div className="kpi-value">Rs. {totalEarnings.toFixed(2)}</div>
+                    </div>
+                    <div className="kpi-card">
+                        <div className="kpi-title">Average Order Value</div>
+                        <div className="kpi-value">Rs. {averageEarnings.toFixed(2)}</div>
+                    </div>
+                    <div className="kpi-card">
+                        <div className="kpi-title">Orders (30d)</div>
+                        <div className="kpi-value">{orders30.reduce((s,o)=>s+(o.count||0),0)}</div>
+                    </div>
+                </div>
+
+                <div className="card">
+                    <div className="card-title">Regular Sales (Revenue by Day)</div>
+                    <Bar data={barData} options={barOptions} />
+                </div>
+
+                <div className="card">
+                    <div className="card-title">Top Store</div>
+                    <ul className="simple-list">
+                        {topSelling.slice(0,5).map((p,idx) => (
+                            <li key={idx} className="list-row">
+                                <span className="rank">{idx+1}</span>
+                                <span className="name">{p.name}</span>
+                                <span className="value">{p.quantity}</span>
+                            </li>
+                        ))}
+                        {topSelling.length === 0 && <li className="muted">No sales yet</li>}
+                    </ul>
+                </div>
+            </div>
+        );
+    };
     const [showNotificationPopup, setShowNotificationPopup] = useState(false);
     // Orders state
     const [orders, setOrders] = useState([]);
@@ -101,6 +164,11 @@ const AdminDashboard = () => {
     const [orderStatus, setOrderStatus] = useState('all');
     const [orderPayment, setOrderPayment] = useState('all');
     const [orderSort, setOrderSort] = useState('newest');
+
+    // Inventory analytics state
+    const [invLoading, setInvLoading] = useState(false);
+    const [invError, setInvError] = useState('');
+    const [invReport, setInvReport] = useState(null);
 
     const sidebarItems = [
         { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
@@ -116,6 +184,27 @@ const AdminDashboard = () => {
     useEffect(() => {
         fetchUsers();
     }, [user]);
+    // Load inventory analytics when inventory section active
+    useEffect(() => {
+        const loadInventoryAnalytics = async () => {
+            if (activeSection !== 'inventory') return;
+            try {
+                setInvLoading(true);
+                setInvError('');
+                const res = await fetch('http://localhost:5001/api/reports/pharmacy', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const json = await res.json();
+                if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to load analytics');
+                setInvReport(json.data);
+            } catch (e) {
+                setInvError(e.message);
+            } finally {
+                setInvLoading(false);
+            }
+        };
+        loadInventoryAnalytics();
+    }, [activeSection]);
 
     useEffect(() => {
         // Get recently registered users (last 5 users)
@@ -197,7 +286,7 @@ const AdminDashboard = () => {
             doc.setFontSize(10);
             doc.text(`Generated: ${generatedAt}`, 14, 20);
 
-            const headers = [['Order', 'Customer', 'Phone', 'Items', 'Total ($)', 'Date', 'Payment', 'Status']];
+            const headers = [['Order', 'Customer', 'Phone', 'Items', 'Total (Rs.)', 'Date', 'Payment', 'Status']];
             const body = rows.map(o => {
                 const count = Array.isArray(o.items) ? o.items.reduce((s,it)=>s+(it.quantity||0),0) : 0;
                 return [
@@ -205,7 +294,7 @@ const AdminDashboard = () => {
                     o?.customer?.name || '-',
                     o?.customer?.phone || '-',
                     String(count),
-                    Number(o.total||0).toFixed(2),
+                    `Rs. ${Number(o.total||0).toFixed(2)}`,
                     new Date(o.createdAt||Date.now()).toLocaleDateString(),
                     (o.paymentMethod||'cod').toUpperCase(),
                     formatStatus(o.status)
@@ -1305,8 +1394,8 @@ const AdminDashboard = () => {
             case 'inventory':
                 return (
                     <div className="inventory-section">
-                        <h2>Inventory Management</h2>
-                        <p>Inventory management features coming soon...</p>
+                        <h2>Inventory Analytics</h2>
+                        <InventoryAnalytics />
                     </div>
                 );
 
