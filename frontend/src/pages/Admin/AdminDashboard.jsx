@@ -1548,8 +1548,8 @@ const AdminDashboard = () => {
                                 <select className="filter-select" value={orderPayment} onChange={e=>setOrderPayment(e.target.value)}>
                                     <option value="all">All payments</option>
                                     <option value="cod">Cash on delivery</option>
-                                    <option value="card">Card</option>
-                                    <option value="paypal">PayPal</option>
+                                    
+                                    
                                 </select>
                             </div>
                         </div>
@@ -1585,7 +1585,7 @@ const AdminDashboard = () => {
                                                         </div>
                                                     </td>
                                                     <td>{Array.isArray(o.items) ? o.items.reduce((s,it)=>s+(it.quantity||0),0) : 0}</td>
-                                                    <td>${Number(o.total||0).toFixed(2)}</td>
+                                                    <td>Rs.{Number(o.total||0).toFixed(2)}</td>
                                                     <td>{new Date(o.createdAt||Date.now()).toLocaleDateString()}</td>
                                                     <td className="payment-cell">{(o.paymentMethod||'cod').toUpperCase()}</td>
                                                     <td>
