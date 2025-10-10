@@ -4,6 +4,18 @@ import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
 import './MyMessages.css';
 
+const stripContactHeader = (text) => {
+  if (!text) return '';
+  const removedCombined = text.replace(/^From:[\s\S]*?(\n\n|\r\n\r\n)/, '');
+  const removedLines = removedCombined
+    .replace(/^From:.*$/mi, '')
+    .replace(/^Email:.*$/mi, '')
+    .replace(/^Phone:.*$/mi, '')
+    .replace(/^\s*\n/, '');
+  const trimmed = removedLines.trimStart();
+  return trimmed.length ? trimmed : text;
+};
+
 const MyMessages = () => {
   const { user, token } = useAuth();
   const [conversations, setConversations] = useState([]);
@@ -16,6 +28,19 @@ const MyMessages = () => {
   const [error, setError] = useState('');
   const [replyTo, setReplyTo] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null);
+
+  const getDisplayName = (otherUser) => {
+    if (!otherUser) return '';
+    if (otherUser.role === 'admin') return 'Admin';
+    if (otherUser.role === 'doctor') return `Dr. ${otherUser.firstName || ''} ${otherUser.lastName || ''}`.trim();
+    return `${otherUser.firstName || ''} ${otherUser.lastName || ''}`.trim();
+  };
+
+  const getAvatarInitial = (otherUser) => {
+    if (!otherUser) return 'U';
+    if (otherUser.role === 'admin') return 'A';
+    return otherUser.firstName?.charAt(0)?.toUpperCase() || 'U';
+  };
 
   useEffect(() => {
     if (user && token) {
@@ -125,7 +150,9 @@ const MyMessages = () => {
       const formData = new FormData();
       formData.append('receiverId', selectedConversation.otherUser._id);
       formData.append('message', composed);
-      formData.append('appointmentId', selectedConversation.lastMessage?.appointmentId || null);
+      if (selectedConversation.lastMessage?.appointmentId) {
+        formData.append('appointmentId', selectedConversation.lastMessage.appointmentId);
+      }
 
       // Add uploaded file if exists
       if (uploadedFile) {
@@ -271,15 +298,13 @@ const MyMessages = () => {
                       onClick={() => handleConversationSelect(conversation)}
                     >
                       <div className="conversation-avatar">
-                        {conversation.otherUser?.firstName?.charAt(0)?.toUpperCase() || 'D'}
+                        {getAvatarInitial(conversation.otherUser)}
                       </div>
                       <div className="conversation-info">
-                        <div className="conversation-name">
-                          Dr. {conversation.otherUser?.firstName} {conversation.otherUser?.lastName}
-                        </div>
+                        <div className="conversation-name">{getDisplayName(conversation.otherUser)}</div>
                         <div className="conversation-preview">
-                          {conversation.lastMessage?.message?.substring(0, 50)}
-                          {conversation.lastMessage?.message?.length > 50 ? '...' : ''}
+                          {stripContactHeader(conversation.lastMessage?.message)?.substring(0, 50)}
+                          {stripContactHeader(conversation.lastMessage?.message)?.length > 50 ? '...' : ''}
                         </div>
                         <div className="conversation-meta">
                           {conversation.unreadCount > 0 && (
@@ -303,7 +328,7 @@ const MyMessages = () => {
                         {selectedConversation.otherUser?.firstName?.charAt(0)?.toUpperCase() || 'D'}
                       </div>
                       <div className="conversation-details">
-                        <h3>Dr. {selectedConversation.otherUser?.firstName} {selectedConversation.otherUser?.lastName}</h3>
+                        <h3>{getDisplayName(selectedConversation.otherUser)}</h3>
                         <p>{selectedConversation.otherUser?.specialization}</p>
                       </div>
                     </div>
@@ -323,7 +348,7 @@ const MyMessages = () => {
                             className={`message-item ${message.senderId._id === user._id ? 'sent' : 'received'}`}
                           >
                               <div className="message-content">
-                                <div className="message-text">{message.message}</div>
+                                <div className="message-text">{stripContactHeader(message.message)}</div>
                                 {message.documentPath && (
                                   <div className="message-document">
                                     <div className="document-item">

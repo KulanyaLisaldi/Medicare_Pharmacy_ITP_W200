@@ -19,6 +19,7 @@ import {
     Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
+import AdminMessages from './AdminMessages.jsx';
 
 ChartJS.register(
     CategoryScale,
@@ -1637,7 +1638,7 @@ const AdminDashboard = () => {
                 return (
                     <div className="messages-section">
                         <h2>Messages</h2>
-                        <p>Messages features coming soon...</p>
+                        <AdminMessages />
                     </div>
                 );
 
@@ -1654,7 +1655,7 @@ const AdminDashboard = () => {
 
     //admin dashboard
 
-    return (
+            return (
         <DashboardLayout 
             title="Admin Dashboard" 
             sidebarItems={sidebarItems}
