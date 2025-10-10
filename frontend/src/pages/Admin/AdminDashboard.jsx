@@ -90,7 +90,14 @@ const AdminDashboard = () => {
         experience: ''
     });
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeSection, setActiveSection] = useState('overview');
+    const [activeSection, setActiveSection] = useState(() => {
+        try {
+            const saved = localStorage.getItem('admin.activeSection');
+            return saved || 'overview';
+        } catch {
+            return 'overview';
+        }
+    });
     const [recentUsers, setRecentUsers] = useState([]);
     const [productsCount, setProductsCount] = useState(0);
     const [notifications, setNotifications] = useState([]);
@@ -181,6 +188,18 @@ const AdminDashboard = () => {
         { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
         { id: 'messages', label: 'Messages', icon: <MessageSquare size={18} /> },
     ];
+
+    // Persist and normalize active section
+    useEffect(() => {
+        try {
+            localStorage.setItem('admin.activeSection', activeSection);
+        } catch {}
+    }, [activeSection]);
+
+    // Ensure channel creation keeps you on appointments
+    const handleAfterChannelCreated = () => {
+        setActiveSection('appointments');
+    };
 
     useEffect(() => {
         fetchUsers();
@@ -1612,7 +1631,7 @@ const AdminDashboard = () => {
                     <div className="appointments-section">
                         {/*<h2>Appointment Management</h2>*/}
                         <div className="space-y-6">
-                            <ChannelCreator />
+                            <ChannelCreator onCreated={handleAfterChannelCreated} />
                             <AdminAppointments />
                         </div>
                     </div>
@@ -2235,7 +2254,7 @@ export default AdminDashboard;
 
 // ChannelCreator Component
 
-function ChannelCreator() {
+function ChannelCreator({ onCreated }) {
     const { token } = useAuth();
     const [doctors, setDoctors] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -2384,10 +2403,10 @@ function ChannelCreator() {
             if (!res.ok) throw new Error(data.message || 'Failed to create channel');
             setMessage('Channel created');
             setForm({ doctorId: '', title: 'Consultation', specialization: '', location: '', date: '', startTime: '', endTime: '', capacity: 10, price: 0, paymentType: 'online', mode: 'physical', notes: '', slotDuration: 10 });
-            // Auto-refresh page after successful appointment creation
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // Keep user in appointments section and refresh data without losing section
+            if (typeof onCreated === 'function') {
+                onCreated();
+            }
         } catch (e) {
             setError(e.message);
         }
