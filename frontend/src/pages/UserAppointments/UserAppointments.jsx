@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
+import { jsPDF } from 'jspdf';
 
 const UserAppointments = () => {
   const { user, token } = useAuth();
@@ -146,149 +147,177 @@ const UserAppointments = () => {
     }
   };
 
-  const downloadAppointmentDetails = (appointment) => {
-    // Create HTML content for PDF
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Appointment Details - ${appointment.referenceNo}</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            line-height: 1.8;
-            color: #333;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 3px solid #2563eb;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-          }
-          .header h1 {
-            color: #2563eb;
-            margin: 0;
-            font-size: 28px;
-          }
-          .header p {
-            color: #666;
-            margin: 5px 0 0 0;
-            font-size: 14px;
-          }
-          .info-item {
-            margin-bottom: 15px;
-            font-size: 16px;
-          }
-          .info-item strong {
-            color: #2563eb;
-            font-weight: bold;
-            margin-right: 10px;
-          }
-          .notes {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8fafc;
-            border-left: 4px solid #2563eb;
-            border-radius: 4px;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 12px;
-          }
-          @media print {
-            body { margin: 20px; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>MediCare</h1>
-          <p>Appointment Details</p>
-        </div>
-
-        <div class="info-item">
-          <strong>Appointment Reference Number:</strong> ${appointment.referenceNo}
-        </div>
-        
-        <div class="info-item">
-          <strong>Slot Number:</strong> ${appointment.slotNumber || 'N/A'}
-        </div>
-        
-        <div class="info-item">
-          <strong>Date:</strong> ${formatDate(appointment.date)}
-        </div>
-        
-        <div class="info-item">
-          <strong>Time:</strong> ${appointment.slotTime ? formatTime(appointment.slotTime) : formatTime(appointment.startTime)}
-        </div>
-        
-        <div class="info-item">
-          <strong>Doctor Name:</strong> Dr. ${appointment.doctorName}
-        </div>
-        
-        <div class="info-item">
-          <strong>Specialization:</strong> ${appointment.specialization}
-        </div>
-        
-        <div class="info-item">
-          <strong>Patient Name:</strong> ${appointment.patientName}
-        </div>
-        
-        <div class="info-item">
-          <strong>Email:</strong> ${appointment.patientEmail}
-        </div>
-        
-        <div class="info-item">
-          <strong>Phone:</strong> ${appointment.patientPhone}
-        </div>
-        
-        <div class="info-item">
-          <strong>Gender:</strong> ${appointment.patientGender}
-        </div>
-        
-        <div class="info-item">
-          <strong>Age:</strong> ${appointment.patientAge}
-        </div>
-        
-        <div class="info-item">
-          <strong>Ongoing Condition:</strong> ${appointment.ongoingCondition}
-        </div>
-
-        ${appointment.notes ? `
-        <div class="notes">
-          <strong>Notes:</strong> ${appointment.notes}
-        </div>
-        ` : ''}
-
-        <div class="footer">
-          <p>Generated on ${new Date().toLocaleString()}</p>
-          <p>MediCare - Your Health, Our Priority</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    
-    // Wait for content to load, then trigger print
-    printWindow.onload = () => {
-      printWindow.focus();
-      printWindow.print();
+  const downloadAppointmentDetails = async (appointment) => {
+    try {
+      console.log('Starting PDF generation for appointment:', appointment);
       
-      // Close the window after a delay
-      setTimeout(() => {
-        printWindow.close();
-      }, 1000);
-    };
+      // Try to import jsPDF dynamically if not available
+      let PDF;
+      if (typeof jsPDF === 'undefined') {
+        console.log('jsPDF not available, importing dynamically...');
+        const jsPDFModule = await import('jspdf');
+        PDF = jsPDFModule.jsPDF;
+        console.log('jsPDF imported successfully:', PDF);
+      } else {
+        console.log('jsPDF available:', jsPDF);
+        PDF = jsPDF;
+      }
+      
+      // Create new PDF document
+      console.log('Creating PDF document...');
+      const doc = new PDF();
+      
+      // Set up colors
+      const primaryColor = [37, 99, 235]; // Blue
+      const secondaryColor = [102, 102, 102]; // Gray
+      const accentColor = [16, 185, 129]; // Green
+      
+      // User-Friendly Header
+      doc.setFillColor(...primaryColor);
+      doc.rect(0, 0, 210, 45, 'F');
+      
+      // MediCare Title
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MediCare', 105, 15, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Your Health, Our Priority', 105, 25, { align: 'center' });
+      
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Appointment Confirmation', 105, 35, { align: 'center' });
+      
+      // Reset colors
+      doc.setTextColor(0, 0, 0);
+      
+      // Main content area
+      let yPosition = 55;
+      const leftMargin = 20;
+      const rightMargin = 190;
+      
+      // Reference Number Section
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('Reference Number:', leftMargin, yPosition);
+      
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(String(appointment.referenceNo || 'N/A'), leftMargin + 5, yPosition + 8);
+      
+      yPosition += 20;
+      
+      // Appointment Time Section
+      const appointmentTime = appointment.slotTime ? formatTime(appointment.slotTime) : (appointment.startTime ? formatTime(appointment.startTime) : 'N/A');
+      const appointmentDate = appointment.date ? formatDate(appointment.date) : 'N/A';
+      
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('Appointment Time:', leftMargin, yPosition);
+      
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(`${appointmentDate} at ${appointmentTime}`, leftMargin + 5, yPosition + 8);
+      
+      yPosition += 25;
+      
+      // Patient Information Section
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('Patient Information', leftMargin, yPosition);
+      yPosition += 15;
+      
+      const patientDetails = [
+        { label: 'Name', value: String(appointment.patientName || 'N/A') },
+        { label: 'Age', value: String(appointment.patientAge || 'N/A') },
+        { label: 'Gender', value: String(appointment.patientGender || 'N/A') },
+        { label: 'Phone', value: String(appointment.patientPhone || 'N/A') },
+        { label: 'Email', value: String(appointment.patientEmail || 'N/A') },
+        { label: 'Ongoing Condition', value: String(appointment.ongoingCondition || 'N/A') }
+      ];
+      
+      patientDetails.forEach(detail => {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${detail.label}: ${detail.value}`, leftMargin + 10, yPosition);
+        yPosition += 8;
+      });
+      
+      yPosition += 10;
+      
+      // Doctor Details Section
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('Doctor Details', leftMargin, yPosition);
+      yPosition += 15;
+      
+      const doctorDetails = [
+        { label: 'Doctor', value: String(appointment.doctorName ? `Dr. ${appointment.doctorName}` : 'N/A') },
+        { label: 'Specialization', value: String(appointment.specialization || 'N/A') }
+      ];
+      
+      doctorDetails.forEach(detail => {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${detail.label}: ${detail.value}`, leftMargin + 10, yPosition);
+        yPosition += 8;
+      });
+      
+      yPosition += 10;
+      
+      // Notes Section
+      if (appointment.notes) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primaryColor);
+        doc.text('Notes', leftMargin, yPosition);
+        yPosition += 15;
+        
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text(String(appointment.notes), leftMargin + 10, yPosition);
+        yPosition += 15;
+      }
+      
+      // Footer
+      yPosition += 10;
+      doc.setFontSize(10);
+      doc.setTextColor(...secondaryColor);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, yPosition);
+      doc.text('Support: support@medicare.com', leftMargin, yPosition + 8);
+      
+      // Add page border
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.rect(10, 10, 190, 280, 'S');
+      
+      // Download the PDF
+      const referenceNo = appointment.referenceNo || 'unknown';
+      const filename = `appointment-${referenceNo}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+      
+      console.log('PDF generated successfully');
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        appointment: appointment
+      });
+      alert(`Failed to generate PDF: ${error.message}. Please try again.`);
+    }
   };
 
   const isUpcoming = (appointment) => {
