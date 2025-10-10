@@ -224,13 +224,13 @@ const ReportsSection = () => {
 
             const result = await response.json();
 
-            
+           
 
             if (result.success) {
 
                 const data = result.data;
 
-                setReportData({
+                setReportData({      //report data save into state
 
                     lowStockProducts: [...data.stockAnalysis.lowStockProducts, ...data.stockAnalysis.outOfStockProducts],
 
@@ -292,7 +292,7 @@ const ReportsSection = () => {
 
 
 
-    if (loading) {
+    if (loading) {    //show the UI when the loading
 
         return (
 
@@ -1588,6 +1588,7 @@ const PharmacistDashboard = () => {
 
 
 
+    //sidebar menue
 	const sidebar = [
 
 		{ id: 'overview', label: 'Overview', icon: <Home size={18} /> },
