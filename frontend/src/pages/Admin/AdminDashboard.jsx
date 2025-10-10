@@ -184,8 +184,6 @@ const AdminDashboard = () => {
         { id: 'inventory', label: 'Inventory', icon: <Package size={18} /> },
         { id: 'orders', label: 'Orders', icon: <ShoppingCart size={18} /> },
         { id: 'appointments', label: 'Appointments', icon: <Calendar size={18} /> },
-        { id: 'delivery', label: 'Delivery', icon: <Truck size={18} /> },
-        { id: 'reports', label: 'Reports', icon: <FileText size={18} /> },
         { id: 'messages', label: 'Messages', icon: <MessageSquare size={18} /> },
     ];
 
