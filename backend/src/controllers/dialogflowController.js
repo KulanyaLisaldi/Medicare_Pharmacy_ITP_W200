@@ -200,8 +200,8 @@ const handleViewBookings = async (userId) => {
       const date = new Date(apt.appointmentDate).toLocaleDateString();
       const time = new Date(apt.appointmentDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       response += `${index + 1}. Dr. ${apt.doctorId.firstName} ${apt.doctorId.lastName} - ${apt.doctorId.specialization}\n`;
-      response += `   📅 ${date} at ${time}\n`;
-      response += `   📍 ${apt.location || 'Main Clinic'}\n\n`;
+      response += ` 📅 ${date} at ${time}\n`;
+      response += ` 📍 ${apt.location || 'Main Clinic'}\n\n`;
     });
 
     response += "Would you like to reschedule or cancel any of these appointments?";

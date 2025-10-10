@@ -93,6 +93,53 @@ export const sendMessage = async (req, res) => {
     }
 };
 
+// Send a contact message to the admin (from Contact Us page)
+export const sendContactMessageToAdmin = async (req, res) => {
+    try {
+        const senderId = req.userId;
+        const { message, fullName, email, phone } = req.body || {};
+
+        if (!message || !message.trim()) {
+            return res.status(400).json({ success: false, message: 'Message is required' });
+        }
+
+        // Find an active admin to receive the message
+        const adminUser = await User.findOne({ role: 'admin', isActive: true });
+        if (!adminUser) {
+            return res.status(404).json({ success: false, message: 'Admin user not found' });
+        }
+
+        const conversationId = generateConversationId(senderId, adminUser._id.toString());
+
+        // Include optional contact details at the top of the message for context
+        const headerLines = [];
+        if (fullName) headerLines.push(`From: ${fullName}`);
+        if (email) headerLines.push(`Email: ${email}`);
+        if (phone) headerLines.push(`Phone: ${phone}`);
+        const composedMessage = headerLines.length > 0
+            ? `${headerLines.join(' | ')}\n\n${message.trim()}`
+            : message.trim();
+
+        const newMessage = await Message.create({
+            senderId,
+            receiverId: adminUser._id,
+            message: composedMessage,
+            conversationId
+        });
+
+        await newMessage.populate('senderId', 'firstName lastName email role');
+
+        return res.status(201).json({
+            success: true,
+            message: 'Message sent to admin successfully',
+            data: newMessage
+        });
+    } catch (error) {
+        console.error('Error sending contact message to admin:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
 // Get messages for a doctor (conversations with patients)
 export const getDoctorMessages = async (req, res) => {
     try {
@@ -478,11 +525,13 @@ export const deleteMessage = async (req, res) => {
             });
         }
 
-        // Check if the user is the sender of the message
-        if (message.senderId.toString() !== userId) {
+        // Allow delete if user is sender OR user is admin
+        const requester = await User.findById(userId).select('role');
+        const isAdmin = requester?.role === 'admin';
+        if (!isAdmin && message.senderId.toString() !== userId) {
             return res.status(403).json({ 
                 success: false, 
-                message: 'You can only delete your own messages' 
+                message: 'Not authorized to delete this message' 
             });
         }
 

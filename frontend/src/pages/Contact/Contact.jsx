@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 const Contact = () => {
   const [formData, setFormData] = useState({ fullName: '', email: '', phone: '', message: '' })
   const [status, setStatus] = useState(null)
-  const { user } = useAuth()
+  const { user, token } = useAuth()
 
   useEffect(() => {
     if (!user) return
@@ -24,19 +24,39 @@ const Contact = () => {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const { fullName, email, phone, message } = formData
     if (!fullName || !email || !message) {
       setStatus({ type: 'error', message: 'Please fill in name, email, and message.' })
       return
     }
-    // Fallback: open mail client. Backend endpoint can replace this later.
-    const subject = 'Contact from MediCare'
-    const body = `Name: ${fullName}\nEmail: ${email}${phone ? `\nPhone: ${phone}` : ''}\n\n${message}`
-    const mailto = `mailto:medicare892@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    window.location.href = mailto
-    setStatus({ type: 'success', message: 'Opening your email client to send the message.' })
+
+    try {
+      const res = await fetch('http://localhost:5001/api/messages/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          fullName,
+          email,
+          phone,
+          message
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.message || 'Failed to send message')
+      }
+
+      setStatus({ type: 'success', message: 'Message sent. Our admin will reply soon.' })
+      setFormData(prev => ({ ...prev, message: '' }))
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message })
+    }
   }
 
   return (

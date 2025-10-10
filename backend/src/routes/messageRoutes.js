@@ -1,6 +1,7 @@
 import express from 'express';
 import {
     sendMessage,
+    sendContactMessageToAdmin,
     getDoctorMessages,
     getConversationMessages,
     replyToMessage,
@@ -16,6 +17,9 @@ const router = express.Router();
 
 // Send a message with optional file upload
 router.post('/send', authenticateToken, uploadMessageFile.single('document'), sendMessage);
+
+// Send Contact Us message to admin
+router.post('/contact', authenticateToken, sendContactMessageToAdmin);
 
 // Get doctor's conversations (list of patients with messages)
 router.get('/doctor/conversations', authenticateToken, getDoctorMessages);
