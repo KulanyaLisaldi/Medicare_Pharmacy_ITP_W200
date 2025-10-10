@@ -367,7 +367,7 @@ class ActionProvider {
       "Call the hospital or clinic directly using the contact information provided in your appointment confirmation.\n\n" +
       "2️⃣ Use the Main Website\n" +
       "Visit the main website and use the 'Contact Us' or 'Support' section for appointment changes.\n\n" +
-      "3️⃣ Contact Your Doctor's Office\n" +
+      " 3️⃣ Contact Your Doctor's Office\n" +
       "Reach out to your doctor's office directly for any scheduling changes.\n\n" +
       "This ensures:\n" +
       "• Appointment data security\n" +
