@@ -14,11 +14,6 @@ A comprehensive pharmacy management system with role-based access for admins, do
 
 ## Quick Start
 
-### Prerequisites
-- Node.js (v16 or higher)
-- MongoDB
-- npm or yarn
-
 ### Installation
 
 1. **Clone the repository**
@@ -77,59 +72,6 @@ A comprehensive pharmacy management system with role-based access for admins, do
 - **Email**: admin@medicare.com
 - **Password**: Admin@12345
 
-### How to Login as Admin
-
-1. Navigate to the login page: `http://localhost:5173/login`
-2. Enter the admin credentials:
-   - Email: `admin@medicare.com`
-   - Password: `Admin@12345`
-3. Click "Sign In"
-4. You will be automatically redirected to the Admin Dashboard
-
-### Admin Dashboard Features
-
-The admin dashboard provides comprehensive system management:
-
-- **Overview**: System statistics and quick actions
-- **User Management**: Create, edit, and manage all user accounts
-  - **Staff Creation**: Create doctors, pharmacists, and delivery agents with comprehensive forms
-  - **Doctor Profiles**: Include specialization, experience, achievements, memberships, and more
-  - **Email Notifications**: Automatic verification emails on creation, welcome emails after verification
-- **Inventory Management**: Manage pharmacy inventory (coming soon)
-- **Order Management**: View and manage all orders (coming soon)
-- **Appointment Management**: Manage doctor appointments (coming soon)
-- **Delivery Management**: Track delivery status (coming soon)
-- **Sales Analytics**: View sales reports and analytics (coming soon)
-
-### Navigation Flow
-
-When an admin logs in:
-1. Login form validates credentials
-2. System checks user role
-3. Admin users are automatically redirected to `/admin/dashboard`
-4. Admin dashboard loads with role-based access control
-
-### Troubleshooting
-
-If admin login doesn't work:
-
-1. **Check if admin user exists**:
-   ```bash
-   cd backend
-   npm run seed:admin
-   ```
-
-2. **Verify database connection**:
-   - Ensure MongoDB is running
-   - Check backend server is running on port 5001
-
-3. **Check browser console**:
-   - Open developer tools (F12)
-   - Look for any error messages in the console
-
-4. **Verify environment variables**:
-   - Ensure all required environment variables are set
-   - Check database connection string
 
 ## Development
 
